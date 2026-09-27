@@ -7,6 +7,15 @@ Este é o modelo implementado em `backend/src/db/migrations/`. Ele tem duas dife
   - A rodada pode ser retomada depois de recarregar a página.
 - **`usuarios.senha_alterada_em`** (coluna nova): quando a senha muda, os JWTs emitidos antes deixam de valer.
 
+Adições da migration `002_aulas_arquivo_e_pesquisa.sql`:
+
+- **`aulas.slug`**: nulo nas aulas criadas pelo admin. Nas aulas importadas de `conteudo/aulas`, é a identidade da aula.
+- **`questoes_aula.chave`**: identidade da questão importada (o `data-pergunta` do HTML). Vem junto com `questoes_aula.ordem`, a posição da pergunta no arquivo.
+- **`usuarios.consentiu_pesquisa_em`**: data do consentimento para a pesquisa. Nulo quando não houve consentimento.
+- **`sessoes_app.standalone` e `sessoes_app.largura_tela`**: contexto da sessão (app instalado ou navegador, e largura da tela).
+- **Tabela `pontuacao_historico`**: `usuario_id`, `origem`, `referencia_id`, `pontos`, `total_apos` e `criado_em`. Cada crédito de pontos gera uma linha.
+- **Visões `pesquisa_*`**: pseudonimizadas e filtradas por consentimento, para exportação.
+
 ## Regras garantidas pelo banco
 
 - `apelido` e `email` são únicos, sem diferenciar maiúsculas de minúsculas.

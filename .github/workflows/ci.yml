@@ -28,6 +28,10 @@ jobs:
       - name: Lint e formatação
         run: npm ci && npx eslint . && npx prettier --check .
 
+      - name: Aulas (valida conteudo/aulas)
+        working-directory: backend
+        run: npm ci && npm run importar-aulas -- --validar
+
       - name: Backend (testes de integração)
         working-directory: backend
         run: npm ci && npm run test:cobertura

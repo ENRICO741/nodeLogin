@@ -194,6 +194,23 @@ a {
   font-weight: 600;
 }
 
+/* Checkbox com texto: a área inteira é clicável (alvo de toque confortável). */
+.campo-check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--esp-3);
+  min-height: var(--alvo-toque);
+  font-size: var(--texto-sm);
+  cursor: pointer;
+}
+.campo-check input {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 2px 0 0;
+  accent-color: var(--cor-primaria);
+}
+
 /* ---------- Avisos e selos ---------- */
 .aviso {
   display: flex;

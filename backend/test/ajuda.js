@@ -7,6 +7,7 @@ const app = require('../src/app');
 const { pool } = require('../src/db/pool');
 const { migrar } = require('../src/db/migrar');
 const { semear } = require('../src/db/seed');
+const { importarConteudo } = require('../src/scripts/importar-aulas');
 const mailer = require('../src/lib/mailer');
 
 const RAIZ_BACKEND = path.join(__dirname, '..');
@@ -17,6 +18,8 @@ async function prepararBanco() {
     "SELECT string_agg(quote_ident(tablename), ', ') AS tabelas FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'migracoes'",
   );
   await pool.query(`TRUNCATE ${rows[0].tabelas} CASCADE`);
+  const { erros } = await importarConteudo();
+  if (erros.length) throw new Error(`conteudo/aulas inválido: ${erros.join('; ')}`);
   await semear();
 }
 

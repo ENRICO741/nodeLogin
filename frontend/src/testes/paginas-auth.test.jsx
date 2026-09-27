@@ -79,7 +79,19 @@ describe('Cadastro', () => {
       apelido: 'maria',
       email: 'maria@empresa.com',
       senha: 'senha-forte-123',
+      consentiu_pesquisa: false,
     });
+  });
+
+  it('checkbox de consentimento marcado envia consentiu_pesquisa: true', async () => {
+    const { servidor } = await renderizarApp('/cadastro', {
+      usuario: null,
+      rotas: { 'POST /auth/cadastro': { status: 201, corpo: SESSAO }, ...rotasLogado },
+    });
+    await userEvent.click(await screen.findByRole('checkbox', { name: /Autorizo o uso anônimo/ }));
+    await preencher();
+    await screen.findByRole('heading', { name: 'Aulas' });
+    expect(servidor.enviados('POST /auth/cadastro')[0].consentiu_pesquisa).toBe(true);
   });
 
   it('erros de validação aparecem junto de cada campo, sem aviso geral', async () => {

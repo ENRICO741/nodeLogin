@@ -91,7 +91,7 @@ async function responder(rodadaId, usuarioId, { questao_id, alternativa }) {
       explicacao: questao.explicacao,
       pontos_ganhos: pontuou ? questao.pontos : 0,
       pontuacao_total: pontuou
-        ? await creditarPontos(c, usuarioId, questao.pontos)
+        ? await creditarPontos(c, usuarioId, questao.pontos, 'trivia_questao', questao_id)
         : await pontuacaoAtual(c, usuarioId),
     };
   });

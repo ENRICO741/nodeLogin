@@ -165,12 +165,8 @@ describe('questões de aula', () => {
     assert.equal(r.correta, true);
   });
 
-  test('aula inexistente dá 400 (referência inválida); questão inexistente dá 404', async () => {
-    const res = await admin
-      .api('post', `/api/admin/aulas/${UUID_INEXISTENTE}/questoes`)
-      .send(questao())
-      .expect(400);
-    assert.equal(res.body.erro.codigo, 'REFERENCIA_INVALIDA');
+  test('aula ou questão inexistente dá 404', async () => {
+    await admin.api('post', `/api/admin/aulas/${UUID_INEXISTENTE}/questoes`).send(questao()).expect(404);
     await admin.api('patch', `/api/admin/questoes-aula/${UUID_INEXISTENTE}`).send({ pontos: 1 }).expect(404);
     await admin.api('delete', `/api/admin/questoes-aula/${UUID_INEXISTENTE}`).expect(404);
   });

@@ -23,8 +23,15 @@ const esquemaPerfil = z
     profissao: textoOpcional(80),
     empresa: textoOpcional(80),
     foto_perfil_url: fotoDataUrl.nullable(),
+    // true registra o consentimento (com data); false retira.
+    consentiu_pesquisa: z.boolean(),
   })
-  .partial();
+  .partial()
+  .transform(({ consentiu_pesquisa, ...dados }) =>
+    consentiu_pesquisa === undefined
+      ? dados
+      : { ...dados, consentiu_pesquisa_em: consentiu_pesquisa ? new Date() : null },
+  );
 
 const router = Router();
 

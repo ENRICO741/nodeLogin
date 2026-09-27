@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 220" font-family="system-ui, sans-serif">
+  <rect width="480" height="220" rx="16" fill="#f1f5f9"/>
+  <rect x="40" y="30" width="400" height="160" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+  <circle cx="80" cy="70" r="18" fill="#fee2e2"/>
+  <text x="80" y="77" text-anchor="middle" font-size="20" font-weight="700" fill="#b91c1c">!</text>
+  <text x="110" y="66" font-size="15" font-weight="700" fill="#0f172a">suporte-ti@empresa-seguranca.co</text>
+  <text x="110" y="86" font-size="13" fill="#475569">URGENTE: sua conta será bloqueada</text>
+  <text x="64" y="124" font-size="14" fill="#0f172a">Confirme sua senha em até 10 minutos</text>
+  <text x="64" y="144" font-size="14" fill="#0f172a">para evitar o bloqueio do acesso.</text>
+  <rect x="64" y="156" width="150" height="24" rx="6" fill="#1e3a8a"/>
+  <text x="139" y="173" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">Confirmar senha</text>
+</svg>

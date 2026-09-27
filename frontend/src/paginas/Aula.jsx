@@ -6,6 +6,7 @@ import { api } from '../lib/api';
 import { registrarEvento } from '../lib/telemetria';
 import { useApi } from '../hooks/useApi';
 import { useQuiz } from '../hooks/useQuiz';
+import { useLeitura } from '../hooks/useLeitura';
 import { useAuth } from '../contexto/Auth';
 import { Aviso, Carregando, ErroCarregamento } from '../componentes/Estado';
 import { QuestaoCard } from '../componentes/QuestaoCard';
@@ -68,11 +69,13 @@ export function Aula() {
   const [visitaId, setVisitaId] = useState(null);
   const [resultado, setResultado] = useState(null);
   const [erroInicio, setErroInicio] = useState(null);
+  const concluirLeitura = useLeitura(id, Boolean(aula) && etapa === 'conteudo');
 
   if (carregando) return <Carregando texto="Carregando aula…" />;
   if (erro) return <ErroCarregamento erro={erro} onTentarDeNovo={recarregar} />;
 
   async function iniciar() {
+    concluirLeitura('iniciou_perguntas');
     setErroInicio(null);
     try {
       const visita = await api(`/aulas/${id}/visitas`, { metodo: 'POST' });
@@ -110,7 +113,9 @@ export function Aula() {
           <Aviso tipo="erro">{erroInicio?.message}</Aviso>
           {aula.questoes.length > 0 ? (
             <button type="button" className="botao botao--bloco" onClick={iniciar}>
-              {aula.concluida ? 'Refazer perguntas' : `Responder ${aula.questoes.length} perguntas`}
+              {aula.concluida
+                ? 'Refazer perguntas'
+                : `Responder ${aula.questoes.length} ${aula.questoes.length === 1 ? 'pergunta' : 'perguntas'}`}
             </button>
           ) : (
             <Aviso>Esta aula ainda não tem perguntas.</Aviso>

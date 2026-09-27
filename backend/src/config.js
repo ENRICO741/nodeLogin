@@ -1,3 +1,5 @@
+const path = require('node:path');
+const crypto = require('node:crypto');
 const { z } = require('zod');
 
 z.config(z.locales.pt());
@@ -15,6 +17,8 @@ const esquema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_SENHA: z.string().optional(),
   SMTP_REMETENTE: z.string().default('Guardião Digital <no-reply@localhost>'),
+  CONTEUDO_DIR: z.string().default(path.resolve(__dirname, '..', '..', 'conteudo')),
+  PESQUISA_SEGREDO: z.string().min(16, 'PESQUISA_SEGREDO precisa de pelo menos 16 caracteres').optional(),
 });
 
 // Variável vazia no .env (ex.: SMTP_HOST=) conta como ausente.
@@ -25,5 +29,12 @@ if (!resultado.success) {
   console.error('Configuração inválida:\n' + z.prettifyError(resultado.error));
   process.exit(1);
 }
+
+// Segredo dos pseudônimos da exportação da pesquisa. Sem valor próprio, deriva do JWT_SECRET
+// (trocar o JWT_SECRET muda os pseudônimos, por isso em produção prefira definir PESQUISA_SEGREDO).
+resultado.data.PESQUISA_SEGREDO ??= crypto
+  .createHash('sha256')
+  .update(`pesquisa:${resultado.data.JWT_SECRET}`)
+  .digest('hex');
 
 module.exports = resultado.data;

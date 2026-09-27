@@ -1,4 +1,7 @@
+import { useEffect } from 'react';
+import { useLocation } from 'react-router';
 import { Award, PartyPopper } from 'lucide-react';
+import { registrarEvento } from '../lib/telemetria';
 import styles from './CardResultado.module.css';
 
 export function CardResultado({
@@ -10,6 +13,19 @@ export function CardResultado({
   novosBadges = [],
   children,
 }) {
+  const { pathname } = useLocation();
+
+  // Exposição ao reforço da gamificação (pontos e conquistas mostrados ao terminar).
+  useEffect(() => {
+    registrarEvento({
+      tipo_evento: 'resultado_visualizado',
+      tela: pathname,
+      metadata: { acertos, total, pontos: pontosGanhos, novos_badges: novosBadges.length },
+    });
+    // Um evento por resultado exibido.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <section className={`cartao ${styles.cartao}`} aria-labelledby="titulo-resultado">
       <PartyPopper aria-hidden="true" size={40} className={styles.icone} />

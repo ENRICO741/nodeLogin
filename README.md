@@ -13,6 +13,7 @@ O Guardião Digital é um PWA mobile-first de **conscientização em segurança 
 frontend/  React 19 + Vite + vite-plugin-pwa   → build estático servido pelo Caddy
 backend/   Node 24 + Express 5 + Postgres (pg) → API REST em /api
 deploy/    Caddyfile, build do PWA para produção, backup e guia da VM
+conteudo/  aulas em HTML (uma pasta por aula) · guia e modelo para quem escreve
 docs/      modelo relacional (ERD)
 
 docker-compose.yml       desenvolvimento: Postgres · API · Vite · Mailpit
@@ -53,6 +54,40 @@ O front e a API ficam sempre na **mesma origem**: `/api` passa pelo proxy do Vit
 | `src/hooks/`           | `useApi` (carregar dados) e `useQuiz` (fluxo de perguntas, usado por aulas e trivia)    |
 | `src/estilos/tokens.css` | Cores, espaçamentos e tipografia. Tema claro e escuro automático                      |
 
+## Aulas
+
+As aulas são arquivos HTML em [`conteudo/aulas/`](conteudo/), uma pasta por aula (`NN-assunto/aula.html` + `imagens/`), com as perguntas no próprio HTML.
+
+- **Importação:** acontece quando a API sobe. Ela valida tudo, atualiza sem perder respostas e desativa perguntas removidas do arquivo.
+- **Arquivo com erro:** não derruba a API. O erro vai para o log e o banco fica como estava.
+- **Como escrever:** o formato, o modelo e as regras estão em [conteudo/README.md](conteudo/README.md).
+- **Validar sem banco:** `npm run importar-aulas -- --validar`. A CI roda esse mesmo comando.
+
+## Telemetria e pesquisa (TCC)
+
+**O que o app registra:**
+
+- **Sessões:** abrem no login e fecham quando o app vai para segundo plano. Se o app voltar em até 30 minutos, a mesma sessão é retomada. Cada sessão guarda se o app está instalado (PWA) e a largura da tela.
+- **Eventos:**
+  - `tela_visualizada`, com a tela anterior;
+  - `aula_conteudo_lido`, com o tempo e a rolagem máxima;
+  - `aula_iniciada`, `quiz_respondido` e `aula_concluida`;
+  - `trivia_iniciada`;
+  - `resultado_visualizado`;
+  - `app_instalado`.
+- **No banco, com data e hora:** respostas, conclusões, badges e o **histórico de pontos** (`pontuacao_historico`).
+
+**Consentimento:** é opcional, pedido no cadastro e alterável no perfil. Só quem consentiu entra na pesquisa.
+
+**Exportação:** Admin → Estatísticas → **Dados da pesquisa** gera CSVs das visões `pesquisa_*` (migration `002`):
+
+- uso diário (DAU);
+- engajamento por participante;
+- retenção por coorte;
+- sessões, eventos, respostas e pontos.
+
+Os CSVs não trazem nome, e-mail nem apelido. Cada pessoa aparece como um pseudônimo, gerado com `PESQUISA_SEGREDO`. Os horários estão em America/Sao_Paulo.
+
 ## Desenvolvimento
 
 Só é preciso ter **Docker** (Docker Desktop no Windows ou macOS). Não precisa instalar Node nem Postgres.
@@ -68,7 +103,7 @@ docker compose up --watch
 | http://localhost:4000/api/saude | A API |
 | `localhost:5432` | Postgres (usuário e senha `app`) |
 
-- Com `--watch`, mudanças em `backend/src` reiniciam a API, e mudanças em `frontend/src` recarregam a página.
+- Com `--watch`, mudanças em `backend/src` ou `conteudo/` reiniciam a API (e reimportam as aulas), e mudanças em `frontend/src` recarregam a página.
 - Mudar um `package.json` reconstrói a imagem.
 - `Ctrl+C` para tudo. `docker compose down -v` também apaga o banco.
 
@@ -76,6 +111,7 @@ Comandos úteis, com o ambiente rodando:
 
 ```bash
 docker compose exec api npm run promover-admin -- voce@empresa.com   # vira admin (cadastre-se antes)
+docker compose exec api npm run importar-aulas -- --validar          # confere as aulas de conteudo/
 docker compose exec api npm run test:cobertura                       # testes do backend
 docker compose exec web npm run test:cobertura                       # testes do frontend
 docker compose logs -f api                                           # logs da API
@@ -115,7 +151,7 @@ A cobertura mínima é de 80% em linhas, branches, funções e statements. Abaix
 
 Os testes rodam também dentro dos containers de dev (veja os comandos acima).
 
-**Backend** (`backend/test/`, 190 testes):
+**Backend** (`backend/test/`, 240 testes):
 
 - `unit/`: validação, erros, logger, mailer e config. Não precisa de banco.
 - `integracao/`: todas as rotas contra o Postgres de teste. Cobrem:
@@ -126,7 +162,7 @@ Os testes rodam também dentro dos containers de dev (veja os comandos acima).
   - rate limit;
   - scripts de linha de comando e boot/desligamento do servidor.
 
-**Frontend** (`frontend/src/testes/`, 153 testes):
+**Frontend** (`frontend/src/testes/`, 171 testes):
 
 - `utils.jsx` tem um `fetch` falso. As páginas rodam pelo `api.js` real e pelo `App` inteiro.
 - Os testes cobrem cada estado das telas: carregando, vazio, erro com nova tentativa, sucesso e validação por campo.

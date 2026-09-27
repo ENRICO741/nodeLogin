@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
 import { Award, BookOpen, Star, Trophy, User, Zap } from 'lucide-react';
 import { useAuth } from '../contexto/Auth';
@@ -16,9 +16,16 @@ const ABAS = [
 export function Layout() {
   const { usuario } = useAuth();
   const { pathname } = useLocation();
+  const telaAnterior = useRef(null);
 
+  // tela_anterior mostra o caminho de navegação (ex.: resultado da aula → ranking).
   useEffect(() => {
-    registrarEvento({ tipo_evento: 'tela_visualizada', tela: pathname });
+    registrarEvento({
+      tipo_evento: 'tela_visualizada',
+      tela: pathname,
+      ...(telaAnterior.current && { metadata: { tela_anterior: telaAnterior.current } }),
+    });
+    telaAnterior.current = pathname;
   }, [pathname]);
 
   return (

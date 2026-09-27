@@ -1,5 +1,8 @@
+import { useState } from 'react';
+import { Download } from 'lucide-react';
+import { baixarArquivo } from '../../lib/api';
 import { useApi } from '../../hooks/useApi';
-import { Carregando, ErroCarregamento } from '../../componentes/Estado';
+import { Aviso, Carregando, ErroCarregamento } from '../../componentes/Estado';
 import { VoltarAdmin } from './Admin';
 import styles from './Admin.module.css';
 
@@ -111,6 +114,57 @@ function Tabela({ titulo, colunas, linhas }) {
   );
 }
 
+// Exportação para a pesquisa do TCC: só quem consentiu, com pseudônimos no lugar de ids.
+function DadosPesquisa() {
+  const { dados, erro, carregando } = useApi('/admin/pesquisa');
+  const [baixando, setBaixando] = useState(null);
+  const [erroDownload, setErroDownload] = useState(null);
+
+  async function baixar(id) {
+    setBaixando(id);
+    setErroDownload(null);
+    try {
+      await baixarArquivo(`/admin/pesquisa/${id}.csv`, `pesquisa-${id}.csv`);
+    } catch (e) {
+      setErroDownload(e);
+    } finally {
+      setBaixando(null);
+    }
+  }
+
+  if (carregando) return <Carregando texto="Carregando dados da pesquisa…" />;
+  if (erro) return <Aviso tipo="erro">{erro.message}</Aviso>;
+  return (
+    <section aria-labelledby="sec-pesquisa" className="pilha">
+      <h2 id="sec-pesquisa">Dados da pesquisa</h2>
+      <p className={styles.itemMeta}>
+        {dados.participantes} participante(s) autorizaram o uso dos dados. Os arquivos CSV trazem só essas
+        pessoas, identificadas por um pseudônimo (sem nome, e-mail ou apelido). Horários em Brasília.
+      </p>
+      <Aviso tipo="erro">{erroDownload?.message}</Aviso>
+      <ul className="cartao" style={{ listStyle: 'none', margin: 0, paddingBlock: 'var(--esp-2)' }}>
+        {dados.visoes.map((v) => (
+          <li key={v.id} className={styles.item}>
+            <span className={styles.itemTexto}>
+              <strong>{v.titulo}</strong>
+              <span className={styles.itemMeta}>{v.descricao}</span>
+            </span>
+            <button
+              type="button"
+              className="botao botao--secundario"
+              disabled={baixando !== null}
+              onClick={() => baixar(v.id)}
+              aria-label={`Baixar ${v.titulo} em CSV`}
+            >
+              <Download aria-hidden="true" size={18} /> {baixando === v.id ? 'Baixando…' : 'CSV'}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function Estatisticas() {
   const { dados, erro, carregando, recarregar } = useApi('/admin/estatisticas');
 
@@ -132,6 +186,7 @@ export function Estatisticas() {
           ))}
         </section>
       ))}
+      <DadosPesquisa />
     </div>
   );
 }

@@ -1,0 +1,80 @@
+<!doctype html>
+<!--
+  MODELO DE AULA · Guardião Digital
+  1. Copie a pasta "modelo" para conteudo/aulas/NN-assunto (ex.: 04-engenharia-social).
+     O número NN define a ordem da aula; "assunto" é a identidade dela (não renomeie depois).
+  2. Preencha o <title>, o conteúdo e as perguntas. Abra o arquivo no navegador para pré-visualizar.
+  3. Rode `docker compose exec api npm run importar-aulas -- --validar` para conferir.
+  Tudo o que estiver entre <!- - e - -> (comentários) é ignorado na importação.
+-->
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <!-- Título da aula (aparece no topo e na lista). Obrigatório. -->
+    <title>Engenharia social: não caia na conversa</title>
+    <!-- Pontos de bônus pela primeira conclusão da aula (0 a 1000). Opcional; padrão 20. -->
+    <meta name="aula:pontos-conclusao" content="20" />
+    <!-- Só para pré-visualizar no navegador; ignorado na importação. Ajuste ../ se mudar a pasta. -->
+    <link rel="stylesheet" href="../../modelo/previa.css" />
+  </head>
+  <body>
+    <!-- CONTEÚDO. Comece em <h2> (o título já é o <h1>). Use <h3> para subtópicos. -->
+    <h2>O que é engenharia social</h2>
+    <p>
+      Engenharia social é quando alguém <strong>manipula pessoas</strong> para conseguir acesso ou
+      informações, em vez de invadir sistemas. O golpista explora confiança, pressa e medo.
+    </p>
+
+    <h3>Sinais de alerta</h3>
+    <ul>
+      <li>Urgência exagerada ("resolva nos próximos 10 minutos").</li>
+      <li>Pedido de senha, código ou dado que a empresa nunca pede.</li>
+      <li>Remetente ou telefone parecido, mas não igual, ao oficial.</li>
+    </ul>
+
+    <!-- Imagem: arquivo dentro da pasta "imagens" da aula. alt é obrigatório (descreva a imagem). -->
+    <figure>
+      <img src="imagens/exemplo.svg" alt="Exemplo de mensagem suspeita pedindo a senha com urgência" />
+      <figcaption>Pressa e pedido de senha juntos: sinal clássico de golpe.</figcaption>
+    </figure>
+
+    <!-- Caixas de destaque: class="nota", "dica" ou "atencao". -->
+    <aside class="nota"><p>A equipe de TI nunca pede sua senha, nem por telefone.</p></aside>
+    <aside class="dica"><p>Na dúvida, desligue e ligue de volta pelo número oficial do ramal.</p></aside>
+    <aside class="atencao"><p>Clicou em algo suspeito? Avise a segurança na hora. Quanto antes, melhor.</p></aside>
+
+    <!-- Tabelas também funcionam. -->
+    <table>
+      <thead>
+        <tr><th scope="col">Canal</th><th scope="col">Nome do golpe</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>E-mail</td><td>Phishing</td></tr>
+        <tr><td>SMS</td><td>Smishing</td></tr>
+        <tr><td>Ligação</td><td>Vishing</td></tr>
+      </tbody>
+    </table>
+
+    <!--
+      PERGUNTAS (verificação de conhecimento). Ficam no fim e aparecem depois do conteúdo.
+      - data-pergunta: identificador único na aula, em minúsculas com hífen. NÃO mude depois de publicada
+        (é o que liga a pergunta às respostas já dadas).
+      - data-pontos: pontos pelo primeiro acerto (0 a 100). Opcional; padrão 10.
+      - Exatamente 4 alternativas em <ol>, e exatamente uma com data-correta.
+      - data-explicacao: mostrada depois da resposta, certa ou errada. Recomendado.
+      - Uma <img> opcional dentro da pergunta vira a imagem de apoio.
+    -->
+    <section data-perguntas>
+      <div data-pergunta="pedido-de-senha" data-pontos="10">
+        <p data-enunciado>Alguém liga dizendo ser do suporte e pede sua senha para "corrigir um erro". O que fazer?</p>
+        <ol>
+          <li>Passar a senha, já que é do suporte</li>
+          <li>Passar só metade da senha</li>
+          <li data-correta>Recusar, desligar e reportar à segurança</li>
+          <li>Pedir que mande um e-mail antes</li>
+        </ol>
+        <p data-explicacao>Ninguém legítimo pede sua senha. Recuse e reporte: a ligação pode ser um ataque de vishing.</p>
+      </div>
+    </section>
+  </body>
+</html>

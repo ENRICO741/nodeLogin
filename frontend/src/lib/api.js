@@ -71,3 +71,23 @@ export async function api(caminho, { metodo = 'GET', corpo, sinal } = {}) {
   }
   return dados;
 }
+
+// Baixa um arquivo de rota autenticada (um <a href> não mandaria o token).
+export async function baixarArquivo(caminho, nomeArquivo) {
+  const token = tokenSalvo.obter();
+  let resposta;
+  try {
+    resposta = await fetch(`/api${caminho}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  } catch {
+    throw new ErroApi(0, {
+      erro: { codigo: 'SEM_CONEXAO', mensagem: 'Sem conexão. Verifique sua internet' },
+    });
+  }
+  if (!resposta.ok) throw new ErroApi(resposta.status, await resposta.json().catch(() => null));
+  const url = URL.createObjectURL(await resposta.blob());
+  const link = Object.assign(document.createElement('a'), { href: url, download: nomeArquivo });
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}

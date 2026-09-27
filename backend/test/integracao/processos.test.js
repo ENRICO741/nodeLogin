@@ -50,8 +50,15 @@ describe('scripts de banco', () => {
       });
       assert.equal(migracao.codigo, 0, migracao.saida);
       assert.match(migracao.saida, /"mensagem":"migração aplicada","nome":"001_schema_inicial.sql"/);
-      const seed = await rodarNode(['src/db/seed.js'], { DATABASE_URL: url.href, NODE_ENV: 'development' });
-      assert.match(seed.saida, /"mensagem":"seed aplicado","aulas":3,"trivia":10/);
+      assert.match(migracao.saida, /"nome":"002_aulas_arquivo_e_pesquisa.sql"/);
+      const env = { DATABASE_URL: url.href, NODE_ENV: 'development' };
+      const importacao = await rodarNode(['src/scripts/importar-aulas.js'], env);
+      assert.equal(importacao.codigo, 0, importacao.saida);
+      assert.match(importacao.saida, /✓ 3 aula\(s\): 3 nova\(s\), 0 atualizada\(s\), 0 sem mudança/);
+      const repetida = await rodarNode(['src/scripts/importar-aulas.js'], env);
+      assert.match(repetida.saida, /0 nova\(s\), 0 atualizada\(s\), 3 sem mudança/);
+      const seed = await rodarNode(['src/db/seed.js'], env);
+      assert.match(seed.saida, /"mensagem":"seed aplicado","trivia":10/);
     } finally {
       await pool.query(`DROP DATABASE IF EXISTS ${nome} WITH (FORCE)`);
     }
@@ -66,7 +73,81 @@ describe('scripts de banco', () => {
   });
 });
 
+describe('npm run importar-aulas', () => {
+  const { pergunta, aulaHtml, criarConteudo } = require('../conteudo-falso');
+  const valido = () => criarConteudo({ '01-ok': { html: aulaHtml() } });
+  const invalido = () =>
+    criarConteudo({ '01-ruim': { html: aulaHtml({ perguntas: [pergunta({ correta: -1 })] }) } });
+
+  test('--validar sem banco: sucesso e falha com a lista de erros', async () => {
+    const semBanco = { DATABASE_URL: '', JWT_SECRET: '' };
+    const ok = await rodarNode(['src/scripts/importar-aulas.js', '--validar'], {
+      CONTEUDO_DIR: valido(),
+      ...semBanco,
+    });
+    assert.equal(ok.codigo, 0);
+    assert.match(ok.saida, /✓ 1 aula\(s\) válidas/);
+    const ruim = await rodarNode(['src/scripts/importar-aulas.js', '--validar'], {
+      CONTEUDO_DIR: invalido(),
+      ...semBanco,
+    });
+    assert.equal(ruim.codigo, 1);
+    assert.match(
+      ruim.saida,
+      /✗ 01-ruim\/aula\.html: pergunta "p1": precisa de exatamente 1 alternativa com data-correta/,
+    );
+    assert.match(ruim.saida, /1 erro\(s\) em/);
+  });
+
+  test('importar com arquivo inválido sai com código 1 e não grava', async () => {
+    const { codigo, saida } = await rodarNode(['src/scripts/importar-aulas.js'], {
+      CONTEUDO_DIR: invalido(),
+    });
+    assert.equal(codigo, 1);
+    assert.match(saida, /✗ 01-ruim/);
+    const { rows } = await pool.query("SELECT 1 FROM aulas WHERE slug = 'ruim'");
+    assert.equal(rows.length, 0);
+  });
+
+  test('conflito no banco sai com código 1 e mensagem de falha', async () => {
+    const { codigo, saida } = await rodarNode(['src/scripts/importar-aulas.js'], {
+      CONTEUDO_DIR: criarConteudo({ '01-conflito-ordem': { html: aulaHtml() } }),
+    });
+    assert.equal(codigo, 1);
+    assert.match(saida, /✗ falha ao gravar/);
+  });
+});
+
 describe('servidor', () => {
+  const subirEParar = (env) =>
+    rodarNode(['-e', "require('./src/server'); setTimeout(() => process.emit('SIGTERM'), 1500);"], {
+      NODE_ENV: 'development',
+      PORT: String(20_000 + Math.floor(Math.random() * 20_000)),
+      ...env,
+    });
+
+  test('aula inválida não derruba a API: loga os erros e sobe', async () => {
+    const { pergunta, aulaHtml, criarConteudo } = require('../conteudo-falso');
+    const { codigo, saida } = await subirEParar({
+      CONTEUDO_DIR: criarConteudo({
+        '01-ruim': { html: aulaHtml({ perguntas: [pergunta({ correta: -1 })] }) },
+      }),
+    });
+    assert.equal(codigo, 0, saida);
+    assert.match(saida, /aulas não importadas: corrija os arquivos/);
+    assert.match(saida, /"mensagem":"API no ar"/);
+  });
+
+  test('conflito com o banco na importação também não derruba a API', async () => {
+    const { aulaHtml, criarConteudo } = require('../conteudo-falso');
+    const { codigo, saida } = await subirEParar({
+      CONTEUDO_DIR: criarConteudo({ '01-outra-ordem-um': { html: aulaHtml() } }),
+    });
+    assert.equal(codigo, 0, saida);
+    assert.match(saida, /aulas não importadas: conflito com o banco/);
+    assert.match(saida, /"mensagem":"API no ar"/);
+  });
+
   test('sobe, responde e desliga limpo ao receber SIGTERM', async () => {
     const porta = String(20_000 + Math.floor(Math.random() * 20_000));
     const script = `

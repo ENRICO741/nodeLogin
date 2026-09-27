@@ -1,6 +1,8 @@
 const crypto = require('node:crypto');
 const express = require('express');
+const path = require('node:path');
 const helmet = require('helmet');
+const config = require('./config');
 const logger = require('./lib/logger');
 const { query } = require('./db/pool');
 const { naoEncontrado } = require('./lib/erros');
@@ -34,6 +36,12 @@ app.get('/api/saude', async (_req, res) => {
   await query('SELECT 1');
   res.json({ status: 'ok' });
 });
+
+// Imagens das aulas (conteudo/aulas/<pasta>/imagens). Públicas: um <img> não envia o token.
+app.use(
+  '/api/conteudo/aulas',
+  express.static(path.join(config.CONTEUDO_DIR, 'aulas'), { maxAge: '1d', index: false, dotfiles: 'ignore' }),
+);
 
 app.use('/api/auth', require('./modulos/auth/routes'));
 

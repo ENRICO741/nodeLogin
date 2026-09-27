@@ -181,7 +181,7 @@ describe('Aula', () => {
         'POST /visitas/v1/finalizar': erroApi(409, 'QUESTOES_PENDENTES', 'Responda todas as questões'),
       }),
     });
-    await userEvent.click(await screen.findByRole('button', { name: 'Responder 1 perguntas' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Responder 1 pergunta' }));
     await userEvent.click(alternativa('q1-B'));
     await userEvent.click(await screen.findByRole('button', { name: 'Concluir aula' }));
     expect(await screen.findByText('Responda todas as questões')).toBeInTheDocument();

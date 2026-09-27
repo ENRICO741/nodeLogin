@@ -76,7 +76,10 @@ export function Entrar() {
 
 export function Cadastro() {
   const { cadastrar } = useAuth();
-  const { enviando, erro, porCampo, enviar } = useEnvio(cadastrar);
+  // Checkbox marcado chega como "on" no FormData; a API espera booleano.
+  const { enviando, erro, porCampo, enviar } = useEnvio(({ consentiu_pesquisa, ...dados }) =>
+    cadastrar({ ...dados, consentiu_pesquisa: consentiu_pesquisa === 'on' }),
+  );
 
   return (
     <TelaAuth
@@ -109,6 +112,13 @@ export function Cadastro() {
           ajuda={`Pelo menos ${MINIMO_SENHA} caracteres. Uma frase longa é mais segura que uma senha curta e complexa.`}
           erro={porCampo.senha}
         />
+        <label className="campo-check">
+          <input type="checkbox" name="consentiu_pesquisa" />
+          <span>
+            Autorizo o uso anônimo dos meus dados de uso do app na pesquisa acadêmica do TCC. Opcional: você
+            pode mudar isso depois no seu perfil.
+          </span>
+        </label>
         <button type="submit" className="botao botao--bloco" disabled={enviando}>
           {enviando ? 'Criando conta…' : 'Criar conta'}
         </button>

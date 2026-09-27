@@ -7,19 +7,131 @@
   font-weight: 600;
   text-decoration: none;
 }
+
+/* Conteúdo da aula (HTML de conteudo/aulas), no estilo de leitura do MS Learn.
+   Mantenha conteudo/modelo/previa.css parecido com isto. */
 .conteudo {
   font-size: var(--texto-md);
-  line-height: 1.65;
+  line-height: 1.7;
+  overflow-wrap: break-word;
 }
-.conteudo h2,
+.conteudo > :first-child {
+  margin-top: 0;
+}
+.conteudo h2 {
+  margin: var(--esp-6) 0 var(--esp-2);
+}
 .conteudo h3 {
-  margin-top: var(--esp-4);
+  margin: var(--esp-5) 0 var(--esp-2);
 }
-.conteudo img {
-  border-radius: var(--raio);
-  margin: var(--esp-3) 0;
+.conteudo p,
+.conteudo ul,
+.conteudo ol {
+  margin: 0 0 var(--esp-3);
 }
 .conteudo ul,
 .conteudo ol {
   padding-left: var(--esp-5);
+}
+.conteudo li + li {
+  margin-top: var(--esp-1);
+}
+.conteudo a {
+  font-weight: 600;
+}
+.conteudo img {
+  height: auto;
+  border-radius: var(--raio);
+  background: var(--cor-superficie-2);
+}
+.conteudo figure {
+  margin: var(--esp-5) 0;
+}
+.conteudo figcaption {
+  margin-top: var(--esp-2);
+  font-size: var(--texto-sm);
+  color: var(--cor-texto-suave);
+  text-align: center;
+}
+.conteudo blockquote {
+  margin: var(--esp-4) 0;
+  padding-left: var(--esp-4);
+  border-left: 3px solid var(--cor-borda);
+  color: var(--cor-texto-suave);
+}
+
+/* Caixas Nota / Dica / Atenção. O rótulo vem do CSS (e é lido por leitores de tela). */
+.conteudo aside {
+  margin: var(--esp-4) 0;
+  padding: var(--esp-3) var(--esp-4);
+  border-left: 4px solid;
+  border-radius: var(--raio);
+}
+.conteudo aside > :last-child {
+  margin-bottom: 0;
+}
+.conteudo aside::before {
+  display: block;
+  margin-bottom: var(--esp-1);
+  font-size: var(--texto-sm);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.conteudo aside:global(.nota) {
+  background: var(--cor-primaria-suave);
+  color: var(--cor-sobre-primaria-suave);
+}
+.conteudo aside:global(.nota)::before {
+  content: 'Nota';
+}
+.conteudo aside:global(.dica) {
+  background: var(--cor-sucesso-suave);
+  color: var(--cor-sobre-sucesso-suave);
+}
+.conteudo aside:global(.dica)::before {
+  content: 'Dica';
+}
+.conteudo aside:global(.atencao) {
+  background: var(--cor-conquista-suave);
+  color: var(--cor-sobre-conquista-suave);
+}
+.conteudo aside:global(.atencao)::before {
+  content: 'Atenção';
+}
+
+/* Tabela larga rola sozinha em vez de alargar a página no celular. */
+.conteudo table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  margin: var(--esp-4) 0;
+  border-collapse: collapse;
+  font-size: var(--texto-sm);
+}
+.conteudo th,
+.conteudo td {
+  padding: var(--esp-2) var(--esp-3);
+  text-align: left;
+  border-bottom: 1px solid var(--cor-borda);
+}
+.conteudo th {
+  background: var(--cor-superficie-2);
+  font-weight: 700;
+}
+.conteudo code {
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  font-size: 0.9em;
+  background: var(--cor-superficie-2);
+}
+.conteudo pre {
+  padding: var(--esp-3) var(--esp-4);
+  overflow-x: auto;
+  border-radius: var(--raio);
+  background: var(--cor-superficie-2);
+}
+.conteudo pre code {
+  padding: 0;
+  background: none;
 }

@@ -5,7 +5,7 @@ const { naoAutenticado, proibido } = require('../lib/erros');
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CAMPOS_USUARIO =
-  'id, nome, apelido, email, foto_perfil_url, bio, profissao, empresa, papel, pontuacao_total, criado_em';
+  'id, nome, apelido, email, foto_perfil_url, bio, profissao, empresa, papel, pontuacao_total, consentiu_pesquisa_em, criado_em';
 
 // `sv` = versão da senha (ms de senha_alterada_em). Trocar a senha invalida todos os tokens anteriores.
 function emitirToken(usuarioId, senhaAlteradaEm) {

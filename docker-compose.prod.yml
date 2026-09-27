@@ -21,7 +21,8 @@ services:
 
   api:
     build:
-      context: ./backend
+      context: .
+      dockerfile: backend/Dockerfile
       target: prod
     restart: unless-stopped
     environment:
@@ -35,6 +36,7 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_SENHA: ${SMTP_SENHA:-}
       SMTP_REMETENTE: ${SMTP_REMETENTE:-}
+      PESQUISA_SEGREDO: ${PESQUISA_SEGREDO:-}
     depends_on:
       db:
         condition: service_healthy

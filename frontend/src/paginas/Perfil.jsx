@@ -131,6 +131,48 @@ function FormPerfil({ usuario, aoSalvar, aoCancelar }) {
   );
 }
 
+// Consentimento para a pesquisa do TCC: pode ser dado ou retirado a qualquer momento (LGPD).
+function ConsentimentoPesquisa({ usuario, aoMudar }) {
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState(null);
+  const consentiu = Boolean(usuario.consentiu_pesquisa_em);
+
+  async function alternar(evento) {
+    setSalvando(true);
+    setErro(null);
+    try {
+      aoMudar(
+        await api('/perfil', { metodo: 'PATCH', corpo: { consentiu_pesquisa: evento.target.checked } }),
+      );
+    } catch (e) {
+      setErro(e);
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <section className="cartao pilha" aria-labelledby="titulo-pesquisa">
+      <h2 id="titulo-pesquisa" className={styles.tituloSecao}>
+        Pesquisa acadêmica
+      </h2>
+      <label className="campo-check">
+        <input type="checkbox" checked={consentiu} disabled={salvando} onChange={alternar} />
+        <span>
+          Autorizo o uso anônimo dos meus dados de uso do app na pesquisa do TCC. Seu nome, e-mail e apelido
+          nunca são exportados.
+        </span>
+      </label>
+      <p className={styles.estadoConsentimento}>
+        {consentiu
+          ? `Autorizado em ${new Date(usuario.consentiu_pesquisa_em).toLocaleDateString('pt-BR')}.`
+          : 'Não autorizado: seus dados ficam fora da pesquisa.'}
+      </p>
+      <Aviso tipo="erro">{erro?.message}</Aviso>
+    </section>
+  );
+}
+
 export function Perfil() {
   const { usuario, atualizarUsuario, sair } = useAuth();
   const [editando, setEditando] = useState(false);
@@ -184,6 +226,8 @@ export function Perfil() {
           </button>
         </section>
       )}
+
+      <ConsentimentoPesquisa usuario={usuario} aoMudar={atualizarUsuario} />
 
       {usuario.papel === 'admin' && (
         <Link to="/admin" className="botao botao--secundario botao--bloco">

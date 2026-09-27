@@ -12,7 +12,8 @@
     "seed": "node --env-file-if-exists=.env src/db/seed.js",
     "promover-admin": "node --env-file-if-exists=.env src/scripts/promover-admin.js",
     "test": "node --test --test-concurrency=1 \"test/**/*.test.js\"",
-    "test:cobertura": "c8 npm test"
+    "test:cobertura": "c8 npm test",
+    "importar-aulas": "node --env-file-if-exists=.env src/scripts/importar-aulas.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
@@ -20,6 +21,7 @@
     "express-rate-limit": "^8.7.0",
     "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.3",
+    "node-html-parser": "^7.1.0",
     "nodemailer": "^10.0.11",
     "pg": "^8.23.0",
     "sanitize-html": "^2.17.7",

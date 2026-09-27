@@ -23,7 +23,7 @@ async function obter(aulaId, usuarioId) {
            'id', q.id, 'enunciado', q.enunciado, 'imagem_url', q.imagem_url, 'pontos', q.pontos,
            'alternativa_a', q.alternativa_a, 'alternativa_b', q.alternativa_b,
            'alternativa_c', q.alternativa_c, 'alternativa_d', q.alternativa_d
-         ) ORDER BY q.criado_em)
+         ) ORDER BY q.ordem NULLS LAST, q.criado_em)
          FROM questoes_aula q WHERE q.aula_id = a.id AND q.ativo
        ), '[]') AS questoes
      FROM aulas a WHERE a.id = $1 AND a.ativo`,
@@ -86,7 +86,7 @@ async function responder(visitaId, usuarioId, { questao_id, alternativa }) {
       explicacao: questao.explicacao,
       pontos_ganhos: pontuou ? questao.pontos : 0,
       pontuacao_total: pontuou
-        ? await creditarPontos(c, usuarioId, questao.pontos)
+        ? await creditarPontos(c, usuarioId, questao.pontos, 'aula_questao', questao_id)
         : await pontuacaoAtual(c, usuarioId),
     };
   });
@@ -135,7 +135,9 @@ async function finalizar(visitaId, usuarioId) {
       total_questoes: resumo.total_questoes,
       pontos_questoes: resumo.pontos_questoes,
       bonus_conclusao: bonus,
-      pontuacao_total: bonus ? await creditarPontos(c, usuarioId, bonus) : await pontuacaoAtual(c, usuarioId),
+      pontuacao_total: bonus
+        ? await creditarPontos(c, usuarioId, bonus, 'aula_conclusao', visita.aula_id)
+        : await pontuacaoAtual(c, usuarioId),
       novos_badges: await concederBadges(c, usuarioId),
     };
   });

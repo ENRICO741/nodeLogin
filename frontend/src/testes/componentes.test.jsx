@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { Campo } from '../componentes/Campo';
 import { Aviso, Carregando, ErroCarregamento, Vazio } from '../componentes/Estado';
@@ -112,9 +113,11 @@ describe('CardResultado', () => {
 
   it('mostra acertos, pontos e ações', () => {
     render(
-      <CardResultado {...base} pontosGanhos={25}>
-        <button>continuar</button>
-      </CardResultado>,
+      <MemoryRouter>
+        <CardResultado {...base} pontosGanhos={25}>
+          <button>continuar</button>
+        </CardResultado>
+      </MemoryRouter>,
     );
     expect(screen.getByRole('heading', { name: 'Fim!' })).toBeInTheDocument();
     expect(screen.getByText(/Você acertou/)).toHaveTextContent('Você acertou 2 de 3');
@@ -125,7 +128,9 @@ describe('CardResultado', () => {
 
   it('zero pontos explica a regra; badges novos aparecem', () => {
     render(
-      <CardResultado {...base} pontosGanhos={0} novosBadges={[{ id: 'b1', nome: 'Primeiros Passos' }]} />,
+      <MemoryRouter>
+        <CardResultado {...base} pontosGanhos={0} novosBadges={[{ id: 'b1', nome: 'Primeiros Passos' }]} />
+      </MemoryRouter>,
     );
     expect(screen.getByText(/pontuam só na primeira vez/)).toBeInTheDocument();
     expect(screen.getByText('Nova conquista!')).toBeInTheDocument();

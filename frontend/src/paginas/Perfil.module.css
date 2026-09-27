@@ -51,3 +51,12 @@
   grid-template-columns: 1fr 1fr;
   gap: var(--esp-2);
 }
+.tituloSecao {
+  font-size: var(--texto-lg);
+  margin: 0;
+}
+.estadoConsentimento {
+  margin: 0;
+  font-size: var(--texto-sm);
+  color: var(--cor-texto-suave);
+}

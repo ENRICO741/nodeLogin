@@ -9,6 +9,8 @@ import { FormQuestao } from './FormQuestao';
 import { VoltarAdmin } from './Admin';
 import styles from './Admin.module.css';
 
+const pastaDaAula = (aula) => `conteudo/aulas/${String(aula.ordem).padStart(2, '0')}-${aula.slug}`;
+
 function FormAula({ aula = {}, aoEnviar, textoEnviar }) {
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState(null);
@@ -122,6 +124,7 @@ export function AdminAulas() {
                   {a.total_questoes} perguntas ativas · bônus {a.pontos_conclusao} pts
                 </span>
               </span>
+              {a.slug && <span className="selo selo--primaria">Arquivo</span>}
               {!a.ativo && <span className="selo">Inativa</span>}
               <Link to={`/admin/aulas/${a.id}`} className="botao botao--secundario">
                 Editar
@@ -134,7 +137,7 @@ export function AdminAulas() {
   );
 }
 
-function ItemQuestao({ questao, aoMudar }) {
+function ItemQuestao({ questao, aoMudar, somenteLeitura }) {
   const [editando, setEditando] = useState(false);
   const alternarAtivo = () =>
     (questao.ativo
@@ -163,18 +166,24 @@ function ItemQuestao({ questao, aoMudar }) {
         {questao.enunciado}
         <span className={styles.itemMeta}>
           Resposta {questao.resposta_correta.toUpperCase()} · {questao.pontos} pts
+          {questao.chave && ` · ${questao.chave}`}
+          {!questao.ativo && ' · removida do arquivo'}
         </span>
       </span>
-      <button type="button" className="botao botao--secundario" onClick={() => setEditando(true)}>
-        Editar
-      </button>
-      <button
-        type="button"
-        className={`botao ${questao.ativo ? 'botao--perigo' : 'botao--secundario'}`}
-        onClick={alternarAtivo}
-      >
-        {questao.ativo ? 'Desativar' : 'Reativar'}
-      </button>
+      {!somenteLeitura && (
+        <>
+          <button type="button" className="botao botao--secundario" onClick={() => setEditando(true)}>
+            Editar
+          </button>
+          <button
+            type="button"
+            className={`botao ${questao.ativo ? 'botao--perigo' : 'botao--secundario'}`}
+            onClick={alternarAtivo}
+          >
+            {questao.ativo ? 'Desativar' : 'Reativar'}
+          </button>
+        </>
+      )}
     </li>
   );
 }
@@ -204,16 +213,32 @@ export function AdminAula() {
       </header>
       {!aula.ativo && <Aviso>Aula inativa: não aparece para os usuários.</Aviso>}
 
-      <FormAula
-        aula={aula}
-        textoEnviar="Salvar aula"
-        aoEnviar={(dados) => api(`/admin/aulas/${id}`, { metodo: 'PATCH', corpo: dados })}
-      />
+      {aula.slug ? (
+        // Aula de arquivo: a próxima importação desfaria edições feitas aqui (a API também bloqueia).
+        <div className="cartao pilha">
+          <Aviso>
+            Esta aula vem do arquivo <code>{pastaDaAula(aula)}</code>. Para mudar o conteúdo ou as perguntas,
+            edite o arquivo: a importação atualiza a aula sem perder respostas nem pontos.
+          </Aviso>
+          <p className={styles.itemMeta}>
+            Ordem {aula.ordem} · bônus de conclusão {aula.pontos_conclusao} pts
+          </p>
+          <Link to={`/aulas/${aula.id}`} className="botao botao--secundario">
+            Ver como o usuário vê
+          </Link>
+        </div>
+      ) : (
+        <FormAula
+          aula={aula}
+          textoEnviar="Salvar aula"
+          aoEnviar={(dados) => api(`/admin/aulas/${id}`, { metodo: 'PATCH', corpo: dados })}
+        />
+      )}
 
       <section style={{ marginTop: 'var(--esp-6)' }} aria-labelledby="titulo-perguntas">
         <div className="linha" style={{ justifyContent: 'space-between' }}>
           <h2 id="titulo-perguntas">Perguntas</h2>
-          {!adicionando && (
+          {!adicionando && !aula.slug && (
             <button type="button" className="botao" onClick={() => setAdicionando(true)}>
               <Plus aria-hidden="true" size={18} /> Nova pergunta
             </button>
@@ -237,7 +262,7 @@ export function AdminAula() {
         ) : (
           <ul className="cartao" style={{ listStyle: 'none', margin: 0, paddingBlock: 'var(--esp-2)' }}>
             {aula.questoes.map((q) => (
-              <ItemQuestao key={q.id} questao={q} aoMudar={recarregar} />
+              <ItemQuestao key={q.id} questao={q} aoMudar={recarregar} somenteLeitura={Boolean(aula.slug)} />
             ))}
           </ul>
         )}

@@ -1,11 +1,15 @@
+# Construído a partir da raiz do repositório (precisa de backend/ e conteudo/):
+#   docker build -f backend/Dockerfile .
 FROM node:24-alpine AS base
 WORKDIR /app
-COPY package*.json ./
+ENV CONTEUDO_DIR=/app/conteudo
+COPY backend/package*.json ./
 
 # Desenvolvimento (docker-compose.yml): inclui devDependencies para rodar os testes no container.
 FROM base AS dev
 RUN npm ci
-COPY . .
+COPY backend/ ./
+COPY conteudo ./conteudo
 EXPOSE 4000
 CMD ["node", "src/server.js"]
 
@@ -13,7 +17,8 @@ CMD ["node", "src/server.js"]
 FROM base AS prod
 ENV NODE_ENV=production
 RUN npm ci --omit=dev
-COPY src ./src
+COPY backend/src ./src
+COPY conteudo ./conteudo
 USER node
 EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=5s CMD wget -qO- http://127.0.0.1:4000/api/saude || exit 1
