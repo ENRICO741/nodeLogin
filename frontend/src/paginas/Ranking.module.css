@@ -1,0 +1,71 @@
+.minha {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-4);
+  margin-bottom: var(--esp-4);
+  padding: var(--esp-4);
+  background: var(--cor-primaria-suave);
+  color: var(--cor-sobre-primaria-suave);
+  border-color: transparent;
+}
+.minhaPosicao {
+  font-size: var(--texto-2xl);
+  font-weight: 800;
+}
+.suave {
+  color: var(--cor-texto-suave);
+}
+.minha .suave {
+  color: inherit;
+}
+.lista {
+  list-style: none;
+  margin: 0;
+  padding: var(--esp-2);
+}
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-3);
+  min-height: 3.5rem;
+  padding: var(--esp-2) var(--esp-3);
+  border-radius: var(--raio);
+}
+.item + .item {
+  border-top: 1px solid var(--cor-borda);
+}
+.eu {
+  background: var(--cor-primaria-suave);
+  box-shadow: inset 3px 0 0 var(--cor-primaria);
+}
+.posicao {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  width: 3.25rem;
+  flex-shrink: 0;
+  font-weight: 800;
+  color: var(--cor-texto-suave);
+}
+.podio1,
+.podio2,
+.podio3 {
+  color: var(--cor-conquista);
+}
+.apelido {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-2);
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+.nomeApelido {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pontos {
+  font-weight: 700;
+  white-space: nowrap;
+}

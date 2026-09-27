@@ -1,0 +1,92 @@
+.voltar {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--esp-1);
+  min-height: var(--alvo-toque);
+  margin-bottom: var(--esp-2);
+  font-weight: 600;
+  text-decoration: none;
+}
+.secao {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-4);
+  padding: var(--esp-4);
+  color: inherit;
+  text-decoration: none;
+}
+.icone {
+  color: var(--cor-primaria);
+  flex-shrink: 0;
+}
+.textos {
+  display: grid;
+  flex: 1;
+}
+.textos span {
+  font-size: var(--texto-sm);
+  color: var(--cor-texto-suave);
+}
+
+/* Listas de conteúdo */
+.item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-2);
+  padding: var(--esp-3) 0;
+}
+.item + .item {
+  border-top: 1px solid var(--cor-borda);
+}
+.itemTexto {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+.itemMeta {
+  display: block;
+  font-size: var(--texto-sm);
+  color: var(--cor-texto-suave);
+}
+.inativo {
+  opacity: 0.6;
+}
+
+/* Tabelas de estatística */
+.tabelaRolagem {
+  overflow-x: auto;
+  margin-bottom: var(--esp-5);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-superficie);
+}
+.tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--texto-sm);
+}
+.tabela caption {
+  padding: var(--esp-3);
+  text-align: left;
+  font-weight: 700;
+  font-size: var(--texto-md);
+}
+.tabela th,
+.tabela td {
+  padding: var(--esp-2) var(--esp-3);
+  text-align: left;
+  border-top: 1px solid var(--cor-borda);
+  white-space: nowrap;
+}
+.tabela th {
+  background: var(--cor-superficie-2);
+  font-weight: 700;
+}
+.tabela td.longo {
+  white-space: normal;
+  min-width: 16rem;
+}
+.tabela td.numero,
+.tabela th.numero {
+  text-align: right;
+}

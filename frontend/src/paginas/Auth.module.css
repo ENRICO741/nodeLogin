@@ -1,0 +1,37 @@
+.tela {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: var(--esp-5);
+  min-height: 100dvh;
+  padding: calc(var(--esp-6) + env(safe-area-inset-top)) var(--esp-4)
+    calc(var(--esp-6) + env(safe-area-inset-bottom));
+}
+.marca {
+  display: grid;
+  justify-items: center;
+  gap: var(--esp-2);
+  font-size: var(--texto-xl);
+  font-weight: 800;
+}
+.cartao {
+  width: 100%;
+  max-width: 26rem;
+}
+.subtitulo {
+  color: var(--cor-texto-suave);
+}
+.link {
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--alvo-toque);
+  font-weight: 600;
+}
+.rodape {
+  margin: 0;
+  color: var(--cor-texto-suave);
+}
+.rodape a {
+  font-weight: 700;
+}

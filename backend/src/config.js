@@ -10,12 +10,11 @@ const esquema = z.object({
   JWT_EXPIRA_EM: z.string().default('7d'),
   BCRYPT_CUSTO: z.coerce.number().int().min(4).max(15).default(12),
   APP_URL: z.url().default('http://localhost:5173'),
-  CORS_ORIGEM: z.string().optional(),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().default(587),
   SMTP_USER: z.string().optional(),
   SMTP_SENHA: z.string().optional(),
-  SMTP_REMETENTE: z.string().default('Security Awareness <no-reply@localhost>'),
+  SMTP_REMETENTE: z.string().default('Guardião Digital <no-reply@localhost>'),
 });
 
 // Variável vazia no .env (ex.: SMTP_HOST=) conta como ausente.

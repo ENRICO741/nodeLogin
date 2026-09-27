@@ -1,0 +1,89 @@
+/* Tokens do Guardião Digital. Cores semânticas: componentes nunca usam hex direto.
+   Contraste mínimo AA (4.5:1 texto, 3:1 bordas de controles) verificado nos dois temas. */
+:root {
+  color-scheme: light;
+
+  --cor-fundo: #f8fafc;
+  --cor-superficie: #ffffff;
+  --cor-superficie-2: #f1f5f9;
+  --cor-borda: #e2e8f0;
+  --cor-borda-campo: #64748b;
+  --cor-texto: #0f172a;
+  --cor-texto-suave: #475569;
+
+  --cor-primaria: #1e3a8a;
+  --cor-primaria-hover: #1e40af;
+  --cor-sobre-primaria: #ffffff;
+  --cor-primaria-suave: #dbeafe;
+  --cor-sobre-primaria-suave: #1e3a8a;
+
+  --cor-sucesso: #15803d;
+  --cor-sucesso-suave: #dcfce7;
+  --cor-sobre-sucesso-suave: #14532d;
+  --cor-erro: #b91c1c;
+  --cor-erro-suave: #fee2e2;
+  --cor-sobre-erro-suave: #7f1d1d;
+  --cor-conquista: #b45309;
+  --cor-conquista-suave: #fef3c7;
+  --cor-sobre-conquista-suave: #78350f;
+
+  --cor-foco: #2563eb;
+  --sombra: 0 1px 2px rgb(15 23 42 / 6%), 0 4px 12px rgb(15 23 42 / 6%);
+
+  --fonte: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --texto-xs: 0.8125rem;
+  --texto-sm: 0.875rem;
+  --texto-md: 1rem;
+  --texto-lg: 1.125rem;
+  --texto-xl: 1.375rem;
+  --texto-2xl: 1.75rem;
+
+  --esp-1: 0.25rem;
+  --esp-2: 0.5rem;
+  --esp-3: 0.75rem;
+  --esp-4: 1rem;
+  --esp-5: 1.5rem;
+  --esp-6: 2rem;
+  --esp-7: 3rem;
+
+  --raio: 12px;
+  --raio-lg: 16px;
+  --raio-pilula: 999px;
+  --alvo-toque: 44px;
+  --largura-conteudo: 42rem;
+  --altura-tabbar: 64px;
+  --transicao: 150ms ease-out;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --cor-fundo: #0b1220;
+    --cor-superficie: #111a2e;
+    --cor-superficie-2: #1a2540;
+    --cor-borda: #26324d;
+    --cor-borda-campo: #7c8aa5;
+    --cor-texto: #e2e8f0;
+    --cor-texto-suave: #a3b0c5;
+
+    --cor-primaria: #60a5fa;
+    --cor-primaria-hover: #93c5fd;
+    --cor-sobre-primaria: #0b1220;
+    --cor-primaria-suave: #172554;
+    --cor-sobre-primaria-suave: #bfdbfe;
+
+    --cor-sucesso: #4ade80;
+    --cor-sucesso-suave: #052e16;
+    --cor-sobre-sucesso-suave: #bbf7d0;
+    --cor-erro: #f87171;
+    --cor-erro-suave: #450a0a;
+    --cor-sobre-erro-suave: #fecaca;
+    --cor-conquista: #fbbf24;
+    --cor-conquista-suave: #451a03;
+    --cor-sobre-conquista-suave: #fde68a;
+
+    --cor-foco: #93c5fd;
+    --sombra: 0 1px 2px rgb(0 0 0 / 40%);
+  }
+}

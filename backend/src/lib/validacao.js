@@ -1,7 +1,15 @@
 const { z } = require('zod');
 
 const texto = (min, max) => z.string().trim().min(min).max(max);
-const textoOpcional = (max) => z.string().trim().max(max).nullable().optional();
+// Texto vazio vira NULL no banco.
+const textoOpcional = (max) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .transform((v) => v || null)
+    .nullable()
+    .optional();
 const urlHttps = z.url({ protocol: /^https$/, error: 'Use uma URL https://' }).max(2000);
 
 const esquemaQuestao = z.object({

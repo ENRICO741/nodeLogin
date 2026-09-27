@@ -1,0 +1,22 @@
+.aviso {
+  position: fixed;
+  left: var(--esp-4);
+  right: var(--esp-4);
+  bottom: calc(var(--altura-tabbar) + env(safe-area-inset-bottom) + var(--esp-3));
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--esp-2);
+  max-width: 28rem;
+  margin: 0 auto;
+  padding: var(--esp-3) var(--esp-4);
+  border-radius: var(--raio-lg);
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  box-shadow: var(--sombra);
+}
+.aviso span {
+  flex: 1;
+  font-weight: 600;
+}

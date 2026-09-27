@@ -1,0 +1,56 @@
+.cartao {
+  display: grid;
+  justify-items: center;
+  gap: var(--esp-3);
+  text-align: center;
+}
+.icone {
+  color: var(--cor-conquista);
+}
+.acertos {
+  margin: 0;
+  color: var(--cor-texto-suave);
+}
+.numeros {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--esp-3);
+  width: 100%;
+}
+.numeros > div {
+  display: grid;
+  padding: var(--esp-3);
+  border-radius: var(--raio);
+  background: var(--cor-superficie-2);
+}
+.valor {
+  font-size: var(--texto-2xl);
+  font-weight: 800;
+}
+.rotulo {
+  font-size: var(--texto-sm);
+  color: var(--cor-texto-suave);
+}
+.nota {
+  font-size: var(--texto-sm);
+  color: var(--cor-texto-suave);
+  margin: 0;
+}
+.badges ul {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--esp-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.badges p {
+  font-weight: 700;
+  margin-bottom: var(--esp-2);
+}
+.acoes {
+  display: grid;
+  gap: var(--esp-2);
+  width: 100%;
+}

@@ -1,0 +1,53 @@
+.cartao {
+  display: grid;
+  justify-items: center;
+  gap: var(--esp-2);
+  text-align: center;
+}
+.nome {
+  margin: var(--esp-2) 0 0;
+}
+.apelido {
+  margin: 0;
+  color: var(--cor-texto-suave);
+}
+.pontos {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--esp-1);
+  padding: var(--esp-1) var(--esp-3);
+  border-radius: var(--raio-pilula);
+  font-weight: 700;
+  background: var(--cor-conquista-suave);
+  color: var(--cor-sobre-conquista-suave);
+}
+.detalhes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--esp-3);
+  color: var(--cor-texto-suave);
+  font-size: var(--texto-sm);
+}
+.detalhes span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--esp-1);
+}
+.bio {
+  margin: var(--esp-2) 0;
+  white-space: pre-line;
+}
+.foto {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-4);
+}
+.foto :global(.pilha) {
+  flex: 1;
+}
+.acoes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--esp-2);
+}

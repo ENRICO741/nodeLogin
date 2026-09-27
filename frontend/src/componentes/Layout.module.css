@@ -1,0 +1,111 @@
+.app {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.pular {
+  position: absolute;
+  left: var(--esp-2);
+  top: -3rem;
+  z-index: 20;
+  padding: var(--esp-2) var(--esp-4);
+  border-radius: var(--raio);
+  background: var(--cor-primaria);
+  color: var(--cor-sobre-primaria);
+}
+.pular:focus {
+  top: var(--esp-2);
+}
+
+.cabecalho {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esp-3);
+  padding: calc(var(--esp-3) + env(safe-area-inset-top)) calc(var(--esp-4) + env(safe-area-inset-right))
+    var(--esp-3) calc(var(--esp-4) + env(safe-area-inset-left));
+  background: var(--cor-superficie);
+  border-bottom: 1px solid var(--cor-borda);
+}
+.marca {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-2);
+  font-weight: 800;
+  font-size: var(--texto-lg);
+}
+.pontos {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--esp-1);
+  padding: var(--esp-1) var(--esp-3);
+  border-radius: var(--raio-pilula);
+  font-weight: 700;
+  background: var(--cor-conquista-suave);
+  color: var(--cor-sobre-conquista-suave);
+}
+
+.conteudo {
+  flex: 1;
+  padding-bottom: calc(var(--altura-tabbar) + env(safe-area-inset-bottom) + var(--esp-4));
+}
+
+.abas {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  background: var(--cor-superficie);
+  border-top: 1px solid var(--cor-borda);
+}
+.aba {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 2px;
+  min-height: var(--altura-tabbar);
+  font-size: var(--texto-xs);
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--cor-texto-suave);
+}
+.ativa {
+  color: var(--cor-primaria);
+}
+.ativa svg {
+  stroke-width: 2.5;
+}
+
+/* Tela larga: a navegação vai para o topo, logo abaixo do cabeçalho. */
+@media (min-width: 48rem) {
+  .abas {
+    position: sticky;
+    top: 0;
+    order: 1;
+    display: flex;
+    justify-content: center;
+    gap: var(--esp-2);
+    border-top: 0;
+    border-bottom: 1px solid var(--cor-borda);
+  }
+  .cabecalho {
+    position: static;
+  }
+  .aba {
+    grid-auto-flow: column;
+    gap: var(--esp-2);
+    min-height: 52px;
+    padding: 0 var(--esp-4);
+    font-size: var(--texto-sm);
+  }
+  .conteudo {
+    order: 2;
+    padding-bottom: var(--esp-6);
+  }
+}

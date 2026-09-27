@@ -1,8 +1,6 @@
 const crypto = require('node:crypto');
 const express = require('express');
 const helmet = require('helmet');
-const cors = require('cors');
-const config = require('./config');
 const logger = require('./lib/logger');
 const { query } = require('./db/pool');
 const { naoEncontrado } = require('./lib/erros');
@@ -15,7 +13,6 @@ const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 1); // atrás do Caddy: IP real vem do X-Forwarded-For
 app.use(helmet());
-if (config.CORS_ORIGEM) app.use(cors({ origin: config.CORS_ORIGEM }));
 app.use(express.json({ limit: '300kb' }));
 
 app.use((req, res, next) => {

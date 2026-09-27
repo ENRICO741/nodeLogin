@@ -1,0 +1,41 @@
+.grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: var(--esp-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.badge {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: var(--esp-2);
+  padding: var(--esp-4);
+  text-align: center;
+}
+.icone,
+.imagem {
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+}
+.obtida .icone {
+  background: var(--cor-conquista-suave);
+  color: var(--cor-sobre-conquista-suave);
+}
+.bloqueada .icone {
+  background: var(--cor-superficie-2);
+  color: var(--cor-texto-suave);
+}
+.nome {
+  font-size: var(--texto-md);
+  margin: 0;
+}
+.descricao {
+  font-size: var(--texto-sm);
+  color: var(--cor-texto-suave);
+  margin: 0;
+}

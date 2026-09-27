@@ -1,0 +1,29 @@
+.centro {
+  display: grid;
+  justify-items: center;
+  gap: var(--esp-3);
+  padding: var(--esp-7) var(--esp-4);
+  text-align: center;
+  color: var(--cor-texto-suave);
+}
+.centro p {
+  margin: 0;
+}
+.titulo {
+  font-weight: 600;
+  color: var(--cor-texto);
+}
+.iconeErro {
+  color: var(--cor-erro);
+}
+.iconeVazio {
+  color: var(--cor-texto-suave);
+}
+.girando {
+  animation: girar 0.9s linear infinite;
+}
+@keyframes girar {
+  to {
+    transform: rotate(360deg);
+  }
+}

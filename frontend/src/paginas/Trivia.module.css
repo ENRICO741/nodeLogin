@@ -1,0 +1,47 @@
+.opcao {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-4);
+  width: 100%;
+  min-height: 5rem;
+  padding: var(--esp-4);
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color var(--transicao);
+}
+.opcao:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+@media (hover: hover) {
+  .opcao:not(:disabled):hover {
+    border-color: var(--cor-primaria);
+  }
+}
+.icone {
+  flex-shrink: 0;
+  color: var(--cor-primaria);
+}
+.textos {
+  display: grid;
+  flex: 1;
+}
+.rotulo {
+  font-size: var(--texto-lg);
+  font-weight: 700;
+}
+.descricao {
+  color: var(--cor-texto-suave);
+  font-size: var(--texto-sm);
+}
+.voltar {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--esp-1);
+  min-height: var(--alvo-toque);
+  margin-bottom: var(--esp-2);
+  font-weight: 600;
+  text-decoration: none;
+}

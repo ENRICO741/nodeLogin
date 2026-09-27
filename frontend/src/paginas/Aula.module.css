@@ -1,0 +1,25 @@
+.voltar {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--esp-1);
+  min-height: var(--alvo-toque);
+  margin-bottom: var(--esp-2);
+  font-weight: 600;
+  text-decoration: none;
+}
+.conteudo {
+  font-size: var(--texto-md);
+  line-height: 1.65;
+}
+.conteudo h2,
+.conteudo h3 {
+  margin-top: var(--esp-4);
+}
+.conteudo img {
+  border-radius: var(--raio);
+  margin: var(--esp-3) 0;
+}
+.conteudo ul,
+.conteudo ol {
+  padding-left: var(--esp-5);
+}

@@ -1,0 +1,101 @@
+.cartao {
+  display: grid;
+  gap: var(--esp-4);
+}
+.topo {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--esp-2);
+}
+.imagem {
+  width: 100%;
+  max-height: 16rem;
+  object-fit: contain;
+  border-radius: var(--raio);
+  background: var(--cor-superficie-2);
+}
+.enunciado {
+  font-size: var(--texto-lg);
+  margin: 0;
+}
+.alternativas {
+  display: grid;
+  gap: var(--esp-2);
+}
+.alternativa {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-3);
+  width: 100%;
+  min-height: 3.25rem;
+  padding: var(--esp-3);
+  text-align: left;
+  font: inherit;
+  color: var(--cor-texto);
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda-campo);
+  border-radius: var(--raio);
+  cursor: pointer;
+  transition:
+    border-color var(--transicao),
+    background-color var(--transicao);
+}
+.alternativa:disabled {
+  cursor: default;
+}
+@media (hover: hover) {
+  .alternativa:not(:disabled):hover {
+    border-color: var(--cor-primaria);
+    background: var(--cor-superficie-2);
+  }
+}
+.letra {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: var(--texto-sm);
+  background: var(--cor-superficie-2);
+}
+.textoAlternativa {
+  flex: 1;
+}
+.escolhida {
+  border-color: var(--cor-primaria);
+  border-width: 2px;
+}
+.correta {
+  border: 2px solid var(--cor-sucesso);
+  background: var(--cor-sucesso-suave);
+  color: var(--cor-sobre-sucesso-suave);
+}
+.errada {
+  border: 2px solid var(--cor-erro);
+  background: var(--cor-erro-suave);
+  color: var(--cor-sobre-erro-suave);
+}
+.feedback {
+  padding: var(--esp-4);
+  border-radius: var(--raio);
+}
+.feedbackOk {
+  background: var(--cor-sucesso-suave);
+  color: var(--cor-sobre-sucesso-suave);
+}
+.feedbackErro {
+  background: var(--cor-erro-suave);
+  color: var(--cor-sobre-erro-suave);
+}
+.feedbackTitulo {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-2);
+  font-weight: 700;
+  margin: 0;
+}
+.explicacao {
+  margin: var(--esp-2) 0 0;
+}
