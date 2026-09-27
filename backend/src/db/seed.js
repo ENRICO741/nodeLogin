@@ -1,3 +1,4 @@
+const { pool, transacao } = require('./pool');
 const logger = require('../lib/logger');
 
 const AULAS = [
@@ -54,7 +55,8 @@ const AULAS = [
         alternativa_c: 'Apenas dados financeiros',
         alternativa_d: 'Apenas dados públicos',
         resposta_correta: 'a',
-        explicacao: 'Dado pessoal é qualquer informação relacionada a pessoa natural identificada ou identificável.',
+        explicacao:
+          'Dado pessoal é qualquer informação relacionada a pessoa natural identificada ou identificável.',
         pontos: 10,
       },
     ],
@@ -143,7 +145,8 @@ const TRIVIA_QUESTOES = [
     alternativa_c: 'Aceite tácito por padrão',
     alternativa_d: 'Permissão dada pela empresa',
     resposta_correta: 'a',
-    explicacao: 'Consentimento é a manifestação livre, informada e inequívoca do titular sobre o tratamento de seus dados.',
+    explicacao:
+      'Consentimento é a manifestação livre, informada e inequívoca do titular sobre o tratamento de seus dados.',
     pontos: 10,
   },
   {
@@ -159,13 +162,15 @@ const TRIVIA_QUESTOES = [
   },
   {
     dificuldade: 'dificil',
-    enunciado: 'Em caso de vazamento de dados, em quanto tempo o incidente deve ser comunicado à ANPD, segundo orientação de "prazo razoável"?',
+    enunciado:
+      'Em caso de vazamento de dados, em quanto tempo o incidente deve ser comunicado à ANPD, segundo orientação de "prazo razoável"?',
     alternativa_a: 'Não há necessidade de comunicação',
     alternativa_b: 'Em prazo razoável, sem prazo fixo definido em lei',
     alternativa_c: 'Exatamente 24 horas',
     alternativa_d: 'Exatamente 72 horas',
     resposta_correta: 'b',
-    explicacao: 'A LGPD exige comunicação em "prazo razoável", sem um prazo fixo estabelecido em lei (diferente do GDPR europeu).',
+    explicacao:
+      'A LGPD exige comunicação em "prazo razoável", sem um prazo fixo estabelecido em lei (diferente do GDPR europeu).',
     pontos: 15,
   },
   {
@@ -176,7 +181,8 @@ const TRIVIA_QUESTOES = [
     alternativa_c: 'É o canal de comunicação entre controlador, titulares e ANPD',
     alternativa_d: 'É um cargo obrigatório apenas para bancos',
     resposta_correta: 'c',
-    explicacao: 'O encarregado (DPO) atua como canal de comunicação entre o controlador, os titulares dos dados e a ANPD.',
+    explicacao:
+      'O encarregado (DPO) atua como canal de comunicação entre o controlador, os titulares dos dados e a ANPD.',
     pontos: 15,
   },
   {
@@ -187,7 +193,8 @@ const TRIVIA_QUESTOES = [
     alternativa_c: 'Pena de prisão para a empresa',
     alternativa_d: 'Bloqueio dos dados pessoais',
     resposta_correta: 'c',
-    explicacao: 'A LGPD não prevê pena de prisão para empresas; as sanções incluem advertência, multa, bloqueio e eliminação dos dados.',
+    explicacao:
+      'A LGPD não prevê pena de prisão para empresas; as sanções incluem advertência, multa, bloqueio e eliminação dos dados.',
     pontos: 15,
   },
   {
@@ -198,133 +205,75 @@ const TRIVIA_QUESTOES = [
     alternativa_c: 'Valor fixo de R$ 1 milhão',
     alternativa_d: 'Até 20% do faturamento anual',
     resposta_correta: 'a',
-    explicacao: 'A multa simples pode chegar a 2% do faturamento da empresa, limitada a R$ 50 milhões por infração.',
+    explicacao:
+      'A multa simples pode chegar a 2% do faturamento da empresa, limitada a R$ 50 milhões por infração.',
     pontos: 15,
   },
 ];
 
-function run(db, sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function callback(err) {
-      if (err) return reject(err);
-      resolve(this);
-    });
-  });
-}
+const COLUNAS_QUESTAO = [
+  'enunciado',
+  'alternativa_a',
+  'alternativa_b',
+  'alternativa_c',
+  'alternativa_d',
+  'resposta_correta',
+  'explicacao',
+  'pontos',
+];
+const valoresQuestao = (q) => COLUNAS_QUESTAO.map((coluna) => q[coluna]);
 
-function get(db, sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => {
-      if (err) return reject(err);
-      resolve(row);
-    });
-  });
-}
+// Popula o conteúdo inicial só em banco vazio. Tudo numa transação: falha parcial não deixa lixo.
+async function semear() {
+  const { rows } = await pool.query('SELECT EXISTS (SELECT 1 FROM aulas) AS tem_conteudo');
+  if (rows[0].tem_conteudo) return;
 
-async function seedAulas(db) {
-  const { count } = await get(db, 'SELECT COUNT(*) AS count FROM aulas');
-  if (count > 0) return;
+  await transacao(async (c) => {
+    const aulaIds = [];
+    for (const aula of AULAS) {
+      const {
+        rows: [{ id }],
+      } = await c.query(
+        'INSERT INTO aulas (titulo, ordem, conteudo_html, pontos_conclusao) VALUES ($1, $2, $3, $4) RETURNING id',
+        [aula.titulo, aula.ordem, aula.conteudo_html, aula.pontos_conclusao],
+      );
+      aulaIds.push(id);
+      for (const questao of aula.questoes) {
+        await c.query(
+          `INSERT INTO questoes_aula (aula_id, ${COLUNAS_QUESTAO.join(', ')})
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [id, ...valoresQuestao(questao)],
+        );
+      }
+    }
 
-  for (const aula of AULAS) {
-    const result = await run(
-      db,
-      `INSERT INTO aulas (titulo, ordem, conteudo_html, pontos_conclusao) VALUES (?, ?, ?, ?)`,
-      [aula.titulo, aula.ordem, aula.conteudo_html, aula.pontos_conclusao]
-    );
-    const aulaId = result.lastID;
-
-    for (const questao of aula.questoes) {
-      await run(
-        db,
-        `INSERT INTO questoes_aula
-          (aula_id, enunciado, alternativa_a, alternativa_b, alternativa_c, alternativa_d, resposta_correta, explicacao, pontos)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          aulaId,
-          questao.enunciado,
-          questao.alternativa_a,
-          questao.alternativa_b,
-          questao.alternativa_c,
-          questao.alternativa_d,
-          questao.resposta_correta,
-          questao.explicacao,
-          questao.pontos,
-        ]
+    for (const questao of TRIVIA_QUESTOES) {
+      await c.query(
+        `INSERT INTO questoes_trivia (dificuldade, ${COLUNAS_QUESTAO.join(', ')})
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [questao.dificuldade, ...valoresQuestao(questao)],
       );
     }
-  }
 
-  logger.info(`Seed: ${AULAS.length} aulas inseridas.`);
-}
-
-async function seedTrivia(db) {
-  const { count } = await get(db, 'SELECT COUNT(*) AS count FROM questoes_trivia');
-  if (count > 0) return;
-
-  for (const questao of TRIVIA_QUESTOES) {
-    await run(
-      db,
-      `INSERT INTO questoes_trivia
-        (dificuldade, enunciado, alternativa_a, alternativa_b, alternativa_c, alternativa_d, resposta_correta, explicacao, pontos)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        questao.dificuldade,
-        questao.enunciado,
-        questao.alternativa_a,
-        questao.alternativa_b,
-        questao.alternativa_c,
-        questao.alternativa_d,
-        questao.resposta_correta,
-        questao.explicacao,
-        questao.pontos,
-      ]
+    await c.query(
+      `INSERT INTO badges (nome, descricao, tipo_criterio, aula_id) VALUES
+        ('Primeiros Passos', 'Concluiu a primeira aula.', 'aula_concluida', $1),
+        ('Curioso da Trivia', 'Terminou sua primeira rodada de trivia.', 'primeira_trivia', NULL),
+        ('Guardião de Dados', 'Concluiu todas as aulas.', 'todas_aulas', NULL)`,
+      [aulaIds[0]],
     );
-  }
+  });
 
-  logger.info(`Seed: ${TRIVIA_QUESTOES.length} questões de trivia inseridas.`);
+  logger.info('seed aplicado', { aulas: AULAS.length, trivia: TRIVIA_QUESTOES.length });
 }
 
-async function seedBadges(db) {
-  const { count } = await get(db, 'SELECT COUNT(*) AS count FROM badges');
-  if (count > 0) return;
+module.exports = { semear };
 
-  const primeiraAula = await get(db, 'SELECT id FROM aulas ORDER BY ordem LIMIT 1');
-
-  await run(
-    db,
-    `INSERT INTO badges (nome, descricao, imagem_url, tipo_criterio, aula_id) VALUES (?, ?, ?, ?, ?)`,
-    [
-      'Primeiros Passos',
-      'Concluiu a primeira aula sobre LGPD.',
-      'https://via.placeholder.com/96?text=1',
-      'aula_concluida',
-      primeiraAula ? primeiraAula.id : null,
-    ]
-  );
-
-  await run(
-    db,
-    `INSERT INTO badges (nome, descricao, imagem_url, tipo_criterio, aula_id) VALUES (?, ?, ?, ?, ?)`,
-    ['Curioso da Trivia', 'Jogou sua primeira rodada de trivia.', 'https://via.placeholder.com/96?text=2', 'trivia_jogada', null]
-  );
-
-  await run(
-    db,
-    `INSERT INTO badges (nome, descricao, imagem_url, tipo_criterio, aula_id) VALUES (?, ?, ?, ?, ?)`,
-    ['Guardião de Dados', 'Demonstrou domínio avançado sobre LGPD.', 'https://via.placeholder.com/96?text=3', 'especialista', null]
-  );
-
-  logger.info('Seed: 3 badges inseridas.');
+if (require.main === module) {
+  semear()
+    .then(() => pool.end())
+    .catch((erro) => {
+      logger.error('falha no seed', { erro });
+      process.exit(1);
+    });
 }
-
-async function seedAtividades(db) {
-  try {
-    await seedAulas(db);
-    await seedTrivia(db);
-    await seedBadges(db);
-  } catch (err) {
-    logger.error('Erro ao popular dados de atividades:', err);
-  }
-}
-
-module.exports = seedAtividades;

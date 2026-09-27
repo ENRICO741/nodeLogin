@@ -1,29 +1,24 @@
-const express = require('express');
-const cors = require('cors');
-const routes = require('./routes');
+const config = require('./config');
+const app = require('./app');
 const logger = require('./lib/logger');
+const { pool } = require('./db/pool');
+const { migrar } = require('./db/migrar');
+const { semear } = require('./db/seed');
 
-const app = express();
+async function iniciar() {
+  await migrar();
+  await semear();
+  const servidor = app.listen(config.PORT, () => logger.info('API no ar', { porta: config.PORT }));
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(routes);
+  const desligar = () => {
+    logger.info('desligando');
+    servidor.close(() => pool.end().then(() => process.exit(0)));
+  };
+  process.on('SIGTERM', desligar);
+  process.on('SIGINT', desligar);
+}
 
-// Simple health route
-app.get('/', (req, res) => {
-    res.send('Hello World!');
-});
-
-// Centralized error handler — any thrown errors will be logged
-// and return a generic 500 response. Route-level handlers may
-// still return custom statuses when appropriate.
-app.use((err, req, res, next) => {
-    logger.error('Unhandled error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-});
-
-const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
-    logger.info(`Server is running on port ${PORT}`);
+iniciar().catch((erro) => {
+  logger.error('falha ao iniciar', { erro });
+  process.exit(1);
 });

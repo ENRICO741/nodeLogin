@@ -1,19 +1,31 @@
 {
-  "name": "backend",
-  "version": "1.0.0",
-  "description": "",
-  "license": "ISC",
-  "author": "",
+  "name": "security-awareness-api",
+  "private": true,
   "type": "commonjs",
-  "main": "index.js",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon src/server.js"
+    "start": "node src/server.js",
+    "dev": "node --watch --env-file-if-exists=.env src/server.js",
+    "migrar": "node --env-file-if-exists=.env src/db/migrar.js",
+    "seed": "node --env-file-if-exists=.env src/db/seed.js",
+    "promover-admin": "node --env-file-if-exists=.env src/scripts/promover-admin.js",
+    "test": "node --test --test-concurrency=1 \"test/**/*.test.js\""
   },
   "dependencies": {
+    "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",
-    "nodemon": "^3.1.14",
-    "sqlite3": "^5.1.6"
+    "express-rate-limit": "^8.7.0",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "nodemailer": "^10.0.11",
+    "pg": "^8.23.0",
+    "sanitize-html": "^2.17.7",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "supertest": "^7.3.0"
   }
 }

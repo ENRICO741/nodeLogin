@@ -1,0 +1,1 @@
+CREATE DATABASE security_awareness_teste;
