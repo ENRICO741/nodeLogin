@@ -83,9 +83,27 @@ Sem SMTP configurado, o link de redefinição de senha aparece no log da API.
 
 ```bash
 npm install && npx eslint . && npx prettier --check .   # na raiz
-cd backend && npm test                                    # integração contra o Postgres de teste
-cd frontend && npm test                                   # vitest + Testing Library
+cd backend && npm run test:cobertura                      # node:test + supertest + c8 (Postgres de teste)
+cd frontend && npm run test:cobertura                     # vitest + Testing Library + v8
 ```
+
+A cobertura mínima é de 80% em linhas, branches, funções e statements. Abaixo disso o comando falha, e a CI também.
+
+**Backend** (`backend/test/`, 190 testes):
+
+- `unit/`: validação, erros, logger, mailer e config. Não precisa de banco.
+- `integracao/`: todas as rotas contra o Postgres de teste. Cobrem:
+  - entrada válida e inválida;
+  - autorização entre usuários;
+  - anti-farm e corridas de pontuação;
+  - recuperação de senha;
+  - rate limit;
+  - scripts de linha de comando e boot/desligamento do servidor.
+
+**Frontend** (`frontend/src/testes/`, 153 testes):
+
+- `utils.jsx` tem um `fetch` falso. As páginas rodam pelo `api.js` real e pelo `App` inteiro.
+- Os testes cobrem cada estado das telas: carregando, vazio, erro com nova tentativa, sucesso e validação por campo.
 
 O GitHub Actions (`.github/workflows/ci.yml`) roda tudo isso a cada push.
 

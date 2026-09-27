@@ -1,0 +1,115 @@
+const { describe, test, before, after } = require('node:test');
+const assert = require('node:assert/strict');
+const { app, request, pool, prepararBanco, novoUsuario } = require('../ajuda');
+const { migrar } = require('../../src/db/migrar');
+const { semear } = require('../../src/db/seed');
+const { transacao, atualizarLinha } = require('../../src/db/pool');
+
+before(prepararBanco);
+after(() => pool.end());
+
+describe('app', () => {
+  test('GET /api/saude responde sem login', async () => {
+    const res = await request(app).get('/api/saude').expect(200);
+    assert.deepEqual(res.body, { status: 'ok' });
+  });
+
+  test('não expõe X-Powered-By e manda headers de segurança do helmet', async () => {
+    const res = await request(app).get('/api/saude');
+    assert.equal(res.headers['x-powered-by'], undefined);
+    assert.equal(res.headers['x-content-type-options'], 'nosniff');
+    assert.ok(res.headers['content-security-policy']);
+  });
+
+  test('rota inexistente: 401 sem login, 404 com login', async () => {
+    await request(app).get('/api/nao-existe').expect(401);
+    const u = await novoUsuario();
+    const res = await u.api('get', '/api/nao-existe').expect(404);
+    assert.equal(res.body.erro.mensagem, 'Rota não encontrada');
+  });
+
+  test('fora de /api dá 404', async () => {
+    await request(app).get('/qualquer').expect(404);
+  });
+
+  test('JSON malformado dá 400 JSON_INVALIDO', async () => {
+    const res = await request(app)
+      .post('/api/auth/login')
+      .set('Content-Type', 'application/json')
+      .send('{"identificador": ')
+      .expect(400);
+    assert.equal(res.body.erro.codigo, 'JSON_INVALIDO');
+  });
+
+  test('corpo acima de 300 KB dá 413', async () => {
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ identificador: 'x'.repeat(310_000), senha: 'x' })
+      .expect(413);
+    assert.equal(res.body.erro.codigo, 'MUITO_GRANDE');
+  });
+
+  test('Content-Type diferente de JSON é tratado como corpo ausente (400, não 500)', async () => {
+    await request(app).post('/api/auth/login').set('Content-Type', 'text/plain').send('oi').expect(400);
+  });
+});
+
+describe('banco', () => {
+  test('migrar de novo não reaplica nada', async () => {
+    const antes = (await pool.query('SELECT nome FROM migracoes ORDER BY nome')).rows;
+    await migrar();
+    const depois = (await pool.query('SELECT nome FROM migracoes ORDER BY nome')).rows;
+    assert.deepEqual(depois, antes);
+    assert.ok(antes.some((m) => m.nome === '001_schema_inicial.sql'));
+  });
+
+  test('seed não duplica conteúdo se já existe aula', async () => {
+    const contar = async () =>
+      (
+        await pool.query(
+          'SELECT (SELECT count(*) FROM aulas)::int AS a, (SELECT count(*) FROM questoes_trivia)::int AS t, (SELECT count(*) FROM badges)::int AS b',
+        )
+      ).rows[0];
+    const antes = await contar();
+    await semear();
+    assert.deepEqual(await contar(), antes);
+  });
+
+  test('transacao desfaz tudo quando a função lança', async () => {
+    await assert.rejects(
+      transacao(async (c) => {
+        await c.query("INSERT INTO aulas (titulo, ordem, conteudo_html) VALUES ('Temporária', 7777, 'x')");
+        throw new Error('falhou no meio');
+      }),
+      /falhou no meio/,
+    );
+    const { rows } = await pool.query('SELECT 1 FROM aulas WHERE ordem = 7777');
+    assert.equal(rows.length, 0);
+  });
+
+  test('transacao confirma e devolve o resultado', async () => {
+    const r = await transacao(async (c) => (await c.query('SELECT 41 + 1 AS n')).rows[0].n);
+    assert.equal(r, 42);
+  });
+
+  test('atualizarLinha: sem dados só lê; id inexistente devolve undefined', async () => {
+    const { rows } = await pool.query('SELECT id, titulo FROM aulas LIMIT 1');
+    assert.deepEqual(await atualizarLinha(pool, 'aulas', rows[0].id, {}, 'id, titulo'), rows[0]);
+    assert.equal(
+      await atualizarLinha(pool, 'aulas', '00000000-0000-4000-8000-000000000000', { titulo: 'x' }, 'id'),
+      undefined,
+    );
+  });
+
+  test('constraints do banco barram dados inválidos mesmo sem passar pela API', async () => {
+    const invalidos = [
+      "INSERT INTO questoes_trivia (dificuldade, enunciado, alternativa_a, alternativa_b, alternativa_c, alternativa_d, resposta_correta) VALUES ('facil','x','a','b','c','d','e')",
+      "INSERT INTO questoes_trivia (dificuldade, enunciado, alternativa_a, alternativa_b, alternativa_c, alternativa_d, resposta_correta) VALUES ('extrema','x','a','b','c','d','a')",
+      "INSERT INTO badges (nome, descricao, tipo_criterio) VALUES ('x', 'y', 'aula_concluida')",
+      "INSERT INTO badges (nome, descricao, tipo_criterio) VALUES ('x', 'y', 'desconhecido')",
+      'UPDATE usuarios SET pontuacao_total = -1',
+      "UPDATE usuarios SET papel = 'root'",
+    ];
+    for (const sql of invalidos) await assert.rejects(pool.query(sql), { code: '23514' }, sql);
+  });
+});

@@ -30,8 +30,8 @@ jobs:
 
       - name: Backend (testes de integração)
         working-directory: backend
-        run: npm ci && npm test
+        run: npm ci && npm run test:cobertura
 
       - name: Frontend (testes e build)
         working-directory: frontend
-        run: npm ci && npm test && npm run build
+        run: npm ci && npm run test:cobertura && npm run build

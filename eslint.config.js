@@ -32,7 +32,10 @@ module.exports = [
   },
   {
     rules: {
-      'no-unused-vars': ['error', { argsIgnorePattern: '^_', caughtErrors: 'none' }],
+      'no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', ignoreRestSiblings: true, caughtErrors: 'none' },
+      ],
     },
   },
 ];
