@@ -16,8 +16,10 @@ export function RotaAdmin() {
   return usuario?.papel === 'admin' ? <Outlet /> : <Navigate to="/aulas" replace />;
 }
 
+// Logado não vê login/cadastro: volta para a página que tentou abrir antes (RotaProtegida guarda em state.de).
 export function RotaPublica() {
   const { usuario, carregando } = useAuth();
+  const { state } = useLocation();
   if (carregando) return <Carregando />;
-  return usuario ? <Navigate to="/aulas" replace /> : <Outlet />;
+  return usuario ? <Navigate to={state?.de ?? '/aulas'} replace /> : <Outlet />;
 }

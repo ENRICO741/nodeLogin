@@ -3,6 +3,7 @@ const config = require('../config');
 const { query } = require('../db/pool');
 const { naoAutenticado, proibido } = require('../lib/erros');
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CAMPOS_USUARIO =
   'id, nome, apelido, email, foto_perfil_url, bio, profissao, empresa, papel, pontuacao_total, criado_em';
 
@@ -26,6 +27,7 @@ async function autenticar(req, _res, next) {
   } catch {
     throw naoAutenticado('Sessão expirada. Faça login novamente');
   }
+  if (!UUID.test(payload.sub ?? '')) throw naoAutenticado('Sessão expirada. Faça login novamente');
 
   const { rows } = await query(
     `SELECT ${CAMPOS_USUARIO}, senha_alterada_em, ativo FROM usuarios WHERE id = $1`,

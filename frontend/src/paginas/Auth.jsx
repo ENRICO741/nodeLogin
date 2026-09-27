@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { useAuth } from '../contexto/Auth';
 import { api } from '../lib/api';
 import { Campo } from '../componentes/Campo';
@@ -46,12 +46,8 @@ function useEnvio(acao) {
 
 export function Entrar() {
   const { entrar } = useAuth();
-  const navigate = useNavigate();
-  const { state } = useLocation();
-  const { enviando, erro, enviar } = useEnvio(async (dados) => {
-    await entrar(dados);
-    navigate(state?.de ?? '/aulas', { replace: true });
-  });
+  // Depois do login, a RotaPublica redireciona (para a página de origem, se houver).
+  const { enviando, erro, enviar } = useEnvio(entrar);
 
   return (
     <TelaAuth
@@ -80,11 +76,7 @@ export function Entrar() {
 
 export function Cadastro() {
   const { cadastrar } = useAuth();
-  const navigate = useNavigate();
-  const { enviando, erro, porCampo, enviar } = useEnvio(async (dados) => {
-    await cadastrar(dados);
-    navigate('/aulas', { replace: true });
-  });
+  const { enviando, erro, porCampo, enviar } = useEnvio(cadastrar);
 
   return (
     <TelaAuth
