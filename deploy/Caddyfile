@@ -1,0 +1,28 @@
+# HTTPS automático (Let's Encrypt) para o domínio em DOMAIN.
+{$DOMAIN} {
+	encode zstd gzip
+
+	handle /api/* {
+		reverse_proxy api:4000
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Content-Security-Policy "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		-Server
+	}
+
+	# Assets com hash no nome nunca mudam; o resto (index.html, sw.js, manifest) sempre revalida.
+	@imutaveis path /assets/*
+	header @imutaveis Cache-Control "public, max-age=31536000, immutable"
+	header ?Cache-Control "no-cache"
+}
