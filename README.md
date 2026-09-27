@@ -12,8 +12,11 @@ O Guardião Digital é um PWA mobile-first de **conscientização em segurança 
 ```
 frontend/  React 19 + Vite + vite-plugin-pwa   → build estático servido pelo Caddy
 backend/   Node 24 + Express 5 + Postgres (pg) → API REST em /api
-deploy/    docker compose: Caddy (HTTPS + proxy /api) · API · Postgres
+deploy/    Caddyfile, build do PWA para produção, backup e guia da VM
 docs/      modelo relacional (ERD)
+
+docker-compose.yml       desenvolvimento: Postgres · API · Vite · Mailpit
+docker-compose.prod.yml  produção: Caddy (HTTPS + proxy /api) · API · Postgres
 ```
 
 O front e a API ficam sempre na **mesma origem**: `/api` passa pelo proxy do Vite em dev e pelo Caddy em produção. Por isso não há CORS.
@@ -52,32 +55,53 @@ O front e a API ficam sempre na **mesma origem**: `/api` passa pelo proxy do Vit
 
 ## Desenvolvimento
 
-Pré-requisitos: Node 24 ou mais recente e Docker.
+Só é preciso ter **Docker** (Docker Desktop no Windows ou macOS). Não precisa instalar Node nem Postgres.
 
-1. Suba o Postgres local. Ele já cria também o banco de testes:
-   ```bash
-   docker compose -f docker-compose.dev.yml up -d
-   ```
-2. Configure o backend:
-   ```bash
-   cd backend
-   printf 'DATABASE_URL=postgres://app:app@localhost:5432/security_awareness\nJWT_SECRET=%s\n' \
-     "$(node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))")" > .env
-   npm install
-   npm run dev      # API em http://localhost:4000; aplica migrações e seed ao subir
-   ```
-3. Em outro terminal, suba o frontend:
-   ```bash
-   cd frontend
-   npm install
-   npm run dev      # http://localhost:5173 (proxy /api → :4000)
-   ```
-4. Promova um usuário a admin (ele precisa ter se cadastrado antes):
-   ```bash
-   cd backend && npm run promover-admin -- email@empresa.com
-   ```
+```bash
+docker compose up --watch
+```
 
-Sem SMTP configurado, o link de redefinição de senha aparece no log da API.
+| Endereço | O quê |
+| --- | --- |
+| http://localhost:5173 | O app. Abra o DevTools no modo celular para ver o layout mobile |
+| http://localhost:8025 | Mailpit: caixa de e-mail falsa. O e-mail de "Esqueci minha senha" chega aqui |
+| http://localhost:4000/api/saude | A API |
+| `localhost:5432` | Postgres (usuário e senha `app`) |
+
+- Com `--watch`, mudanças em `backend/src` reiniciam a API, e mudanças em `frontend/src` recarregam a página.
+- Mudar um `package.json` reconstrói a imagem.
+- `Ctrl+C` para tudo. `docker compose down -v` também apaga o banco.
+
+Comandos úteis, com o ambiente rodando:
+
+```bash
+docker compose exec api npm run promover-admin -- voce@empresa.com   # vira admin (cadastre-se antes)
+docker compose exec api npm run test:cobertura                       # testes do backend
+docker compose exec web npm run test:cobertura                       # testes do frontend
+docker compose logs -f api                                           # logs da API
+```
+
+<details>
+<summary>Sem Docker para a API e o front (Node 24 na máquina)</summary>
+
+Suba só o banco com `docker compose up -d db`. Depois, no `backend/`, crie um `.env`:
+
+```
+DATABASE_URL=postgres://app:app@localhost:5432/security_awareness
+JWT_SECRET=<32+ caracteres>
+```
+
+Em seguida rode `npm install && npm run dev` no `backend/` e `npm install && npm run dev` no `frontend/`. Sem SMTP, o link de redefinição de senha aparece no log da API.
+
+</details>
+
+### Conferir o build de produção na sua máquina
+
+```bash
+DOMAIN=:80 APP_URL=http://localhost POSTGRES_PASSWORD=local JWT_SECRET=local-local-local-local-local-local-local   docker compose -f docker-compose.prod.yml -p guardiao-local up -d --build
+```
+
+O app abre em http://localhost, com o mesmo Caddy, CSP e service worker da VM, mas sem HTTPS. Para derrubar: `docker compose -p guardiao-local -f docker-compose.prod.yml down -v`.
 
 ### Testes e qualidade
 
@@ -88,6 +112,8 @@ cd frontend && npm run test:cobertura                     # vitest + Testing Lib
 ```
 
 A cobertura mínima é de 80% em linhas, branches, funções e statements. Abaixo disso o comando falha, e a CI também.
+
+Os testes rodam também dentro dos containers de dev (veja os comandos acima).
 
 **Backend** (`backend/test/`, 190 testes):
 

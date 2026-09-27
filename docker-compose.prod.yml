@@ -1,13 +1,17 @@
-# Produção numa única VM. Rode a partir desta pasta, com o arquivo deploy/.env preenchido:
-#   docker compose up -d --build
+# Produção (VM Azure). Na raiz do repositório, com o arquivo .env preenchido (veja .env.example):
+#   docker compose -f docker-compose.prod.yml up -d --build
+# Para conferir o build de produção na sua máquina, sem domínio nem HTTPS:
+#   DOMAIN=:80 APP_URL=http://localhost docker compose -f docker-compose.prod.yml up -d --build
+name: guardiao
+
 services:
   db:
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_USER: ${POSTGRES_USER:-app}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_DB: ${POSTGRES_DB:-security_awareness}
     volumes:
       - db:/var/lib/postgresql/data
     healthcheck:
@@ -16,14 +20,16 @@ services:
       retries: 10
 
   api:
-    build: ../backend
+    build:
+      context: ./backend
+      target: prod
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      DATABASE_URL: postgres://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-security_awareness}
       JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env}
       JWT_EXPIRA_EM: ${JWT_EXPIRA_EM:-7d}
-      APP_URL: https://${DOMAIN}
+      APP_URL: ${APP_URL:-https://${DOMAIN}}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}
@@ -35,10 +41,11 @@ services:
 
   web:
     build:
-      context: ..
+      context: .
       dockerfile: deploy/web.Dockerfile
     restart: unless-stopped
     environment:
+      # Domínio real = HTTPS automático (Let's Encrypt). ":80" = só HTTP, para teste local.
       DOMAIN: ${DOMAIN:?defina DOMAIN no .env}
     ports:
       - '80:80'

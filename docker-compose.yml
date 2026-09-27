@@ -1,0 +1,85 @@
+# Ambiente de desenvolvimento completo. Só precisa de Docker:
+#   docker compose up --watch
+# App: http://localhost:5173 · API: http://localhost:4000 · E-mails: http://localhost:8025
+# Alterações em backend/src e frontend/src são aplicadas sozinhas (--watch).
+name: guardiao-dev
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: security_awareness
+    ports:
+      - '5432:5432' # exposto para rodar os testes do backend a partir da máquina
+    volumes:
+      - db:/var/lib/postgresql/data
+      - ./deploy/dev-init.sql:/docker-entrypoint-initdb.d/dev-init.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U app -d security_awareness']
+      interval: 3s
+      retries: 20
+
+  # Caixa de e-mail falsa: recebe o e-mail de redefinição de senha.
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - '8025:8025'
+
+  api:
+    build:
+      context: ./backend
+      target: dev
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgres://app:app@db:5432/security_awareness
+      TEST_DATABASE_URL: postgres://app:app@db:5432/security_awareness_teste
+      JWT_SECRET: segredo-so-para-desenvolvimento-local-0123456789
+      APP_URL: http://localhost:5173
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMTP_REMETENTE: Guardião Digital <no-reply@guardiao.local>
+    ports:
+      - '4000:4000'
+    depends_on:
+      db:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./backend/src
+          target: /app/src
+        - action: sync
+          path: ./backend/test
+          target: /app/test
+        - action: rebuild
+          path: ./backend/package.json
+
+  web:
+    build: ./frontend
+    environment:
+      VITE_API_PROXY: http://api:4000
+    ports:
+      - '5173:5173'
+    depends_on:
+      - api
+    develop:
+      watch:
+        - action: sync
+          path: ./frontend/src
+          target: /app/src
+        - action: sync
+          path: ./frontend/public
+          target: /app/public
+        - action: sync+restart
+          path: ./frontend/index.html
+          target: /app/index.html
+        - action: sync+restart
+          path: ./frontend/vite.config.js
+          target: /app/vite.config.js
+        - action: rebuild
+          path: ./frontend/package.json
+
+volumes:
+  db:

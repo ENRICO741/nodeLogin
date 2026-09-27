@@ -1,5 +1,8 @@
 # Deploy numa VM Azure
 
+Tudo roda com o [`docker-compose.prod.yml`](../docker-compose.prod.yml), da raiz do repositório.
+Dica: rode `export COMPOSE_FILE=docker-compose.prod.yml` na VM, e aí o `-f` deixa de ser necessário nos comandos abaixo.
+
 Três contêineres rodam numa única VM:
 
 - **web** (Caddy): serve o PWA, faz o proxy de `/api` para a API e emite o certificado HTTPS automaticamente com Let's Encrypt.
@@ -22,12 +25,12 @@ Só as portas 80 e 443 ficam expostas. A API e o banco ficam na rede interna do 
 
 ## 2. Primeiro deploy
 
-1. Clone o repositório e crie o `.env`:
+1. Clone o repositório e crie o `.env` na raiz:
    ```bash
    sudo mkdir -p /opt/guardiao && sudo chown $USER /opt/guardiao
    git clone <url-do-repositorio> /opt/guardiao
-   cd /opt/guardiao/deploy
-   cp ../.env.example .env
+   cd /opt/guardiao
+   cp .env.example .env
    ```
 2. Edite o `.env` e preencha no mínimo:
 
@@ -38,23 +41,22 @@ Só as portas 80 e 443 ficam expostas. A API e o banco ficam na rede interna do 
    | `JWT_SECRET` | Gere com `openssl rand -base64 48` |
    | `SMTP_*` | Os dados do provedor de e-mail |
 
-   Remova a linha `DATABASE_URL`: em produção o compose monta a URL sozinho.
 3. Suba a stack:
    ```bash
-   docker compose up -d --build
-   docker compose ps               # api e db devem ficar "healthy"
-   curl https://$DOMAIN/api/saude  # {"status":"ok"}
+   docker compose -f docker-compose.prod.yml up -d --build
+   docker compose -f docker-compose.prod.yml ps   # api e db devem ficar "healthy"
+   curl https://SEU_DOMINIO/api/saude             # {"status":"ok"}
    ```
 4. Crie o primeiro admin. Cadastre-se pelo app e depois rode:
    ```bash
-   docker compose exec api node src/scripts/promover-admin.js email@empresa.com
+   docker compose -f docker-compose.prod.yml exec api node src/scripts/promover-admin.js email@empresa.com
    ```
 
 ## 3. Atualizar
 
 ```bash
 cd /opt/guardiao && git pull
-cd deploy && docker compose up -d --build
+docker compose -f docker-compose.prod.yml up -d --build
 ```
 
 Migrações novas são aplicadas sozinhas quando a API sobe. Quem estiver com o app aberto vê o aviso "Nova versão disponível".
@@ -74,11 +76,11 @@ Copie os backups para fora da VM (por exemplo, um Azure Blob Storage). Se a VM f
 ### Restaurar
 
 ```bash
-cd /opt/guardiao/deploy
-docker compose stop api
+cd /opt/guardiao
+docker compose -f docker-compose.prod.yml stop api
 gunzip -c /var/backups/guardiao/banco-AAAA-MM-DD.sql.gz | \
-  docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d postgres -c "DROP DATABASE $POSTGRES_DB" -c "CREATE DATABASE $POSTGRES_DB" && psql -U "$POSTGRES_USER" "$POSTGRES_DB"'
-docker compose start api
+  docker compose -f docker-compose.prod.yml exec -T db sh -c 'psql -U "$POSTGRES_USER" -d postgres -c "DROP DATABASE $POSTGRES_DB" -c "CREATE DATABASE $POSTGRES_DB" && psql -U "$POSTGRES_USER" "$POSTGRES_DB"'
+docker compose -f docker-compose.prod.yml start api
 ```
 
 > **Atenção:** a restauração **apaga** o banco atual antes de carregar o backup. Confira a data do arquivo antes de rodar.
@@ -86,6 +88,6 @@ docker compose start api
 ## 5. Logs e diagnóstico
 
 ```bash
-docker compose logs -f api   # uma linha JSON por requisição/evento
-docker compose logs -f web   # Caddy (certificado, acessos)
+docker compose -f docker-compose.prod.yml logs -f api   # uma linha JSON por requisição/evento
+docker compose -f docker-compose.prod.yml logs -f web   # Caddy (certificado, acessos)
 ```

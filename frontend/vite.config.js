@@ -37,7 +37,8 @@ export default defineConfig({
     }),
   ],
   server: {
-    proxy: { '/api': 'http://localhost:4000' },
+    // No docker-compose de dev a API é o serviço "api"; rodando direto na máquina, localhost.
+    proxy: { '/api': process.env.VITE_API_PROXY ?? 'http://localhost:4000' },
   },
   test: {
     environment: 'jsdom',
