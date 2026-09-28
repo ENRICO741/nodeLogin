@@ -6,4 +6,5 @@ const apiBaseUrl = process.env.REACT_APP_API_URL || `${window.location.protocol}
 
 const api = axios.create({ baseURL: apiBaseUrl });
 
+export { apiBaseUrl };
 export default api;

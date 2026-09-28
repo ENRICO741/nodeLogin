@@ -43,6 +43,7 @@ const {
     getEstatisticasUsuariosTrivia,
   },
 } = require('./models');
+const { listarConteudos, getConteudoPorOrdem } = require('./lib/conteudoAulas');
 
 const routes = express.Router();
 
@@ -499,6 +500,30 @@ routes.put('/questoes-trivia/:id', async (req, res) => {
   } catch (err) {
     logger.error('Erro ao atualizar imagem da questão de trivia:', err);
     return res.status(500).json({ error: 'Erro ao atualizar imagem da questão' });
+  }
+});
+
+// ----- Conteúdo teórico das aulas (módulo separado do quiz) -----
+
+routes.get('/conteudos', (req, res) => {
+  try {
+    const conteudos = listarConteudos();
+    return res.json(conteudos);
+  } catch (err) {
+    logger.error('Erro ao listar conteúdos de aula:', err);
+    return res.status(500).json({ error: 'Erro ao listar conteúdos' });
+  }
+});
+
+routes.get('/conteudos/:ordem', (req, res) => {
+  const { ordem } = req.params;
+  try {
+    const conteudo = getConteudoPorOrdem(ordem);
+    if (!conteudo) return res.status(404).json({ error: 'Conteúdo não encontrado' });
+    return res.json(conteudo);
+  } catch (err) {
+    logger.error('Erro ao buscar conteúdo de aula:', err);
+    return res.status(500).json({ error: 'Erro ao buscar conteúdo' });
   }
 });
 

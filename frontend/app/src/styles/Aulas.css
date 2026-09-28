@@ -119,6 +119,27 @@
   margin-bottom: 28px;
 }
 
+.aula-conteudo-html img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 14px;
+  margin: 12px 0 20px;
+  display: block;
+}
+
+.aula-conteudo-html h2 {
+  margin-top: 28px;
+  color: #111827;
+}
+
+.aula-conteudo-html h2:first-child {
+  margin-top: 0;
+}
+
+.aula-conteudo-html h3 {
+  color: #334155;
+}
+
 .aula-ja-concluida {
   display: inline-block;
   margin-bottom: 16px;

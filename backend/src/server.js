@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const cors = require('cors');
 const routes = require('./routes');
 const logger = require('./lib/logger');
@@ -8,6 +9,7 @@ const app = express();
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use('/content-assets', express.static(path.resolve(__dirname, '..', 'content', 'aulas', 'assets')));
 app.use(routes);
 
 // Simple health route

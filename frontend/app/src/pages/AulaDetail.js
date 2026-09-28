@@ -1,14 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import api from '../lib/api';
+import api, { apiBaseUrl } from '../lib/api';
 import QuestionCard from '../components/QuestionCard';
 import * as telemetry from '../lib/telemetry';
 import '../styles/Aulas.css';
+
+function resolverCaminhosDeImagem(html) {
+  return html.replaceAll('src="/content-assets/', `src="${apiBaseUrl}/content-assets/`);
+}
 
 function AulaDetail({ userId }) {
   const { aulaId } = useParams();
 
   const [aula, setAula] = useState(null);
+  const [conteudoTeorico, setConteudoTeorico] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -43,6 +48,21 @@ function AulaDetail({ userId }) {
 
     fetchAula();
   }, [aulaId, userId]);
+
+  useEffect(() => {
+    if (!aula) return;
+
+    const fetchConteudoTeorico = async () => {
+      try {
+        const response = await api.get(`/conteudos/${aula.ordem}`);
+        setConteudoTeorico(response.data);
+      } catch (err) {
+        setConteudoTeorico(null);
+      }
+    };
+
+    fetchConteudoTeorico();
+  }, [aula]);
 
   const iniciarAtividade = async () => {
     try {
@@ -132,7 +152,12 @@ function AulaDetail({ userId }) {
             <div className="aula-ja-concluida">✔ Você já concluiu esta aula</div>
           )}
           <h1>{aula.titulo}</h1>
-          <div className="aula-conteudo-html" dangerouslySetInnerHTML={{ __html: aula.conteudo_html }} />
+          <div
+            className="aula-conteudo-html"
+            dangerouslySetInnerHTML={{
+              __html: resolverCaminhosDeImagem(conteudoTeorico ? conteudoTeorico.conteudoHtml : aula.conteudo_html),
+            }}
+          />
           <button type="button" className="btn-iniciar" onClick={iniciarAtividade}>
             {aula.concluida ? 'Refazer atividade' : 'Iniciar atividade'}
           </button>
