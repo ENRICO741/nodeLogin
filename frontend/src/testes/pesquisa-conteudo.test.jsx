@@ -148,7 +148,7 @@ describe('eventos de navegação, leitura e resultado', () => {
     const { servidor } = await renderizarApp('/aulas/a1', { rotas });
     expect((await screen.findByText('Importante')).closest('aside')).toHaveClass('nota');
     await userEvent.click(screen.getByRole('button', { name: 'Responder 1 pergunta' }));
-    await userEvent.click(await screen.findByRole('button', { name: /^A/ }));
+    await userEvent.click(await screen.findByRole('button', { name: 'A' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Concluir aula' }));
     await screen.findByRole('heading', { name: 'Aula concluída!' });
 

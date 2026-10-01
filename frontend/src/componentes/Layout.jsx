@@ -46,7 +46,7 @@ function BotaoTema() {
     <button
       type="button"
       className={`botao botao--texto ${styles.tema}`}
-      aria-label="Tema escuro"
+      aria-label={escuro ? 'Ativar tema claro' : 'Ativar tema escuro'}
       aria-pressed={escuro}
       onClick={alternar}
     >
