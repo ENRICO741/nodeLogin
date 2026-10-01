@@ -1,5 +1,15 @@
 @import './tokens.css';
 
+/* Montserrat (SIL OFL 1.1, ver fontes/OFL.txt), servida pelo próprio app: a CSP só libera 'self'.
+   Arquivo variável (pesos 400–800), subconjunto latin, que cobre os acentos do português. */
+@font-face {
+  font-family: 'Montserrat';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('./fontes/montserrat-latin.woff2') format('woff2');
+}
+
 *,
 *::before,
 *::after {

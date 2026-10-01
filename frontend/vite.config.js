@@ -30,6 +30,8 @@ export default defineConfig({
       },
       workbox: {
         // App shell em cache; a API (/api) nunca vai para o cache.
+        // woff2 entra no precache para a Montserrat funcionar offline.
+        globPatterns: ['**/*.{js,css,html,woff2}'],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//],
         cleanupOutdatedCaches: true,
