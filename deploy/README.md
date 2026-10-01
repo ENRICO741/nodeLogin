@@ -55,9 +55,12 @@ Só as portas 80 e 443 ficam expostas. A API e o banco ficam na rede interna do 
 ## 3. Atualizar
 
 ```bash
-cd /opt/guardiao && git pull
-docker compose -f docker-compose.prod.yml up -d --build
+/opt/guardiao/deploy/deploy.sh
 ```
+
+O script baixa o código (`git pull`), faz backup do banco, reconstrói as imagens com `--pull` (traz as correções de segurança das imagens base), sobe a stack e espera a API ficar saudável. Se ela não subir, mostra os últimos logs e termina com erro.
+
+Para voltar a uma versão anterior: `git reset --hard <commit>` e `docker compose -f docker-compose.prod.yml up -d --build`.
 
 Migrações novas são aplicadas sozinhas quando a API sobe. Quem estiver com o app aberto vê o aviso "Nova versão disponível".
 
