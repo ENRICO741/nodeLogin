@@ -11,13 +11,14 @@
   z-index: 20;
   padding: var(--esp-2) var(--esp-4);
   border-radius: var(--raio);
-  background: var(--cor-primaria);
-  color: var(--cor-sobre-primaria);
+  background: var(--cor-acao);
+  color: var(--cor-sobre-acao);
 }
 .pular:focus {
   top: var(--esp-2);
 }
 
+/* Barra escura nos dois temas, como o menu do site da Impacta. */
 .cabecalho {
   position: sticky;
   top: 0;
@@ -28,8 +29,9 @@
   gap: var(--esp-3);
   padding: calc(var(--esp-3) + env(safe-area-inset-top)) calc(var(--esp-4) + env(safe-area-inset-right))
     var(--esp-3) calc(var(--esp-4) + env(safe-area-inset-left));
-  background: var(--cor-superficie);
-  border-bottom: 1px solid var(--cor-borda);
+  background: var(--cor-cabecalho);
+  color: var(--cor-sobre-cabecalho);
+  border-bottom: 1px solid var(--cor-borda-cabecalho);
 }
 .marca {
   display: flex;
@@ -37,12 +39,14 @@
   gap: var(--esp-2);
   font-weight: 800;
   font-size: var(--texto-lg);
+  letter-spacing: var(--espaco-letras);
 }
 .acoes {
   display: flex;
   align-items: center;
   gap: var(--esp-1);
 }
+
 /* Switch de tema: o botão inteiro (44x44) é o alvo de toque; o trilho visível é menor. */
 .tema {
   display: inline-flex;
@@ -66,14 +70,13 @@
   position: relative;
   width: var(--alvo-toque);
   height: 1.5rem;
-  border: 1px solid var(--cor-borda-campo);
+  border: 1px solid var(--cor-sobre-cabecalho-suave);
   border-radius: var(--raio-pilula);
-  background: var(--cor-superficie-2);
+  background: var(--cor-trilho-cabecalho);
   transition:
     background-color var(--transicao),
     border-color var(--transicao);
 }
-/* Borda na bolinha: branco sobre o trilho bege não chega a 3:1, a borda-campo sim. */
 .bolinha {
   position: absolute;
   top: 1px;
@@ -82,30 +85,32 @@
   place-items: center;
   width: 1.25rem;
   height: 1.25rem;
-  border: 1px solid var(--cor-borda-campo);
   border-radius: 50%;
-  background: var(--cor-superficie);
-  color: var(--cor-texto-suave);
+  background: var(--cor-sobre-cabecalho);
+  color: var(--cor-cabecalho);
   transition: transform var(--transicao);
 }
 .tema[aria-checked='true'] .trilho {
-  border-color: var(--cor-primaria);
-  background: var(--cor-primaria);
+  border-color: var(--cor-acao);
+  background: var(--cor-acao);
 }
 .tema[aria-checked='true'] .bolinha {
-  border-color: var(--cor-superficie);
-  color: var(--cor-primaria);
+  background: var(--cor-sobre-acao);
+  color: var(--cor-acao);
   transform: translateX(1.25rem);
 }
+
+/* Pontos no estilo do botão "Login" do site: retângulo ciano, texto escuro em negrito. */
 .pontos {
   display: inline-flex;
   align-items: center;
   gap: var(--esp-1);
   padding: var(--esp-1) var(--esp-3);
-  border-radius: var(--raio-pilula);
-  font-weight: 700;
-  background: var(--cor-conquista-suave);
-  color: var(--cor-sobre-conquista-suave);
+  border-radius: var(--raio-sm);
+  font-weight: 800;
+  letter-spacing: var(--espaco-letras);
+  background: var(--cor-cta);
+  color: var(--cor-sobre-cta);
 }
 
 .conteudo {
@@ -120,8 +125,8 @@
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-  background: var(--cor-superficie);
-  border-top: 1px solid var(--cor-borda);
+  background: var(--cor-cabecalho);
+  border-top: 1px solid var(--cor-borda-cabecalho);
 }
 .aba {
   display: grid;
@@ -132,16 +137,24 @@
   font-size: var(--texto-xs);
   font-weight: 600;
   text-decoration: none;
-  color: var(--cor-texto-suave);
+  color: var(--cor-sobre-cabecalho-suave);
+  /* Indicador da aba ativa (não só a cor): barra no topo no celular, embaixo na tela larga. */
+  border-top: 3px solid transparent;
+}
+@media (hover: hover) {
+  .aba:hover {
+    color: var(--cor-sobre-cabecalho);
+  }
 }
 .ativa {
-  color: var(--cor-primaria);
+  color: var(--cor-cta);
+  border-top-color: var(--cor-cta);
 }
 .ativa svg {
   stroke-width: 2.5;
 }
 
-/* Tela larga: a navegação vai para o topo, logo abaixo do cabeçalho. */
+/* Tela larga: a navegação vai para o topo, logo abaixo do cabeçalho, como o menu do site. */
 @media (min-width: 48rem) {
   .abas {
     position: sticky;
@@ -151,10 +164,15 @@
     justify-content: center;
     gap: var(--esp-2);
     border-top: 0;
-    border-bottom: 1px solid var(--cor-borda);
+    border-bottom: 1px solid var(--cor-borda-cabecalho);
   }
   .cabecalho {
     position: static;
+    border-bottom: 0;
+  }
+  .marca {
+    text-transform: uppercase;
+    letter-spacing: var(--espaco-letras);
   }
   .aba {
     grid-auto-flow: column;
@@ -162,9 +180,40 @@
     min-height: 52px;
     padding: 0 var(--esp-4);
     font-size: var(--texto-sm);
+    font-weight: 500;
+    color: var(--cor-sobre-cabecalho);
+    border-top: 0;
+    border-bottom: 3px solid transparent;
+  }
+  .ativa {
+    color: var(--cor-cta);
+    border-bottom-color: var(--cor-cta);
   }
   .conteudo {
     order: 2;
     padding-bottom: var(--esp-6);
+  }
+}
+
+/* Tela bem larga: uma barra só, como o site. As abas ficam centralizadas sobre o cabeçalho.
+   72rem: abaixo disso a marca em caixa alta encosta nas abas. */
+@media (min-width: 72rem) {
+  .cabecalho {
+    position: sticky;
+    top: 0;
+    border-bottom: 1px solid var(--cor-borda-cabecalho);
+  }
+  .abas {
+    position: fixed;
+    inset: 0 auto auto 50%;
+    z-index: 11;
+    transform: translateX(-50%);
+    padding-top: env(safe-area-inset-top);
+    background: transparent;
+    border-bottom: 0;
+  }
+  .aba {
+    min-height: calc(var(--alvo-toque) + 2 * var(--esp-3));
+    padding: 0 var(--esp-3);
   }
 }
