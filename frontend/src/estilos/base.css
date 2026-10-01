@@ -39,14 +39,21 @@ h3 {
   line-height: 1.25;
   text-wrap: balance;
 }
+/* Título de página no padrão Impacta: caixa alta, negrito, azul da marca (texto grande, 3:1). */
 h1 {
   font-size: var(--texto-2xl);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: var(--espaco-letras);
+  color: var(--cor-titulo);
 }
 h2 {
   font-size: var(--texto-xl);
+  font-weight: 700;
 }
 h3 {
   font-size: var(--texto-lg);
+  font-weight: 700;
 }
 p {
   margin: 0 0 var(--esp-3);
@@ -103,6 +110,12 @@ a {
   align-items: center;
   gap: var(--esp-2);
 }
+.linha > :is(h1, h2, h3) {
+  margin-bottom: 0;
+}
+.linha > .campo {
+  flex: 1 1 12rem;
+}
 
 /* ---------- Cartão ---------- */
 .cartao {
@@ -114,6 +127,7 @@ a {
 }
 
 /* ---------- Botões ---------- */
+/* Pílula azul com texto branco em negrito, como "Vestibular 2027" e "Voltar" no site. */
 .botao {
   display: inline-flex;
   align-items: center;
@@ -122,28 +136,30 @@ a {
   min-height: var(--alvo-toque);
   padding: var(--esp-2) var(--esp-5);
   border: 1px solid transparent;
-  border-radius: var(--raio);
+  border-radius: var(--raio-pilula);
   font: inherit;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: var(--espaco-letras);
   text-decoration: none;
   cursor: pointer;
   transition:
     background-color var(--transicao),
     border-color var(--transicao);
-  background: var(--cor-primaria);
-  color: var(--cor-sobre-primaria);
+  background: var(--cor-acao);
+  color: var(--cor-sobre-acao);
 }
 .botao:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
+/* Contornado, como o "Ver cursos"/"Enviar" do site. */
 .botao--secundario {
-  background: var(--cor-superficie);
+  background: transparent;
   color: var(--cor-primaria);
-  border-color: var(--cor-borda-campo);
+  border-color: var(--cor-primaria);
 }
 .botao--perigo {
-  background: var(--cor-superficie);
+  background: transparent;
   color: var(--cor-erro);
   border-color: currentColor;
 }
@@ -157,12 +173,14 @@ a {
 }
 @media (hover: hover) {
   .botao:not(:disabled):hover {
-    background: var(--cor-primaria-hover);
+    background: var(--cor-acao-hover);
   }
   .botao--secundario:not(:disabled):hover,
-  .botao--perigo:not(:disabled):hover,
   .botao--texto:not(:disabled):hover {
-    background: var(--cor-superficie-2);
+    background: var(--cor-primaria-suave);
+  }
+  .botao--perigo:not(:disabled):hover {
+    background: var(--cor-erro-suave);
   }
 }
 
@@ -185,7 +203,7 @@ a {
   color: var(--cor-texto);
   background: var(--cor-superficie);
   border: 1px solid var(--cor-borda-campo);
-  border-radius: var(--raio);
+  border-radius: var(--raio-sm);
 }
 .campo textarea {
   min-height: 7rem;
@@ -251,7 +269,8 @@ a {
   display: inline-flex;
   align-items: center;
   gap: var(--esp-1);
-  padding: 2px var(--esp-2);
+  padding: 1px var(--esp-2);
+  border: 1px solid currentColor;
   border-radius: var(--raio-pilula);
   font-size: var(--texto-xs);
   font-weight: 700;
@@ -277,6 +296,7 @@ a {
   height: 8px;
   border-radius: var(--raio-pilula);
   background: var(--cor-superficie-2);
+  box-shadow: inset 0 0 0 1px var(--cor-borda);
   overflow: hidden;
 }
 .progresso > span {

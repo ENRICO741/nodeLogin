@@ -1,27 +1,35 @@
 /* Tokens do Guardião Digital. Cores semânticas: componentes nunca usam hex direto.
 
+   Identidade visual: segue o site do Centro Universitário Impacta (impacta.edu.br): Montserrat,
+   cabeçalho quase-preto em todos os temas, títulos em caixa alta no azul da marca, botões em
+   pílula azul, CTA ciano retangular e cards com borda fina e cantos de 20px. O tema escuro
+   reproduz o site (fundo #00050b, painéis #0d181d); o claro usa as mesmas peças sobre bege.
+
    Tema: atributo data-theme="light" | "dark" no <html>, aplicado por public/tema.js antes da
    primeira pintura (escolha salva em localStorage; sem escolha, segue prefers-color-scheme do SO).
 
-   Paleta de marca (Faculdade Impacta): azul #116FFF, ciano #00C2FC, quase-preto #020D13.
-   Puros, o azul e o ciano não passam AA como texto (#fff sobre #116FFF = 4.43:1; #116FFF sobre
-   #faf7f0 = 4.14:1; #00C2FC sobre #fff = 2.07:1). Por isso os tokens derivados são misturas em
-   OKLab (= color-mix(in oklab, A p%, B)) no menor ajuste que atinge o contraste exigido:
-     claro:  primária = 87% #116FFF + #020D13; hover = 85% primária + #020D13;
-             primária-suave = 12% #116FFF + fundo; sobre-primária-suave = 62% #116FFF + #020D13;
-             destaque = 77% #00C2FC + #020D13 (3:1 sobre a trilha); conquista = 93% #b45309 + #020D13;
-             foco = #116FFF puro (anel de foco só precisa de 3:1);
-             borda = 50% #cbd5e1 + #e9e3d9 (slate puxado para o bege: some menos na superfície-2).
-     escuro: primária = 83% #116FFF + #fff; hover/foco = 75% primária + #fff;
-             primária-suave = 22% #116FFF + #020D13; sobre-primária-suave = 60% #116FFF + #fff;
-             superfícies = #020D13 + #4a6d88 (84%, 72%, 58% de #020D13); destaque = #00C2FC puro.
+   Paleta de marca: azul #116FFF, ciano #00C2FC, quase-preto #020D13 (e #00050b, #0d181d,
+   #b0b3b7 e #e2e2e2, tirados do CSS do site). Puros, o azul e o ciano não passam AA como texto
+   comum (#fff sobre #116FFF = 4.43:1; #116FFF sobre #faf7f0 = 4.14:1). Por isso os tokens
+   derivados são misturas em OKLab (= color-mix(in oklab, A p%, B)) no menor ajuste que atinge o
+   contraste exigido:
+     ação (pílula azul, texto branco) = 99% #116FFF + #020D13; hover = 85% ação + #020D13.
+     título = #116FFF puro: só em texto grande (h1/h2), que pede 3:1.
+     claro:  primária (links) = 87% #116FFF + #020D13; primária-suave = 12% #116FFF + fundo;
+             sobre-primária-suave = 62% #116FFF + #020D13; destaque = 77% #00C2FC + #020D13;
+             conquista = 93% #b45309 + #020D13; borda = 50% #cbd5e1 + #e9e3d9.
+     escuro: primária = 83% #116FFF + #fff; foco = 75% primária + #fff;
+             primária-suave = 20% #116FFF + fundo; sobre-primária-suave = 60% #116FFF + #fff;
+             superfície-2 = 94% superfície + #fff; borda = 82% superfície + #fff.
+     cabeçalho: borda = 86% #020d13 + #fff; trilho do switch = 80% #020d13 + #fff.
 
    Contrastes mínimos validados (claro / escuro), contra fundo, superfície, superfície-2 e os
    fundos "-suave" onde o par aparece nos CSS:
-     texto 14.48 / 12.80 · texto-suave 6.15 / 7.19 · primária (texto) 4.53 / 4.54
-     sobre-primária em primária 5.58 / 5.97 · sobre-*-suave em *-suave 7.05 / 7.01
-     erro 5.50 / 5.70 · conquista 4.58 / 9.73 · borda-campo 4.04 / 4.53 · foco 3.76 / 6.72
-     destaque (barra de progresso) 3.01 / 7.60 */
+     texto 14.48 / 13.54 · texto-suave 6.15 / 7.60 · primária (texto) 4.53 / 4.54
+     título (texto grande) 3.76 / 3.61 · branco na ação 4.51 · ação contra o fundo 4.21 / 4.00
+     sobre-*-suave em *-suave 7.05 / 7.11 · erro 5.50 / 5.78 · conquista 4.58 / 10.75
+     borda-campo 4.74 / 3.61 · foco 3.76 / 6.82 · destaque (barra de progresso) 3.01 / 7.71
+     cabeçalho: texto 15.16 · texto suave 4.5+ · CTA ciano 6.07 · texto no CTA 9.46 · foco 4.43 */
 :root {
   color-scheme: light;
 
@@ -29,15 +37,17 @@
   --cor-superficie: #ffffff;
   --cor-superficie-2: #f1ece3;
   --cor-borda: #dadcdd;
-  --cor-borda-campo: #64748b;
+  --cor-borda-campo: #0e61dc;
   --cor-texto: #0f172a;
   --cor-texto-suave: #475569;
 
+  --cor-titulo: #116fff;
   --cor-primaria: #0e61dc;
-  --cor-primaria-hover: #0b54ba;
-  --cor-sobre-primaria: #ffffff;
   --cor-primaria-suave: #e0e8f5;
   --cor-sobre-primaria-suave: #08489c;
+  --cor-acao: #116efc;
+  --cor-acao-hover: #0d5ed4;
+  --cor-sobre-acao: #ffffff;
   --cor-destaque: #0893bf;
 
   --cor-sucesso: #15803d;
@@ -50,16 +60,27 @@
   --cor-conquista-suave: #fef3c7;
   --cor-sobre-conquista-suave: #78350f;
 
-  --cor-foco: #116fff;
-  --sombra: 0 1px 2px rgb(15 23 42 / 6%), 0 4px 12px rgb(15 23 42 / 6%);
+  /* Cabeçalho e abas: escuros nos dois temas, como a barra do site. */
+  --cor-cabecalho: #020d13;
+  --cor-sobre-cabecalho: #e2e2e2;
+  --cor-sobre-cabecalho-suave: #7d8a91;
+  --cor-borda-cabecalho: #1c282e;
+  --cor-trilho-cabecalho: #29353b;
+  --cor-cta: #00c2fc;
+  --cor-sobre-cta: #020d13;
 
-  --fonte: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --cor-foco: #116fff;
+  --sombra: 0 1px 2px rgb(2 13 19 / 6%), 0 4px 12px rgb(2 13 19 / 6%);
+
+  --fonte: 'Montserrat', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
   --texto-xs: 0.8125rem;
   --texto-sm: 0.875rem;
   --texto-md: 1rem;
   --texto-lg: 1.125rem;
   --texto-xl: 1.375rem;
   --texto-2xl: 1.75rem;
+  --espaco-letras: 0.04em;
+  --espaco-letras-largo: 0.18em;
 
   --esp-1: 0.25rem;
   --esp-2: 0.5rem;
@@ -69,8 +90,9 @@
   --esp-6: 2rem;
   --esp-7: 3rem;
 
-  --raio: 12px;
-  --raio-lg: 16px;
+  --raio-sm: 4px;
+  --raio: 8px;
+  --raio-lg: 20px;
   --raio-pilula: 999px;
   --alvo-toque: 44px;
   --largura-conteudo: 42rem;
@@ -81,18 +103,17 @@
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  --cor-fundo: #020d13;
-  --cor-superficie: #091a23;
-  --cor-superficie-2: #112530;
-  --cor-borda: #1c3240;
-  --cor-borda-campo: #7c8aa5;
-  --cor-texto: #e2e8f0;
-  --cor-texto-suave: #a3b0c5;
+  --cor-fundo: #00050b;
+  --cor-superficie: #0d181d;
+  --cor-superficie-2: #192328;
+  --cor-borda: #313b40;
+  --cor-borda-campo: #116fff;
+  --cor-texto: #ececec;
+  --cor-texto-suave: #b0b3b7;
 
+  --cor-titulo: #116fff;
   --cor-primaria: #458bff;
-  --cor-primaria-hover: #75aaff;
-  --cor-sobre-primaria: #020d13;
-  --cor-primaria-suave: #03213f;
+  --cor-primaria-suave: #001733;
   --cor-sobre-primaria-suave: #7aaeff;
   --cor-destaque: #00c2fc;
 
@@ -107,5 +128,5 @@
   --cor-sobre-conquista-suave: #fde68a;
 
   --cor-foco: #75aaff;
-  --sombra: 0 1px 2px rgb(0 0 0 / 40%);
+  --sombra: none;
 }
