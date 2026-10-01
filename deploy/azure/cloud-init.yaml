@@ -1,0 +1,30 @@
+#cloud-config
+# Roda uma vez, no primeiro boot da VM. __REPO__ e __DOMINIO__ são trocados pelo criar-vm.sh.
+swap:
+  filename: /swapfile
+  size: 2G
+
+package_update: true
+packages: [git, openssl]
+
+runcmd:
+  - curl -fsSL https://get.docker.com | sh
+  - usermod -aG docker azureuser
+  - git clone __REPO__ /opt/guardiao
+  # .env com o domínio e segredos gerados aqui mesmo (não saem da VM). Falta só o SMTP.
+  - |
+    cd /opt/guardiao
+    cp .env.example .env
+    sed -i \
+      -e "s|^DOMAIN=.*|DOMAIN=__DOMINIO__|" \
+      -e "s|^SMTP_HOST=.*|SMTP_HOST=smtp-relay.brevo.com|" \
+      -e "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -hex 24)|" \
+      -e "s|^JWT_SECRET=.*|JWT_SECRET=$(openssl rand -base64 48 | tr -d '\n/+=')|" \
+      -e "s|^PESQUISA_SEGREDO=.*|PESQUISA_SEGREDO=$(openssl rand -hex 24)|" \
+      .env
+    chmod 600 .env
+  # Backup diário às 3h (deploy/backup.sh).
+  - mkdir -p /var/backups/guardiao
+  - touch /var/log/guardiao-backup.log
+  - chown -R azureuser:azureuser /opt/guardiao /var/backups/guardiao /var/log/guardiao-backup.log
+  - echo "0 3 * * * /opt/guardiao/deploy/backup.sh >> /var/log/guardiao-backup.log 2>&1" | crontab -u azureuser -
