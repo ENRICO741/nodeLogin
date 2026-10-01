@@ -38,6 +38,17 @@
   font-weight: 800;
   font-size: var(--texto-lg);
 }
+.acoes {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-1);
+}
+/* .acoes na frente: base.css carrega depois dos módulos e .botao--texto venceria o empate. */
+.acoes .tema {
+  min-width: var(--alvo-toque);
+  padding: 0;
+  color: var(--cor-texto-suave);
+}
 .pontos {
   display: inline-flex;
   align-items: center;

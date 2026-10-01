@@ -1,21 +1,44 @@
 /* Tokens do Guardião Digital. Cores semânticas: componentes nunca usam hex direto.
-   Contraste mínimo AA (4.5:1 texto, 3:1 bordas de controles) verificado nos dois temas. */
+
+   Tema: atributo data-theme="light" | "dark" no <html>, aplicado por public/tema.js antes da
+   primeira pintura (escolha salva em localStorage; sem escolha, segue prefers-color-scheme do SO).
+
+   Paleta de marca (Faculdade Impacta): azul #116FFF, ciano #00C2FC, quase-preto #020D13.
+   Puros, o azul e o ciano não passam AA como texto (#fff sobre #116FFF = 4.43:1; #116FFF sobre
+   #faf7f0 = 4.14:1; #00C2FC sobre #fff = 2.07:1). Por isso os tokens derivados são misturas em
+   OKLab (= color-mix(in oklab, A p%, B)) no menor ajuste que atinge o contraste exigido:
+     claro:  primária = 87% #116FFF + #020D13; hover = 85% primária + #020D13;
+             primária-suave = 12% #116FFF + fundo; sobre-primária-suave = 62% #116FFF + #020D13;
+             destaque = 77% #00C2FC + #020D13 (3:1 sobre a trilha); conquista = 93% #b45309 + #020D13;
+             foco = #116FFF puro (anel de foco só precisa de 3:1);
+             borda = 50% #cbd5e1 + #e9e3d9 (slate puxado para o bege: some menos na superfície-2).
+     escuro: primária = 83% #116FFF + #fff; hover/foco = 75% primária + #fff;
+             primária-suave = 22% #116FFF + #020D13; sobre-primária-suave = 60% #116FFF + #fff;
+             superfícies = #020D13 + #4a6d88 (84%, 72%, 58% de #020D13); destaque = #00C2FC puro.
+
+   Contrastes mínimos validados (claro / escuro), contra fundo, superfície, superfície-2 e os
+   fundos "-suave" onde o par aparece nos CSS:
+     texto 14.48 / 12.80 · texto-suave 6.15 / 7.19 · primária (texto) 4.53 / 4.54
+     sobre-primária em primária 5.58 / 5.97 · sobre-*-suave em *-suave 7.05 / 7.01
+     erro 5.50 / 5.70 · conquista 4.58 / 9.73 · borda-campo 4.04 / 4.53 · foco 3.76 / 6.72
+     destaque (barra de progresso) 3.01 / 7.60 */
 :root {
   color-scheme: light;
 
-  --cor-fundo: #f8fafc;
+  --cor-fundo: #faf7f0;
   --cor-superficie: #ffffff;
-  --cor-superficie-2: #f1f5f9;
-  --cor-borda: #e2e8f0;
+  --cor-superficie-2: #f1ece3;
+  --cor-borda: #dadcdd;
   --cor-borda-campo: #64748b;
   --cor-texto: #0f172a;
   --cor-texto-suave: #475569;
 
-  --cor-primaria: #1e3a8a;
-  --cor-primaria-hover: #1e40af;
+  --cor-primaria: #0e61dc;
+  --cor-primaria-hover: #0b54ba;
   --cor-sobre-primaria: #ffffff;
-  --cor-primaria-suave: #dbeafe;
-  --cor-sobre-primaria-suave: #1e3a8a;
+  --cor-primaria-suave: #e0e8f5;
+  --cor-sobre-primaria-suave: #08489c;
+  --cor-destaque: #0893bf;
 
   --cor-sucesso: #15803d;
   --cor-sucesso-suave: #dcfce7;
@@ -23,11 +46,11 @@
   --cor-erro: #b91c1c;
   --cor-erro-suave: #fee2e2;
   --cor-sobre-erro-suave: #7f1d1d;
-  --cor-conquista: #b45309;
+  --cor-conquista: #a64e11;
   --cor-conquista-suave: #fef3c7;
   --cor-sobre-conquista-suave: #78350f;
 
-  --cor-foco: #2563eb;
+  --cor-foco: #116fff;
   --sombra: 0 1px 2px rgb(15 23 42 / 6%), 0 4px 12px rgb(15 23 42 / 6%);
 
   --fonte: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -55,35 +78,34 @@
   --transicao: 150ms ease-out;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
+:root[data-theme='dark'] {
+  color-scheme: dark;
 
-    --cor-fundo: #0b1220;
-    --cor-superficie: #111a2e;
-    --cor-superficie-2: #1a2540;
-    --cor-borda: #26324d;
-    --cor-borda-campo: #7c8aa5;
-    --cor-texto: #e2e8f0;
-    --cor-texto-suave: #a3b0c5;
+  --cor-fundo: #020d13;
+  --cor-superficie: #091a23;
+  --cor-superficie-2: #112530;
+  --cor-borda: #1c3240;
+  --cor-borda-campo: #7c8aa5;
+  --cor-texto: #e2e8f0;
+  --cor-texto-suave: #a3b0c5;
 
-    --cor-primaria: #60a5fa;
-    --cor-primaria-hover: #93c5fd;
-    --cor-sobre-primaria: #0b1220;
-    --cor-primaria-suave: #172554;
-    --cor-sobre-primaria-suave: #bfdbfe;
+  --cor-primaria: #458bff;
+  --cor-primaria-hover: #75aaff;
+  --cor-sobre-primaria: #020d13;
+  --cor-primaria-suave: #03213f;
+  --cor-sobre-primaria-suave: #7aaeff;
+  --cor-destaque: #00c2fc;
 
-    --cor-sucesso: #4ade80;
-    --cor-sucesso-suave: #052e16;
-    --cor-sobre-sucesso-suave: #bbf7d0;
-    --cor-erro: #f87171;
-    --cor-erro-suave: #450a0a;
-    --cor-sobre-erro-suave: #fecaca;
-    --cor-conquista: #fbbf24;
-    --cor-conquista-suave: #451a03;
-    --cor-sobre-conquista-suave: #fde68a;
+  --cor-sucesso: #4ade80;
+  --cor-sucesso-suave: #052e16;
+  --cor-sobre-sucesso-suave: #bbf7d0;
+  --cor-erro: #f87171;
+  --cor-erro-suave: #450a0a;
+  --cor-sobre-erro-suave: #fecaca;
+  --cor-conquista: #fbbf24;
+  --cor-conquista-suave: #451a03;
+  --cor-sobre-conquista-suave: #fde68a;
 
-    --cor-foco: #93c5fd;
-    --sombra: 0 1px 2px rgb(0 0 0 / 40%);
-  }
+  --cor-foco: #75aaff;
+  --sombra: 0 1px 2px rgb(0 0 0 / 40%);
 }

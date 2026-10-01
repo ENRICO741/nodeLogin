@@ -258,4 +258,25 @@ describe('navegação', () => {
     expect(screen.getByRole('link', { name: 'Pular para o conteúdo' })).toHaveAttribute('href', '#conteudo');
     expect(screen.getByRole('main')).toHaveAttribute('id', 'conteudo');
   });
+
+  it('botão de tema alterna claro/escuro no <html> e guarda a escolha', async () => {
+    document.documentElement.dataset.theme = 'light';
+    await renderizarApp('/aulas', { rotas: { 'GET /aulas': [] } });
+    const botao = screen.getByRole('button', { name: 'Tema escuro' });
+    expect(botao).toHaveAttribute('aria-pressed', 'false');
+
+    await userEvent.click(botao);
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    expect(localStorage.getItem('guardiao.tema')).toBe('dark');
+    expect(botao).toHaveAttribute('aria-pressed', 'true');
+
+    await userEvent.click(botao);
+    expect(document.documentElement.dataset.theme).toBe('light');
+    expect(localStorage.getItem('guardiao.tema')).toBe('light');
+
+    // Troca vinda de fora (tema.js seguindo o SO): o botão acompanha.
+    document.documentElement.dataset.theme = 'dark';
+    await waitFor(() => expect(botao).toHaveAttribute('aria-pressed', 'true'));
+    delete document.documentElement.dataset.theme;
+  });
 });

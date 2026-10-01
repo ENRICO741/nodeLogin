@@ -48,8 +48,9 @@
   font-size: var(--texto-sm);
   color: var(--cor-texto-suave);
 }
-.inativo {
-  opacity: 0.6;
+/* Esmaece só o título (o selo "Inativa" diz o estado); opacity no li derrubava o contraste dos botões. */
+.inativo .itemTexto {
+  color: var(--cor-texto-suave);
 }
 
 /* Tabelas de estatística */

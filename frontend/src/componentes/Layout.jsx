@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
-import { Award, BookOpen, Star, Trophy, User, Zap } from 'lucide-react';
+import { Award, BookOpen, Moon, Star, Sun, Trophy, User, Zap } from 'lucide-react';
 import { useAuth } from '../contexto/Auth';
 import { registrarEvento } from '../lib/telemetria';
 import styles from './Layout.module.css';
@@ -12,6 +12,48 @@ const ABAS = [
   { para: '/conquistas', rotulo: 'Conquistas', Icone: Award },
   { para: '/perfil', rotulo: 'Perfil', Icone: User },
 ];
+
+// O tema vem de public/tema.js (aplicado no <html> antes da pintura, e segue o SO sem escolha salva).
+// O botão lê o próprio atributo, assim fica certo mesmo quando o SO troca o tema.
+const assinarTema = (avisar) => {
+  const observador = new MutationObserver(avisar);
+  observador.observe(document.documentElement, { attributeFilter: ['data-theme'] });
+  return () => observador.disconnect();
+};
+const temaEscuro = () => document.documentElement.dataset.theme === 'dark';
+
+function BotaoTema() {
+  const escuro = useSyncExternalStore(assinarTema, temaEscuro);
+
+  function alternar() {
+    const tema = escuro ? 'light' : 'dark';
+    const aplicar = () => {
+      document.documentElement.dataset.theme = tema;
+    };
+    // Esmaecimento nativo entre os temas; sem animação para quem pediu menos movimento.
+    if (document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches)
+      document.startViewTransition(aplicar);
+    else aplicar();
+    try {
+      localStorage.setItem('guardiao.tema', tema);
+    } catch {
+      /* vale só nesta sessão */
+    }
+  }
+
+  const Icone = escuro ? Moon : Sun;
+  return (
+    <button
+      type="button"
+      className={`botao botao--texto ${styles.tema}`}
+      aria-label="Tema escuro"
+      aria-pressed={escuro}
+      onClick={alternar}
+    >
+      <Icone aria-hidden="true" size={20} />
+    </button>
+  );
+}
 
 export function Layout() {
   const { usuario } = useAuth();
@@ -38,9 +80,12 @@ export function Layout() {
           <img src="/logo.svg" alt="" width="28" height="28" />
           Guardião Digital
         </span>
-        <span className={styles.pontos} aria-label={`${usuario.pontuacao_total} pontos`}>
-          <Star aria-hidden="true" size={16} />
-          {usuario.pontuacao_total}
+        <span className={styles.acoes}>
+          <span className={styles.pontos} aria-label={`${usuario.pontuacao_total} pontos`}>
+            <Star aria-hidden="true" size={16} />
+            {usuario.pontuacao_total}
+          </span>
+          <BotaoTema />
         </span>
       </header>
 
