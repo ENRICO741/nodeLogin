@@ -1,3 +1,4 @@
+/* Opções de dificuldade no estilo dos cards de curso do site: borda fina, título azul em negrito. */
 .opcao {
   display: flex;
   align-items: center;
@@ -9,7 +10,9 @@
   text-align: left;
   color: inherit;
   cursor: pointer;
-  transition: border-color var(--transicao);
+  transition:
+    border-color var(--transicao),
+    background-color var(--transicao);
 }
 .opcao:disabled {
   cursor: wait;
@@ -18,11 +21,20 @@
 @media (hover: hover) {
   .opcao:not(:disabled):hover {
     border-color: var(--cor-primaria);
+    background: var(--cor-superficie-2);
   }
 }
+/* Ícone em círculo azul-suave. É o próprio <svg>: o padding mantém o traço em 28px dentro dos 2.75rem. */
 .icone {
+  display: grid;
+  place-items: center;
   flex-shrink: 0;
-  color: var(--cor-primaria);
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: var(--esp-2);
+  border-radius: 50%;
+  background: var(--cor-primaria-suave);
+  color: var(--cor-sobre-primaria-suave);
 }
 .textos {
   display: grid;
@@ -31,17 +43,27 @@
 .rotulo {
   font-size: var(--texto-lg);
   font-weight: 700;
+  color: var(--cor-primaria);
 }
 .descricao {
   color: var(--cor-texto-suave);
   font-size: var(--texto-sm);
 }
+/* "Sorteando…": selo contornado, como as tags "Presencial" do site. */
+.opcao :global(.selo) {
+  background: transparent;
+  border: 1px solid currentColor;
+}
+/* Voltar: rótulo pequeno, caixa alta e espaçado, como os títulos de seção do rodapé do site. */
 .voltar {
   display: inline-flex;
   align-items: center;
   gap: var(--esp-1);
   min-height: var(--alvo-toque);
   margin-bottom: var(--esp-2);
-  font-weight: 600;
+  font-size: var(--texto-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--espaco-letras-largo);
   text-decoration: none;
 }

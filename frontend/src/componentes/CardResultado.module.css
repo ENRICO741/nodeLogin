@@ -11,6 +11,11 @@
   margin: 0;
   color: var(--cor-texto-suave);
 }
+.acertos strong {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--cor-texto);
+}
 .numeros {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -19,22 +24,44 @@
 }
 .numeros > div {
   display: grid;
-  padding: var(--esp-3);
-  border-radius: var(--raio);
-  background: var(--cor-superficie-2);
+  align-content: center;
+  gap: var(--esp-1);
+  padding: var(--esp-4) var(--esp-3);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+}
+/* Pontos ganhos em destaque: fundo ciano e texto escuro, como os pontos do cabeçalho. */
+.numeros > div:first-child {
+  border-color: var(--cor-cta);
+  background: var(--cor-cta);
+  color: var(--cor-sobre-cta);
+}
+.numeros > div:first-child .rotulo {
+  color: inherit;
 }
 .valor {
   font-size: var(--texto-2xl);
   font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
 }
+/* Rótulo no padrão do site: pequeno, caixa alta, negrito e espaçado. */
 .rotulo {
-  font-size: var(--texto-sm);
+  font-size: var(--texto-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--espaco-letras-largo);
   color: var(--cor-texto-suave);
 }
 .nota {
   font-size: var(--texto-sm);
   color: var(--cor-texto-suave);
   margin: 0;
+}
+.badges {
+  width: 100%;
+  padding-top: var(--esp-3);
+  border-top: 1px solid var(--cor-borda);
 }
 .badges ul {
   display: flex;
@@ -46,7 +73,11 @@
   padding: 0;
 }
 .badges p {
+  font-size: var(--texto-sm);
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--espaco-letras-largo);
+  color: var(--cor-primaria);
   margin-bottom: var(--esp-2);
 }
 .acoes {
