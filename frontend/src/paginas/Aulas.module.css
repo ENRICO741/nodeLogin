@@ -7,9 +7,19 @@
 .resumo :global(.linha) {
   justify-content: space-between;
 }
+/* Rótulo no padrão Impacta ("CURSOS", "CENTRAL DE ATENDIMENTO"): pequeno, caixa alta, espaçado. */
+.resumo strong {
+  font-size: var(--texto-xs);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: var(--espaco-letras-largo);
+  color: var(--cor-primaria);
+}
 .contagem {
   color: var(--cor-texto-suave);
   font-size: var(--texto-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 .lista {
   display: grid;
@@ -31,31 +41,80 @@
   .item:hover {
     border-color: var(--cor-primaria);
   }
+  .item:hover .seta,
+  .item:hover .titulo {
+    color: var(--cor-primaria);
+  }
 }
+.item:focus-visible .titulo {
+  color: var(--cor-primaria);
+}
+/* Número em círculo contornado, como as tags "Presencial"; aula concluída ganha o ciano de destaque. */
 .numero {
   display: grid;
   place-items: center;
   flex-shrink: 0;
   width: 2.5rem;
   height: 2.5rem;
+  border: 2px solid currentColor;
   border-radius: 50%;
   font-weight: 800;
-  background: var(--cor-primaria-suave);
-  color: var(--cor-sobre-primaria-suave);
+  font-variant-numeric: tabular-nums;
+  color: var(--cor-primaria);
+}
+.numero:has(svg) {
+  border-color: var(--cor-destaque);
+  background: var(--cor-destaque);
+  color: var(--cor-superficie);
 }
 .info {
   display: grid;
   flex: 1;
   min-width: 0;
 }
+/* Título do item em negrito neutro; fica azul no hover/foco do card. */
 .titulo {
   font-weight: 700;
+  color: var(--cor-texto);
+  transition: color var(--transicao);
 }
 .meta {
   font-size: var(--texto-sm);
   color: var(--cor-texto-suave);
+  font-variant-numeric: tabular-nums;
+}
+.item :global(.selo--sucesso) {
+  background: transparent;
+  border: 1px solid currentColor;
+  color: var(--cor-sucesso);
 }
 .seta {
   flex-shrink: 0;
   color: var(--cor-texto-suave);
+  transition: color var(--transicao);
+}
+/* Celular: selo "Concluída" desce para baixo do título em vez de espremer a linha. */
+@media (max-width: 30rem) {
+  .item {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    column-gap: var(--esp-3);
+    row-gap: var(--esp-1);
+  }
+  .numero {
+    grid-row: 1 / span 2;
+  }
+  .info {
+    grid-column: 2;
+  }
+  .item :global(.selo) {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: start;
+  }
+  .seta {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    align-self: center;
+  }
 }

@@ -1,30 +1,56 @@
-/* Prévia local das aulas: imita o visual do app. Não é importado para o banco.
-   Se mudar o estilo da aula no app (frontend/src/paginas/Aula.module.css), atualize aqui também. */
+/* Prévia local das aulas: imita o visual do app (tema claro). Não é importado para o banco.
+   Se mudar o estilo da aula no app (frontend/src/paginas/Aula.module.css), atualize aqui também.
+   Cores = tokens do tema claro (frontend/src/estilos/tokens.css). */
+
+/* Mesma Montserrat do app. url() resolve a partir deste arquivo, então serve para qualquer aula.
+   Se o navegador bloquear a fonte em file:// (ex.: Firefox), cai no system-ui. */
+@font-face {
+  font-family: 'Montserrat';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('../../frontend/src/estilos/fontes/montserrat-latin.woff2') format('woff2');
+}
 :root {
-  --primaria: #1e3a8a;
+  --titulo: #116fff;
+  --primaria: #0e61dc;
   --texto: #0f172a;
   --suave: #475569;
-  --borda: #e2e8f0;
-  --superficie-2: #f1f5f9;
+  --borda: #dadcdd;
+  --superficie-2: #f1ece3;
   font-family:
+    'Montserrat',
     system-ui,
     -apple-system,
     'Segoe UI',
     Roboto,
+    Arial,
     sans-serif;
   color: var(--texto);
-  background: #f8fafc;
+  background: #faf7f0;
+}
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 body {
   max-width: 42rem;
   margin: 0 auto;
   padding: 1.5rem 1rem 4rem;
-  line-height: 1.65;
+  line-height: 1.7;
+  overflow-wrap: break-word;
+  -webkit-font-smoothing: antialiased;
 }
+/* O <title> faz o papel do <h1> do app: caixa alta, negrito, azul da marca. */
 head title {
   display: block;
   font-size: 1.75rem;
   font-weight: 800;
+  line-height: 1.25;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--titulo);
   margin: 0 0 1rem;
 }
 head {
@@ -33,20 +59,55 @@ head {
 head > :not(title) {
   display: none;
 }
+h2,
+h3 {
+  line-height: 1.25;
+  text-wrap: balance;
+}
 h2 {
   font-size: 1.375rem;
-  margin: 1.75rem 0 0.5rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--titulo);
+  margin: 2rem 0 0.5rem;
 }
 h3 {
-  font-size: 1.125rem;
-  margin: 1.25rem 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  margin: 1.5rem 0 0.5rem;
+}
+p,
+ul,
+ol {
+  margin: 0 0 0.75rem;
+}
+ul,
+ol {
+  padding-left: 1.5rem;
+}
+li + li {
+  margin-top: 0.25rem;
+}
+li::marker {
+  color: var(--primaria);
+  font-weight: 700;
+}
+a {
+  color: var(--primaria);
+  font-weight: 600;
 }
 img {
+  display: block;
   max-width: 100%;
-  border-radius: 12px;
+  height: auto;
+  border-radius: 8px;
+  background: var(--superficie-2);
 }
 figure {
-  margin: 1.25rem 0;
+  margin: 1.5rem 0;
 }
 figcaption {
   font-size: 0.875rem;
@@ -54,28 +115,36 @@ figcaption {
   margin-top: 0.5rem;
   text-align: center;
 }
+blockquote {
+  margin: 1rem 0;
+  padding-left: 1rem;
+  border-left: 3px solid var(--primaria);
+  color: var(--suave);
+}
 aside {
   margin: 1rem 0;
-  padding: 0.75rem 1rem 0.75rem 1rem;
-  border-radius: 10px;
-  border-left: 4px solid;
+  padding: 0.75rem 1rem;
+  border-left: 3px solid;
+  border-radius: 0 8px 8px 0;
 }
 aside > :last-child {
   margin-bottom: 0;
 }
 aside::before {
   display: block;
-  font-weight: 700;
-  font-size: 0.875rem;
   margin-bottom: 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
 }
 aside.nota {
-  background: #dbeafe;
-  border-color: #1e3a8a;
-  color: #1e3a8a;
+  background: #e0e8f5;
+  border-color: #0e61dc;
+  color: #08489c;
 }
 aside.nota::before {
-  content: 'ⓘ Nota';
+  content: 'Nota';
 }
 aside.dica {
   background: #dcfce7;
@@ -83,21 +152,24 @@ aside.dica {
   color: #14532d;
 }
 aside.dica::before {
-  content: '✓ Dica';
+  content: 'Dica';
 }
 aside.atencao {
   background: #fef3c7;
-  border-color: #b45309;
+  border-color: #a64e11;
   color: #78350f;
 }
 aside.atencao::before {
-  content: '⚠ Atenção';
+  content: 'Atenção';
 }
 table {
-  width: 100%;
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
   border-collapse: collapse;
   margin: 1rem 0;
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
 }
 th,
 td {
@@ -106,18 +178,29 @@ td {
   border-bottom: 1px solid var(--borda);
 }
 th {
-  background: var(--superficie-2);
+  font-size: 0.8125rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--primaria);
+  border-bottom: 2px solid var(--primaria);
 }
 code {
   background: var(--superficie-2);
   padding: 0.1em 0.35em;
   border-radius: 4px;
+  font-size: 0.9em;
 }
 pre {
   background: var(--superficie-2);
   padding: 0.75rem 1rem;
-  border-radius: 10px;
+  border: 1px solid var(--borda);
+  border-radius: 8px;
   overflow-x: auto;
+}
+pre code {
+  padding: 0;
+  background: none;
 }
 
 /* Perguntas: na prévia aparecem como na tela de quiz, com a correta marcada (só para quem escreve). */
@@ -136,7 +219,7 @@ pre {
 [data-pergunta] {
   background: #fff;
   border: 1px solid var(--borda);
-  border-radius: 16px;
+  border-radius: 20px;
   padding: 1rem 1.25rem;
   margin-bottom: 1rem;
 }
