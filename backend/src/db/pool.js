@@ -1,7 +1,11 @@
 const { Pool } = require('pg');
 const config = require('../config');
+const logger = require('../lib/logger');
 
-const pool = new Pool({ connectionString: config.DATABASE_URL });
+// Banco fora do ar: a requisição falha em 5 s em vez de esperar uma conexão para sempre.
+const pool = new Pool({ connectionString: config.DATABASE_URL, connectionTimeoutMillis: 5000 });
+// Banco reiniciou/caiu: o pg avisa pelas conexões ociosas. Sem este listener o Node derruba a API.
+pool.on('error', (erro) => logger.error('conexão ociosa com o banco caiu', { erro }));
 
 async function transacao(fn) {
   const cliente = await pool.connect();

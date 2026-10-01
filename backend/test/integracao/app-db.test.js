@@ -14,6 +14,14 @@ describe('app', () => {
     assert.deepEqual(res.body, { status: 'ok' });
   });
 
+  test('conexão ociosa que cai (banco reiniciou) só vai para o log, sem derrubar a API', (t) => {
+    const erro = t.mock.method(console, 'error', () => {});
+    pool.emit('error', new Error('terminating connection due to administrator command'));
+    assert.ok(
+      erro.mock.calls.some((c) => String(c.arguments[0]).includes('conexão ociosa com o banco caiu')),
+    );
+  });
+
   test('não expõe X-Powered-By e manda headers de segurança do helmet', async () => {
     const res = await request(app).get('/api/saude');
     assert.equal(res.headers['x-powered-by'], undefined);
