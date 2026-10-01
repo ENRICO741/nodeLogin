@@ -90,11 +90,30 @@ Os CSVs não trazem nome, e-mail nem apelido. Cada pessoa aparece como um pseud�
 
 ## Desenvolvimento
 
-Só é preciso ter **Docker** (Docker Desktop no Windows ou macOS). Não precisa instalar Node nem Postgres.
+Só é preciso ter **Docker** (Docker Desktop no Windows ou macOS). Não precisa instalar Node nem Postgres, nem criar `.env`.
 
-```bash
-docker compose up --watch
-```
+### Passo a passo
+
+1. Abra o Docker Desktop e espere ele ficar pronto.
+2. Na raiz do repositório, suba tudo em segundo plano:
+
+   ```bash
+   docker compose up -d --build
+   ```
+
+   A primeira vez demora alguns minutos (baixa as imagens e instala as dependências).
+
+3. Confira se a API subiu: abra http://localhost:4000/api/saude. Deve aparecer `"banco":"ok"`.
+4. Abra o app em http://localhost:5173 e crie sua conta em **Cadastrar**.
+5. Transforme sua conta em admin (use o e-mail do cadastro):
+
+   ```bash
+   docker compose exec api npm run promover-admin -- voce@empresa.com
+   ```
+
+   Deve aparecer `<seu apelido> agora é admin.`
+
+6. Recarregue a página do app e vá em **Perfil → Área do administrador** (ou abra http://localhost:5173/admin).
 
 | Endereço | O quê |
 | --- | --- |
@@ -103,9 +122,11 @@ docker compose up --watch
 | http://localhost:4000/api/saude | A API |
 | `localhost:5432` | Postgres (usuário e senha `app`) |
 
-- Com `--watch`, mudanças em `backend/src` ou `conteudo/` reiniciam a API (e reimportam as aulas), e mudanças em `frontend/src` recarregam a página.
-- Mudar um `package.json` reconstrói a imagem.
-- `Ctrl+C` para tudo. `docker compose down -v` também apaga o banco.
+**Depois de mudar o código**, rode `docker compose up -d --build` de novo: sem `--watch`, os containers não acompanham as mudanças sozinhos. Para acompanhar ao vivo, use `docker compose up --watch` (mostra os logs no terminal).
+
+**Parar:** `docker compose down`. Para apagar também o banco (e começar do zero, inclusive o admin): `docker compose down -v`.
+
+**Algo não subiu?** `docker compose ps` mostra o estado de cada container e `docker compose logs api` mostra o erro da API.
 
 Comandos úteis, com o ambiente rodando:
 
