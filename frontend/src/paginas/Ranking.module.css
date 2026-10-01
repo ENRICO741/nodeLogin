@@ -1,22 +1,40 @@
+/* "Sua posição": número em bloco azul da marca e fio azul ao lado do texto. */
 .minha {
   display: flex;
   align-items: center;
   gap: var(--esp-4);
   margin-bottom: var(--esp-4);
   padding: var(--esp-4);
-  background: var(--cor-primaria-suave);
-  color: var(--cor-sobre-primaria-suave);
-  border-color: transparent;
 }
 .minhaPosicao {
+  padding: var(--esp-1) var(--esp-3);
+  border-radius: var(--raio-sm);
   font-size: var(--texto-2xl);
   font-weight: 800;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  background: var(--cor-acao);
+  color: var(--cor-sobre-acao);
+}
+.minha > span:last-child {
+  padding-left: var(--esp-3);
+  border-left: 3px solid var(--cor-primaria);
+}
+.minha strong {
+  font-size: var(--texto-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--espaco-letras-largo);
+  color: var(--cor-primaria);
 }
 .suave {
   color: var(--cor-texto-suave);
 }
 .minha .suave {
-  color: inherit;
+  font-size: var(--texto-lg);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--cor-texto);
 }
 .lista {
   list-style: none;
@@ -35,22 +53,32 @@
   border-top: 1px solid var(--cor-borda);
 }
 .eu {
-  background: var(--cor-primaria-suave);
+  background: var(--cor-superficie-2);
   box-shadow: inset 3px 0 0 var(--cor-primaria);
 }
 .posicao {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 2px;
   width: 3.25rem;
   flex-shrink: 0;
+  padding: 2px var(--esp-1);
+  border: 1px solid transparent;
+  border-radius: var(--raio-sm);
   font-weight: 800;
+  font-variant-numeric: tabular-nums;
   color: var(--cor-texto-suave);
 }
-.podio1,
+/* Pódio: 1º em bloco azul da marca; 2º e 3º contornados no azul, como as tags "Presencial". */
+.podio1 {
+  background: var(--cor-acao);
+  color: var(--cor-sobre-acao);
+}
 .podio2,
 .podio3 {
-  color: var(--cor-conquista);
+  border-color: currentColor;
+  color: var(--cor-primaria);
 }
 .apelido {
   display: flex;
@@ -66,6 +94,7 @@
   white-space: nowrap;
 }
 .pontos {
-  font-weight: 700;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }

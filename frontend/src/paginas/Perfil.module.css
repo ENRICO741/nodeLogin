@@ -6,20 +6,26 @@
 }
 .nome {
   margin: var(--esp-2) 0 0;
+  font-weight: 800;
 }
 .apelido {
   margin: 0;
   color: var(--cor-texto-suave);
+  font-weight: 600;
+  letter-spacing: var(--espaco-letras);
 }
+/* Pontos na pílula azul da marca. */
 .pontos {
   display: inline-flex;
   align-items: center;
   gap: var(--esp-1);
   padding: var(--esp-1) var(--esp-3);
   border-radius: var(--raio-pilula);
-  font-weight: 700;
-  background: var(--cor-conquista-suave);
-  color: var(--cor-sobre-conquista-suave);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--espaco-letras);
+  background: var(--cor-acao);
+  color: var(--cor-sobre-acao);
 }
 .detalhes {
   display: flex;
@@ -35,7 +41,10 @@
   gap: var(--esp-1);
 }
 .bio {
+  justify-self: stretch;
   margin: var(--esp-2) 0;
+  padding-top: var(--esp-3);
+  border-top: 1px solid var(--cor-borda);
   white-space: pre-line;
 }
 .foto {
@@ -51,12 +60,20 @@
   grid-template-columns: 1fr 1fr;
   gap: var(--esp-2);
 }
+/* Rótulo de seção do site: pequeno, caixa alta, espaçado, no azul da marca. */
 .tituloSecao {
-  font-size: var(--texto-lg);
   margin: 0;
+  font-size: var(--texto-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--espaco-letras-largo);
+  color: var(--cor-primaria);
 }
+/* Filete azul ao lado do bloco informativo, como na página de contato do site. */
 .estadoConsentimento {
   margin: 0;
+  padding-left: var(--esp-3);
+  border-left: 3px solid var(--cor-primaria);
   font-size: var(--texto-sm);
   color: var(--cor-texto-suave);
 }

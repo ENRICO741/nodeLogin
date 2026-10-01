@@ -8,6 +8,7 @@
 }
 .badge {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   justify-items: center;
   align-content: start;
   gap: var(--esp-2);
@@ -22,9 +23,10 @@
   height: 3.5rem;
   border-radius: 50%;
 }
+/* Obtida: ícone na pílula azul da marca; bloqueada: neutra. */
 .obtida .icone {
-  background: var(--cor-conquista-suave);
-  color: var(--cor-sobre-conquista-suave);
+  background: var(--cor-acao);
+  color: var(--cor-sobre-acao);
 }
 .bloqueada .icone {
   background: var(--cor-superficie-2);
@@ -32,10 +34,28 @@
 }
 .nome {
   font-size: var(--texto-md);
+  font-weight: 700;
+  letter-spacing: var(--espaco-letras);
   margin: 0;
 }
 .descricao {
   font-size: var(--texto-sm);
   color: var(--cor-texto-suave);
   margin: 0;
+}
+/* Selo: azul-suave quando obtida; contornado (como as tags "Presencial") quando bloqueada. */
+.badge :global(.selo) {
+  max-width: 100%;
+  white-space: normal;
+  text-align: center;
+}
+.obtida :global(.selo) {
+  border: 1px solid currentColor;
+  background: var(--cor-primaria-suave);
+  color: var(--cor-sobre-primaria-suave);
+}
+.bloqueada :global(.selo) {
+  border: 1px solid currentColor;
+  background: transparent;
+  color: var(--cor-texto-suave);
 }
