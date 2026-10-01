@@ -24,5 +24,7 @@
 	# Assets com hash no nome nunca mudam; o resto (index.html, sw.js, manifest) sempre revalida.
 	@imutaveis path /assets/*
 	header @imutaveis Cache-Control "public, max-age=31536000, immutable"
+	# Respostas da API (perfil, exportações) não ficam no disco de um computador compartilhado.
+	header /api/* Cache-Control "no-store"
 	header ?Cache-Control "no-cache"
 }

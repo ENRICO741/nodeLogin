@@ -24,4 +24,6 @@ module.exports = {
   }),
   // Rotas autenticadas: chave pelo usuário, não pelo IP (vários funcionários atrás do mesmo NAT).
   limiteGeral: limitar(MINUTO, 300, { keyGenerator: (req) => req.usuario.id }),
+  // Rotas que gravam uma linha por chamada (telemetria, rodadas de trivia).
+  limiteEscrita: limitar(MINUTO, 60, { keyGenerator: (req) => req.usuario.id }),
 };

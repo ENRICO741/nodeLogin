@@ -3,6 +3,7 @@ const { z } = require('zod');
 const { query } = require('../../db/pool');
 const { naoEncontrado } = require('../../lib/erros');
 const { idDaRota } = require('../../lib/validacao');
+const { limiteEscrita } = require('../../middleware/limites');
 
 const TAMANHO_MAXIMO_METADATA = 2048;
 
@@ -58,7 +59,7 @@ router.post('/sessoes/:id/retomar', async (req, res) => {
   res.status(204).end();
 });
 
-router.post('/eventos', async (req, res) => {
+router.post('/eventos', limiteEscrita, async (req, res) => {
   const e = esquemaEvento.parse(req.body);
   // O evento só entra se a sessão (quando informada) for do próprio usuário.
   const { rowCount } = await query(

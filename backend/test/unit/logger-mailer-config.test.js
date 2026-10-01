@@ -121,15 +121,22 @@ describe('mailer', () => {
     assert.equal(opcoesTransporte[0].auth, undefined);
   });
 
-  test('produção sem SMTP avisa no log', () => {
+  test('produção sem SMTP avisa no log e não registra o texto (link de redefinição)', async () => {
     const log = mock.method(console, 'log', () => {});
+    const erro = mock.method(console, 'error', () => {});
     process.env.NODE_ENV = 'production';
+    let mailer;
     try {
-      carregarMailer({ NODE_ENV: 'production', SMTP_HOST: '' });
+      ({ mailer } = carregarMailer({ NODE_ENV: 'production', SMTP_HOST: '' }));
     } finally {
       process.env.NODE_ENV = 'test';
     }
-    assert.ok(log.mock.calls.some((c) => c.arguments[0].includes('SMTP não configurado')));
+    await mailer.enviarEmail({ para: 'a@b.com', assunto: 'x', texto: 'token-secreto' });
+    const linhas = [...log.mock.calls, ...erro.mock.calls].map((c) => String(c.arguments[0]));
+    log.mock.restore();
+    erro.mock.restore();
+    assert.ok(linhas.some((l) => l.includes('SMTP não configurado')));
+    assert.ok(linhas.every((l) => !l.includes('token-secreto')));
   });
 });
 

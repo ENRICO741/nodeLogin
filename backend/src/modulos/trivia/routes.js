@@ -3,6 +3,7 @@ const { z } = require('zod');
 const service = require('./service');
 const { pool } = require('../../db/pool');
 const { idDaRota, esquemaResposta } = require('../../lib/validacao');
+const { limiteEscrita } = require('../../middleware/limites');
 
 const esquemaNovaRodada = z.object({
   dificuldade: z.enum(['facil', 'media', 'dificil']),
@@ -11,7 +12,7 @@ const esquemaNovaRodada = z.object({
 
 const router = Router();
 
-router.post('/rodadas', async (req, res) => {
+router.post('/rodadas', limiteEscrita, async (req, res) => {
   res.status(201).json(await service.criarRodada(req.usuario.id, esquemaNovaRodada.parse(req.body)));
 });
 

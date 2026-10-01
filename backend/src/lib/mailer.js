@@ -17,6 +17,11 @@ if (!transporte && config.NODE_ENV === 'production') {
 
 async function enviarEmail({ para, assunto, texto }) {
   if (!transporte) {
+    // Em produção o texto não vai para o log: traz o link de redefinição de senha.
+    if (config.NODE_ENV === 'production') {
+      logger.error('e-mail descartado (SMTP não configurado)', { para, assunto });
+      return;
+    }
     logger.info('e-mail não enviado (SMTP não configurado)', { para, assunto, texto });
     return;
   }

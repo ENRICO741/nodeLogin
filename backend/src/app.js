@@ -38,9 +38,14 @@ app.get('/api/saude', async (_req, res) => {
 });
 
 // Imagens das aulas (conteudo/aulas/<pasta>/imagens). Públicas: um <img> não envia o token.
-app.use(
-  '/api/conteudo/aulas',
-  express.static(path.join(config.CONTEUDO_DIR, 'aulas'), { maxAge: '1d', index: false, dotfiles: 'ignore' }),
+// Só imagens: o aula.html da mesma pasta traz o gabarito (data-correta). O resto segue para o login.
+const imagensDasAulas = express.static(path.join(config.CONTEUDO_DIR, 'aulas'), {
+  maxAge: '1d',
+  index: false,
+  dotfiles: 'ignore',
+});
+app.use('/api/conteudo/aulas', (req, res, next) =>
+  /\.(png|jpe?g|webp|gif|svg)$/i.test(req.path) ? imagensDasAulas(req, res, next) : next(),
 );
 
 app.use('/api/auth', require('./modulos/auth/routes'));

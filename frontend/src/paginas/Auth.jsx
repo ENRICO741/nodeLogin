@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useAuth } from '../contexto/Auth';
 import { api } from '../lib/api';
@@ -164,7 +164,11 @@ export function EsqueciSenha() {
 
 export function RedefinirSenha() {
   const [params] = useSearchParams();
-  const token = params.get('token') ?? '';
+  const [token] = useState(() => params.get('token') ?? '');
+  // Tira o token da URL: não fica no histórico nem vai no Referer.
+  useEffect(() => {
+    if (token) history.replaceState(null, '', '/redefinir-senha');
+  }, [token]);
   const [concluido, setConcluido] = useState(false);
   const [erroConfirmacao, setErroConfirmacao] = useState(null);
   const { enviando, erro, porCampo, enviar } = useEnvio(async ({ senha, confirmacao }) => {

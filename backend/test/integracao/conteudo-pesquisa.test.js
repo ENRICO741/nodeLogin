@@ -131,6 +131,8 @@ describe('imagens das aulas', () => {
       .get('/api/conteudo/aulas/02-dados-pessoais-e-sensiveis/imagens/nao-existe.png')
       .expect(401);
     await request(app).get('/api/conteudo/aulas/..%2F..%2Fpackage.json').expect(401);
+    // O HTML da aula traz o gabarito: não pode ser servido.
+    await request(app).get('/api/conteudo/aulas/02-dados-pessoais-e-sensiveis/aula.html').expect(401);
   });
 
   test('a aula real aponta a imagem para a URL pública', async () => {
@@ -487,11 +489,13 @@ describe('paraCsv', () => {
       [
         { a: 'com,vírgula', b: 'com "aspas"', c: null, d: 'linha\nnova', e: '+SOMA(1)' },
         { a: '-1', b: '-x', c: '@x', d: 5, e: true },
+        { a: '-1.5', b: '-1+cmd', c: '', d: '', e: '' },
       ],
     );
     assert.equal(
       csv,
-      'a,b,c,d,e\r\n"com,vírgula","com ""aspas""",,"linha\nnova",\'+SOMA(1)\r\n-1,\'-x,\'@x,5,true\r\n',
+      'a,b,c,d,e\r\n"com,vírgula","com ""aspas""",,"linha\nnova",\'+SOMA(1)\r\n-1,\'-x,\'@x,5,true\r\n' +
+        "-1.5,'-1+cmd,,,\r\n",
     );
   });
 });
