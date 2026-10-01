@@ -62,6 +62,7 @@ describe('mailer', () => {
     };
     const enviados = [];
     const opcoesTransporte = [];
+    const verificacoes = [];
     const caminhoNodemailer = require.resolve('nodemailer', { paths: [SRC] });
     const original = require.cache[caminhoNodemailer];
     require.cache[caminhoNodemailer] = {
@@ -71,13 +72,20 @@ describe('mailer', () => {
       exports: {
         createTransport: (opcoes) => {
           opcoesTransporte.push(opcoes);
-          return { sendMail: async (m) => enviados.push(m) };
+          return {
+            sendMail: async (m) => enviados.push(m),
+            verify: async () => {
+              verificacoes.push(1);
+              if (env.SMTP_HOST === 'smtp.quebrado.com') throw new Error('535 Authentication failed');
+              return true;
+            },
+          };
         },
       },
     };
     for (const m of ['config.js', 'lib/mailer.js']) delete require.cache[path.join(SRC, m)];
     try {
-      return { mailer: require('../../src/lib/mailer'), enviados, opcoesTransporte };
+      return { mailer: require('../../src/lib/mailer'), enviados, opcoesTransporte, verificacoes };
     } finally {
       restaurarAmbiente();
       if (original) require.cache[caminhoNodemailer] = original;
@@ -113,6 +121,22 @@ describe('mailer', () => {
       subject: 'Assunto',
       text: 'Corpo',
     });
+  });
+
+  test('verificar: null sem SMTP; com SMTP faz login uma vez e reaproveita o resultado', async () => {
+    assert.equal(await carregarMailer({ SMTP_HOST: '' }).mailer.verificar(), null);
+
+    const { mailer, verificacoes } = carregarMailer({ SMTP_HOST: 'smtp.exemplo.com' });
+    assert.deepEqual(await Promise.all([mailer.verificar(), mailer.verificar()]), [true, true]);
+    assert.equal(await mailer.verificar(), true);
+    assert.equal(verificacoes.length, 1);
+  });
+
+  test('verificar: login recusado devolve false e registra o erro', async (t) => {
+    const erro = t.mock.method(console, 'error', () => {});
+    const { mailer } = carregarMailer({ SMTP_HOST: 'smtp.quebrado.com' });
+    assert.equal(await mailer.verificar(), false);
+    assert.ok(erro.mock.calls.some((c) => String(c.arguments[0]).includes('SMTP indisponível')));
   });
 
   test('porta 465 usa TLS direto e sem usuário não manda auth', () => {

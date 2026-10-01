@@ -4,14 +4,31 @@ const { app, request, pool, prepararBanco, novoUsuario } = require('../ajuda');
 const { migrar } = require('../../src/db/migrar');
 const { semear } = require('../../src/db/seed');
 const { transacao, atualizarLinha } = require('../../src/db/pool');
+const mailer = require('../../src/lib/mailer');
 
 before(prepararBanco);
 after(() => pool.end());
 
 describe('app', () => {
-  test('GET /api/saude responde sem login', async () => {
+  test('GET /api/saude responde sem login; sem SMTP fica "degradado" (200)', async () => {
     const res = await request(app).get('/api/saude').expect(200);
-    assert.deepEqual(res.body, { status: 'ok' });
+    assert.deepEqual(res.body, {
+      status: 'degradado',
+      verificacoes: { banco: 'ok', smtp: 'nao_configurado' },
+    });
+  });
+
+  test('GET /api/saude: SMTP ok dá "ok"; SMTP recusando login dá "degradado" (200)', async (t) => {
+    const verificar = t.mock.method(mailer, 'verificar', async () => true);
+    assert.deepEqual((await request(app).get('/api/saude').expect(200)).body, {
+      status: 'ok',
+      verificacoes: { banco: 'ok', smtp: 'ok' },
+    });
+    verificar.mock.mockImplementation(async () => false);
+    assert.deepEqual((await request(app).get('/api/saude').expect(200)).body, {
+      status: 'degradado',
+      verificacoes: { banco: 'ok', smtp: 'falha' },
+    });
   });
 
   test('conexão ociosa que cai (banco reiniciou) só vai para o log, sem derrubar a API', (t) => {
@@ -20,6 +37,15 @@ describe('app', () => {
     assert.ok(
       erro.mock.calls.some((c) => String(c.arguments[0]).includes('conexão ociosa com o banco caiu')),
     );
+  });
+
+  test('GET /api/saude com o banco fora dá 503 sem detalhes do erro', async (t) => {
+    t.mock.method(pool, 'query', async () => {
+      throw new Error('connect ECONNREFUSED 10.0.0.1:5432');
+    });
+    t.mock.method(console, 'error', () => {});
+    const res = await request(app).get('/api/saude').expect(503);
+    assert.deepEqual(res.body, { status: 'erro', verificacoes: { banco: 'falha', smtp: 'nao_configurado' } });
   });
 
   test('não expõe X-Powered-By e manda headers de segurança do helmet', async () => {

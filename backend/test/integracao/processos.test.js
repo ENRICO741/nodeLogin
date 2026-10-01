@@ -160,7 +160,10 @@ describe('servidor', () => {
     `;
     const { codigo, saida } = await rodarNode(['-e', script], { PORT: porta, NODE_ENV: 'development' });
     assert.equal(codigo, 0, saida);
-    assert.match(saida, /SAUDE 200 \{"status":"ok"\}/);
+    assert.match(
+      saida,
+      /SAUDE 200 \{"status":"degradado","verificacoes":\{"banco":"ok","smtp":"nao_configurado"\}\}/,
+    );
     assert.match(saida, /"mensagem":"API no ar"/);
     assert.match(saida, /"mensagem":"desligando"/);
   });

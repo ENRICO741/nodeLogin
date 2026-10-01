@@ -45,7 +45,7 @@ Só as portas 80 e 443 ficam expostas. A API e o banco ficam na rede interna do 
    ```bash
    docker compose -f docker-compose.prod.yml up -d --build
    docker compose -f docker-compose.prod.yml ps   # api e db devem ficar "healthy"
-   curl https://SEU_DOMINIO/api/saude             # {"status":"ok"}
+   curl https://SEU_DOMINIO/api/saude             # {"status":"ok","verificacoes":{"banco":"ok","smtp":"ok"}}
    ```
 4. Crie o primeiro admin. Cadastre-se pelo app e depois rode:
    ```bash

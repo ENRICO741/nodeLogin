@@ -15,6 +15,29 @@ if (!transporte && config.NODE_ENV === 'production') {
   logger.warn('SMTP não configurado: e-mails serão apenas registrados no log');
 }
 
+// Login no SMTP, no máximo a cada 5 min: o /api/saude é público e o healthcheck chama a cada 30 s.
+// Guarda a promessa (e não o resultado) para chamadas simultâneas dividirem a mesma verificação.
+const VALIDADE_VERIFICACAO_MS = 5 * 60 * 1000;
+let verificacao = null;
+
+// true = SMTP aceitou o login, false = falhou, null = SMTP não configurado.
+async function verificar() {
+  if (!transporte) return null;
+  if (!verificacao || Date.now() - verificacao.em > VALIDADE_VERIFICACAO_MS) {
+    verificacao = {
+      em: Date.now(),
+      promessa: transporte.verify().then(
+        () => true,
+        (erro) => {
+          logger.error('SMTP indisponível', { erro });
+          return false;
+        },
+      ),
+    };
+  }
+  return verificacao.promessa;
+}
+
 async function enviarEmail({ para, assunto, texto }) {
   if (!transporte) {
     // Em produção o texto não vai para o log: traz o link de redefinição de senha.
@@ -28,4 +51,4 @@ async function enviarEmail({ para, assunto, texto }) {
   await transporte.sendMail({ from: config.SMTP_REMETENTE, to: para, subject: assunto, text: texto });
 }
 
-module.exports = { enviarEmail };
+module.exports = { enviarEmail, verificar };

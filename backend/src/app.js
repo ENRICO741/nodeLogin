@@ -4,6 +4,7 @@ const path = require('node:path');
 const helmet = require('helmet');
 const config = require('./config');
 const logger = require('./lib/logger');
+const mailer = require('./lib/mailer');
 const { query } = require('./db/pool');
 const { naoEncontrado } = require('./lib/erros');
 const { autenticar, exigirAdmin } = require('./middleware/autenticacao');
@@ -32,9 +33,28 @@ app.use((req, res, next) => {
   next();
 });
 
+// Cada verificação tem 2 s: o healthcheck do Docker desiste em 5 s.
+const PRAZO_VERIFICACAO_MS = 2000;
+const comPrazo = (promessa) =>
+  Promise.race([
+    promessa,
+    new Promise((_, rejeitar) => {
+      setTimeout(rejeitar, PRAZO_VERIFICACAO_MS, new Error('tempo esgotado')).unref();
+    }),
+  ]);
+
+// Banco fora = 503 (o container fica "unhealthy"). SMTP fora = 200 "degradado": o app funciona,
+// só a redefinição de senha não chega. A resposta é pública, então não leva detalhes do erro.
 app.get('/api/saude', async (_req, res) => {
-  await query('SELECT 1');
-  res.json({ status: 'ok' });
+  const [banco, smtp] = await Promise.allSettled([comPrazo(query('SELECT 1')), comPrazo(mailer.verificar())]);
+  if (banco.status === 'rejected') logger.error('saúde: banco indisponível', { erro: banco.reason });
+  const verificacoes = {
+    banco: banco.status === 'fulfilled' ? 'ok' : 'falha',
+    smtp:
+      smtp.status === 'fulfilled' && smtp.value === null ? 'nao_configurado' : smtp.value ? 'ok' : 'falha',
+  };
+  const status = verificacoes.banco === 'falha' ? 'erro' : verificacoes.smtp === 'ok' ? 'ok' : 'degradado';
+  res.status(status === 'erro' ? 503 : 200).json({ status, verificacoes });
 });
 
 // Imagens das aulas (conteudo/aulas/<pasta>/imagens). Públicas: um <img> não envia o token.
