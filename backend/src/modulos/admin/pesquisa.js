@@ -47,7 +47,8 @@ const TIPOS_TEXTO = { getTypeParser: (oid) => (oid === BOOL ? (v) => v === 't' :
 function celula(valor) {
   if (valor === null || valor === undefined) return '';
   let texto = String(valor);
-  if (/^[=+@\t\r]/.test(texto) || (texto.startsWith('-') && !/^-\d+(\.\d+)?$/.test(texto))) texto = `'${texto}`;
+  if (/^[=+@\t\r]/.test(texto) || (texto.startsWith('-') && !/^-\d+(\.\d+)?$/.test(texto)))
+    texto = `'${texto}`;
   return /[",\r\n]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto;
 }
 
