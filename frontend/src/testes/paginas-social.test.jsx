@@ -259,27 +259,31 @@ describe('navegação', () => {
     expect(screen.getByRole('main')).toHaveAttribute('id', 'conteudo');
   });
 
-  it('botão de tema alterna claro/escuro no <html> e guarda a escolha', async () => {
+  it('switch de tema alterna claro/escuro no <html> e guarda a escolha', async () => {
     document.documentElement.dataset.theme = 'light';
     await renderizarApp('/aulas', { rotas: { 'GET /aulas': [] } });
-    const botao = screen.getByRole('button', { name: 'Ativar tema escuro' });
-    expect(botao).toHaveAttribute('aria-pressed', 'false');
+    const chave = screen.getByRole('switch', { name: 'Tema escuro' });
+    expect(chave).not.toBeChecked();
 
-    await userEvent.click(botao);
+    await userEvent.click(chave);
     expect(document.documentElement.dataset.theme).toBe('dark');
     expect(localStorage.getItem('guardiao.tema')).toBe('dark');
-    expect(botao).toHaveAttribute('aria-pressed', 'true');
-    expect(botao).toHaveAccessibleName('Ativar tema claro');
+    expect(chave).toBeChecked();
 
-    await userEvent.click(botao);
+    // Teclado: Espaço e Enter acionam o switch (comportamento nativo do <button>).
+    chave.focus();
+    await userEvent.keyboard(' ');
     expect(document.documentElement.dataset.theme).toBe('light');
     expect(localStorage.getItem('guardiao.tema')).toBe('light');
-    expect(botao).toHaveAccessibleName('Ativar tema escuro');
+    expect(chave).not.toBeChecked();
+    await userEvent.keyboard('{Enter}');
+    expect(chave).toBeChecked();
+    await userEvent.keyboard('{Enter}');
 
-    // Troca vinda de fora (tema.js seguindo o SO): o botão acompanha.
+    // Troca vinda de fora (tema.js seguindo o SO): o switch acompanha.
     document.documentElement.dataset.theme = 'dark';
-    await waitFor(() => expect(botao).toHaveAttribute('aria-pressed', 'true'));
-    expect(botao).toHaveAccessibleName('Ativar tema claro');
+    await waitFor(() => expect(chave).toBeChecked());
+    expect(chave).toHaveAccessibleName('Tema escuro');
     delete document.documentElement.dataset.theme;
   });
 });

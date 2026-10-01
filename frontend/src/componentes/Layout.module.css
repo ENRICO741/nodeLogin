@@ -43,11 +43,59 @@
   align-items: center;
   gap: var(--esp-1);
 }
-/* .acoes na frente: base.css carrega depois dos módulos e .botao--texto venceria o empate. */
-.acoes .tema {
+/* Switch de tema: o botão inteiro (44x44) é o alvo de toque; o trilho visível é menor. */
+.tema {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: var(--alvo-toque);
+  min-height: var(--alvo-toque);
   padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.tema:focus-visible {
+  outline: none;
+}
+.tema:focus-visible .trilho {
+  outline: 3px solid var(--cor-foco);
+  outline-offset: 2px;
+}
+.trilho {
+  position: relative;
+  width: var(--alvo-toque);
+  height: 1.5rem;
+  border: 1px solid var(--cor-borda-campo);
+  border-radius: var(--raio-pilula);
+  background: var(--cor-superficie-2);
+  transition:
+    background-color var(--transicao),
+    border-color var(--transicao);
+}
+/* Borda na bolinha: branco sobre o trilho bege não chega a 3:1, a borda-campo sim. */
+.bolinha {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  display: grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 1px solid var(--cor-borda-campo);
+  border-radius: 50%;
+  background: var(--cor-superficie);
   color: var(--cor-texto-suave);
+  transition: transform var(--transicao);
+}
+.tema[aria-checked='true'] .trilho {
+  border-color: var(--cor-primaria);
+  background: var(--cor-primaria);
+}
+.tema[aria-checked='true'] .bolinha {
+  border-color: var(--cor-superficie);
+  color: var(--cor-primaria);
+  transform: translateX(1.25rem);
 }
 .pontos {
   display: inline-flex;

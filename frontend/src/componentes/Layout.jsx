@@ -45,12 +45,17 @@ function BotaoTema() {
   return (
     <button
       type="button"
-      className={`botao botao--texto ${styles.tema}`}
-      aria-label={escuro ? 'Ativar tema claro' : 'Ativar tema escuro'}
-      aria-pressed={escuro}
+      role="switch"
+      aria-checked={escuro}
+      aria-label="Tema escuro"
+      className={styles.tema}
       onClick={alternar}
     >
-      <Icone aria-hidden="true" size={20} />
+      <span className={styles.trilho}>
+        <span className={styles.bolinha}>
+          <Icone aria-hidden="true" size={14} />
+        </span>
+      </span>
     </button>
   );
 }
