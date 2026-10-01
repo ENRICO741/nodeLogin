@@ -7,18 +7,37 @@
   padding: calc(var(--esp-6) + env(safe-area-inset-top)) var(--esp-4)
     calc(var(--esp-6) + env(safe-area-inset-bottom));
 }
+/* Marca em caixa alta espaçada, como o logotipo "IMPACTA" do site. */
 .marca {
   display: grid;
   justify-items: center;
-  gap: var(--esp-2);
-  font-size: var(--texto-xl);
+  gap: var(--esp-3);
+  font-size: var(--texto-lg);
   font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: var(--espaco-letras-largo);
+  text-align: center;
 }
+/* Painel do formulário, como o "Fale conosco": título centralizado com fio azul curto embaixo. */
 .cartao {
   width: 100%;
   max-width: 26rem;
 }
+.cartao h1 {
+  text-align: center;
+}
+.cartao h1::after {
+  content: '';
+  display: block;
+  width: var(--esp-6);
+  height: 3px;
+  margin: var(--esp-3) auto 0;
+  border-radius: var(--raio-pilula);
+  background: var(--cor-primaria);
+}
 .subtitulo {
+  margin-bottom: var(--esp-4);
+  text-align: center;
   color: var(--cor-texto-suave);
 }
 .link {
@@ -26,10 +45,13 @@
   display: inline-flex;
   align-items: center;
   min-height: var(--alvo-toque);
-  font-weight: 600;
+  font-size: var(--texto-sm);
+  font-weight: 700;
 }
 .rodape {
   margin: 0;
+  font-size: var(--texto-sm);
+  text-align: center;
   color: var(--cor-texto-suave);
 }
 .rodape a {

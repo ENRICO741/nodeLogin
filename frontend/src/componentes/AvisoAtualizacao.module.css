@@ -1,3 +1,4 @@
+/* Bloco de informação com fio azul vertical à esquerda, como os do site da Impacta. */
 .aviso {
   position: fixed;
   left: var(--esp-4);
@@ -11,12 +12,19 @@
   max-width: 28rem;
   margin: 0 auto;
   padding: var(--esp-3) var(--esp-4);
-  border-radius: var(--raio-lg);
+  border-radius: var(--raio-sm);
   background: var(--cor-superficie);
   border: 1px solid var(--cor-borda);
+  border-left: 3px solid var(--cor-primaria);
   box-shadow: var(--sombra);
 }
 .aviso span {
   flex: 1;
-  font-weight: 600;
+  font-weight: 700;
+}
+/* Tela larga: as abas sobem para o topo, então o aviso desce até a borda. */
+@media (min-width: 48rem) {
+  .aviso {
+    bottom: calc(env(safe-area-inset-bottom) + var(--esp-4));
+  }
 }

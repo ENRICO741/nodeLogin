@@ -9,15 +9,20 @@
 .centro p {
   margin: 0;
 }
+/* Rótulo no padrão Impacta ("CENTRAL DE ATENDIMENTO"): pequeno, caixa alta, negrito, espaçado. */
 .titulo {
-  font-weight: 600;
+  font-size: var(--texto-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--espaco-letras-largo);
   color: var(--cor-texto);
 }
 .iconeErro {
   color: var(--cor-erro);
 }
-.iconeVazio {
-  color: var(--cor-texto-suave);
+.iconeVazio,
+.girando {
+  color: var(--cor-primaria);
 }
 .girando {
   animation: girar 0.9s linear infinite;
