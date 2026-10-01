@@ -16,7 +16,8 @@ CMD ["node", "src/server.js"]
 # Produção (docker-compose.prod.yml): alvo padrão.
 FROM base AS prod
 ENV NODE_ENV=production
-RUN npm ci --omit=dev
+# O npm da imagem base não é usado em execução e traz CVEs próprias: sai depois de instalar.
+RUN npm ci --omit=dev && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 COPY backend/src ./src
 COPY conteudo ./conteudo
 USER node
