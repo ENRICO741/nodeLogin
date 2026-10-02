@@ -8,3 +8,7 @@ coverage/
 *.sqlite3
 *.log
 .DS_Store
+.devcontainer/
+*.tfvars
+*.tfstate
+.claude/settings.local.json
