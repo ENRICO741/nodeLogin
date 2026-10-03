@@ -13,7 +13,9 @@ Só as portas 80 e 443 ficam expostas. A API e o banco ficam na rede interna do 
 
 ## 1. VM e rede
 
-1. Crie a VM. Ubuntu 24.04 LTS com 2 vCPU e 4 GB de RAM (B2s) é suficiente para começar.
+**Atalho:** [`azure/criar-vm.sh`](azure/criar-vm.sh) faz os passos 1 a 5 e o início da seção 2 sozinho (VM B2ats_v2 em Chile Central, portas, Docker, clone, `.env` com segredos gerados e backup diário). Rode no seu PC com `az login` feito: `NOME_DNS=guardiaoimpacta ./deploy/azure/criar-vm.sh`. Depois só falta o SMTP no `.env` e o `deploy.sh`.
+
+1. Crie a VM. Ubuntu 24.04 LTS com 2 vCPU e 1 GB de RAM mais swap (B2ats_v2) atende ~40 usuários (10 simultâneos).
 2. No **NSG**, libere a entrada TCP 80 e 443, e UDP 443 (HTTP/3).
 3. Deixe a porta 22 liberada só para o seu IP.
 4. No DNS do domínio, crie um registro **A** apontando para o IP público da VM. Use um IP estático.

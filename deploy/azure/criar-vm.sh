@@ -1,14 +1,16 @@
 #!/bin/sh
 # Cria a VM do app no Azure (Ubuntu 24.04 + Docker, via cloud-init). Roda no seu PC, com o Azure CLI logado (az login).
-# Uso:  NOME_DNS=guardiao-tcc ./deploy/azure/criar-vm.sh
+# Uso:  NOME_DNS=guardiaoimpacta ./deploy/azure/criar-vm.sh
 # Apagar tudo depois:  az group delete -n guardiao
 set -eu
 cd "$(dirname "$0")"
 
 : "${NOME_DNS:?defina NOME_DNS, ex.: NOME_DNS=guardiao-tcc (vira o endereço do app)}"
 GRUPO="${GRUPO:-guardiao}"
-REGIAO="${REGIAO:-brazilsouth}"
-# B2ats_v2 (2 vCPU AMD, 1 GB + 2 GB de swap): grátis por 12 meses na conta gratuita/estudante; ~US$ 11/mês fora dela.
+# Chile Central: a região mais próxima onde o Azure for Students libera a série B (no Brasil só há D/F, ~US$ 70+/mês).
+REGIAO="${REGIAO:-chilecentral}"
+# B2ats_v2 (2 vCPU AMD, 1 GB + 2 GB de swap): grátis por 12 meses na conta gratuita/estudante; ~US$ 10/mês fora dela.
+# Folga para ~40 usuários / 10 simultâneos.
 TAMANHO="${TAMANHO:-Standard_B2ats_v2}"
 REPO="${REPO:-$(git remote get-url origin)}"
 VM=guardiao-vm
