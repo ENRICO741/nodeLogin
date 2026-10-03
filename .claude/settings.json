@@ -1,9 +1,59 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "AZURE_CONFIG_DIR": "C:/Users/SEU-USUARIO/.azure-claude-tcc"
+  },
   "permissions": {
-    "allow": [
-      "Bash(npm run *)",
-      "Bash(npm test *)",
-      "Bash(az deployment group what-if *)"
+    "disableBypassPermissionsMode": "disable",
+    "deny": [
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
+      "Read(**/*.pfx)",
+      "Read(**/secrets/**)",
+      "Read(**/*.tfvars)",
+      "Read(**/*.tfstate)",
+      "Read(~/.ssh/**)",
+      "Read(~/.azure/**)",
+      "Read(~/.azure-claude-tcc/**)",
+      "Edit(.claude/settings.json)",
+      "Edit(.claude/hooks/**)",
+      "Write(.claude/settings.json)",
+      "Write(.claude/hooks/**)",
+      "Bash(cat *.env*)",
+      "Bash(az login *)",
+      "Bash(az account get-access-token *)",
+      "Bash(az ad *)",
+      "Bash(az role *)",
+      "Bash(az group delete *)",
+      "Bash(az vm delete *)",
+      "Bash(az resource delete *)",
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(git reset --hard *)"
+    ],
+    "ask": [
+      "Bash(git push *)",
+      "Bash(az deployment group create *)",
+      "Bash(az vm *)",
+      "Bash(az network *)",
+      "Bash(ssh *)",
+      "Bash(scp *)",
+      "Bash(curl *)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-dangerous.sh\""
+          }
+        ]
+      }
     ]
   }
 }
