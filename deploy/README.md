@@ -56,19 +56,37 @@ Só as portas 80 e 443 ficam expostas. A API e o banco ficam na rede interna do 
 
 ## 3. Atualizar
 
+**Automático:** cada push no `main` com o CI verde roda o job `deploy` do [ci.yml](../.github/workflows/ci.yml). Ele entra no Azure por OIDC e, pelo Run Command (sem abrir a porta 22), atualiza o código da VM para o commit testado e roda o `deploy.sh`. O log do Actions é público, então mostra só as linhas `==>`. Logs da API: pelo Bastion.
+
+Para ativar, uma vez:
+
+1. Federated credential no app registration do service principal: issuer `https://token.actions.githubusercontent.com`, subject `repo:ENRICO741/nodeLogin:environment:producao`, audience `api://AzureADTokenExchange`.
+2. No GitHub, environment `producao` com _Deployment branches_ restrito a `main`.
+3. Variables **do repositório** (Settings > Secrets and variables > Actions > Variables): `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` e `AZURE_SUBSCRIPTION_ID`. São IDs, não segredos. Enquanto `AZURE_CLIENT_ID` não existir, o job fica pulado.
+
+**Manual**, na VM pelo Bastion:
+
 ```bash
-/opt/guardiao/deploy/deploy.sh
+cd /opt/guardiao && git fetch -q origin main && git merge --ff-only origin/main && deploy/deploy.sh
 ```
 
-O script baixa o código (`git pull`), faz backup do banco, reconstrói as imagens com `--pull` (traz as correções de segurança das imagens base), sobe a stack e espera a API ficar saudável. Se ela não subir, mostra os últimos logs e termina com erro.
+O script faz backup do banco, reconstrói as imagens com `--pull` (traz as correções de segurança das imagens base), sobe a stack e espera a API ficar saudável. Se ela não subir, mostra os últimos logs e termina com erro. Ele aceita o commit a implantar (`deploy.sh <commit>`) e recusa um commit mais antigo que o atual.
 
-Para voltar a uma versão anterior: `git reset --hard <commit>` e `docker compose -f docker-compose.prod.yml up -d --build`.
+### Voltar uma versão
+
+O caminho seguro é `git revert` do commit com problema e push: o CI testa e implanta. Para voltar à mão, segure o CI primeiro (desative o workflow), senão o próximo push avança de novo. Depois:
+
+```bash
+git reset --hard <commit> && docker compose -f docker-compose.prod.yml up -d --build
+```
+
+Migrations não voltam junto. Se a versão com problema trouxe migration, restaure o backup que o deploy tirou antes dela (abaixo).
 
 Migrações novas são aplicadas sozinhas quando a API sobe. Quem estiver com o app aberto vê o aviso "Nova versão disponível".
 
 ## 4. Backup
 
-Faça um backup diário às 3h, mantendo os 7 mais recentes em `/var/backups/guardiao`:
+Faça um backup diário às 3h em `/var/backups/guardiao`. O `deploy.sh` também faz um antes de cada deploy, e ficam os 14 mais recentes:
 
 ```bash
 chmod +x /opt/guardiao/deploy/backup.sh
@@ -83,7 +101,7 @@ Copie os backups para fora da VM (por exemplo, um Azure Blob Storage). Se a VM f
 ```bash
 cd /opt/guardiao
 docker compose -f docker-compose.prod.yml stop api
-gunzip -c /var/backups/guardiao/banco-AAAA-MM-DD.sql.gz | \
+gunzip -c /var/backups/guardiao/banco-AAAA-MM-DD-HHMMSS.sql.gz | \
   docker compose -f docker-compose.prod.yml exec -T db sh -c 'psql -U "$POSTGRES_USER" -d postgres -c "DROP DATABASE $POSTGRES_DB" -c "CREATE DATABASE $POSTGRES_DB" && psql -U "$POSTGRES_USER" "$POSTGRES_DB"'
 docker compose -f docker-compose.prod.yml start api
 ```

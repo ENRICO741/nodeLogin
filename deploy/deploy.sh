@@ -9,6 +9,12 @@ export COMPOSE_FILE=docker-compose.prod.yml
 echo "==> Atualizando o código"
 git fetch --quiet origin main
 git merge --ff-only "${1:-origin/main}"
+# Commit mais antigo que o atual não volta a versão (o merge só diz "Already up to date"): falha em vez de
+# fingir que publicou. Para voltar, veja "Voltar uma versão" no deploy/README.md.
+if [ "$(git rev-parse HEAD)" != "$(git rev-parse "${1:-origin/main}^{commit}")" ]; then
+  echo "==> A VM já está num commit mais novo que ${1:-origin/main}; nada foi alterado"
+  exit 1
+fi
 git log -1 --oneline
 
 # No primeiro deploy ainda não existe banco para copiar.
