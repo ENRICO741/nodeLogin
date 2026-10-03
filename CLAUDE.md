@@ -18,14 +18,13 @@ PWA de conscientização em segurança da informação (TCC). Visão geral e arq
 
 ## Restrições
 
-- Rodar `az` só com o service principal do devcontainer (`AZURE_CONFIG_DIR=/home/node/.azure-claude`). Nunca usar outra conta logada.
+- Rodar `az` só com o service principal, escopo apenas o RG `TCC` (`AZURE_CONFIG_DIR` vem de `.claude/settings.local.json`). Nunca usar outra conta logada nem sobrescrever essa variável. Se `az account show` não mostrar `servicePrincipal`, parar e avisar.
 - Antes de qualquer deploy Azure, rodar `az deployment group what-if`.
-- Não ler nem commitar `.env*`, `*.tfvars`, `*.tfstate`, chaves `.pem`/`.key`. Só `.env.example` é versionado.
-- Guardrails em `/etc/claude-code/managed-settings.json` (somente leitura, root); não tente contornar.
+- Não ler nem commmitar `.env*`, `*.tfvars`, `*.tfstate`, chaves `.pem`/`.key`. Só `.env.example` é versionado.
+- Guardrails em `.claude/settings.json` e `.claude/hooks/` (somente leitura para o Claude); não tente contornar.
 
 ## Armadilhas
 
-- Firewall do devcontainer libera só domínios listados em `.devcontainer/init-firewall.sh`. `az` com timeout: falta domínio ou IP de CDN mudou; reinicie o container.
 - Pontuação é garantida no banco, não no cliente. Não mover regra de pontos para o front.
 - Migrations em `backend/src/db/migrations/*.sql` rodam em ordem na subida da API. Nunca editar migration já aplicada; criar nova.
 - `PESQUISA_SEGREDO` define os pseudônimos dos CSVs. Trocar muda todos.

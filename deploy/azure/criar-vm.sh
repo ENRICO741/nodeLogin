@@ -20,11 +20,12 @@ MEU_IP="$(curl -fsS https://api.ipify.org)"
 sed -e "s|__REPO__|$REPO|" -e "s|__DOMINIO__|$DOMINIO|" cloud-init.yaml > cloud-init.gerado.yaml
 trap 'rm -f cloud-init.gerado.yaml' EXIT
 
-echo "==> Grupo $GRUPO em $REGIAO"
-az group create -n "$GRUPO" -l "$REGIAO" -o none
+# Grupo já existente (ex.: o único em que um service principal tem permissão) é reaproveitado, seja qual for a região dele.
+echo "==> Grupo $GRUPO"
+az group show -n "$GRUPO" -o none 2> /dev/null || az group create -n "$GRUPO" -l "$REGIAO" -o none
 
-echo "==> VM $TAMANHO (leva uns 2 minutos)"
-az vm create -g "$GRUPO" -n "$VM" \
+echo "==> VM $TAMANHO em $REGIAO (leva uns 2 minutos)"
+az vm create -g "$GRUPO" -n "$VM" -l "$REGIAO" \
   --image Canonical:ubuntu-24_04-lts:server:latest \
   --size "$TAMANHO" \
   --os-disk-size-gb 64 --storage-sku Premium_LRS \
