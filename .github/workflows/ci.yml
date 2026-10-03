@@ -47,6 +47,7 @@ jobs:
     needs: verificar
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.AZURE_CLIENT_ID != ''
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment:
       name: producao
       url: https://guardiaoimpacta.brazilsouth.cloudapp.azure.com
@@ -58,7 +59,8 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - uses: azure/login@v2
+      # Fixado pelo SHA: o token deste job dá root na VM, então a action não pode mudar por baixo.
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
@@ -73,5 +75,7 @@ jobs:
           saida=$(az vm run-command invoke -g TCC -n guardiao-vm --command-id RunShellScript \
             --scripts "sudo -iu azureuser sh -c 'cd /opt/guardiao && git fetch -q origin main && git merge -q --ff-only $COMMIT && deploy/deploy.sh $COMMIT'" \
             --query 'value[0].message' -o tsv)
-          echo "$saida"
-          echo "$saida" | grep -q '==> Deploy concluído'
+          # O log do Actions é público: só as linhas de progresso. Logs da API ficam na VM (Bastion).
+          echo "$saida" | grep '==>' || true
+          # Só ASCII no marcador: o Run Command perde os acentos da saída ("concluído" chega "concludo").
+          echo "$saida" | grep -q '==> Deploy conclu'
