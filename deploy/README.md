@@ -13,11 +13,11 @@ Só as portas 80 e 443 ficam expostas. A API e o banco ficam na rede interna do 
 
 ## 1. VM e rede
 
-**Atalho:** [`azure/criar-vm.sh`](azure/criar-vm.sh) faz os passos 1 a 5 e o início da seção 2 sozinho (VM B2ats_v2 em Chile Central, portas, Docker, clone, `.env` com segredos gerados e backup diário). Rode no seu PC com `az login` feito: `NOME_DNS=guardiaoimpacta ./deploy/azure/criar-vm.sh`. Depois só falta o SMTP no `.env` e o `deploy.sh`.
+**Atalho:** [`azure/criar-vm.sh`](azure/criar-vm.sh) aplica o template [`azure/vm.json`](azure/vm.json) e faz os passos 1 a 5 e o início da seção 2 sozinho (VM D2s_v4 com Trusted Launch no grupo `TCC`, NSG, Bastion Developer, Docker, clone, `.env` com segredos gerados e backup diário). Rode no seu PC com o `az` logado: `./deploy/azure/criar-vm.sh` (mostra o what-if e pede confirmação). O app fica em `guardiaoimpacta.brazilsouth.cloudapp.azure.com`. Depois só falta o SMTP no `.env` e o `deploy.sh`.
 
-1. Crie a VM. Ubuntu 24.04 LTS com 2 vCPU e 1 GB de RAM mais swap (B2ats_v2) atende ~40 usuários (10 simultâneos).
+1. Crie a VM. Ubuntu 24.04 LTS com 2 vCPU e 8 GB (D2s_v4; a série B não é liberada em Brazil South nesta assinatura e a D2als_v7 ficou sem capacidade).
 2. No **NSG**, libere a entrada TCP 80 e 443, e UDP 443 (HTTP/3).
-3. Deixe a porta 22 liberada só para o seu IP.
+3. Não abra a porta 22 para a internet: entre pelo Bastion Developer (portal > VM > Conectar > Bastion), que é gratuito.
 4. No DNS do domínio, crie um registro **A** apontando para o IP público da VM. Use um IP estático.
 5. Instale o Docker:
    ```bash

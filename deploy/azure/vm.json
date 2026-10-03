@@ -1,0 +1,148 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "nomeDns": { "type": "string" },
+    "chavePublica": { "type": "securestring" },
+    "customData": { "type": "securestring", "metadata": { "description": "cloud-init.yaml já preenchido, em base64" } },
+    "tamanho": { "type": "string", "defaultValue": "Standard_D2s_v4", "metadata": { "description": "Série B não é liberada em brazilsouth nesta assinatura e a D2als_v7 ficou sem capacidade; D2s_v4 (2 vCPU, 8 GB), ~US$ 0,15/h." } },
+    "location": { "type": "string", "defaultValue": "[resourceGroup().location]" }
+  },
+  "variables": {
+    "vm": "guardiao-vm",
+    "subnetId": "[resourceId('Microsoft.Network/virtualNetworks/subnets', 'guardiao-vnet', 'default')]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2024-05-01",
+      "name": "guardiao-nsg",
+      "location": "[parameters('location')]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "web",
+            "properties": {
+              "priority": 100, "direction": "Inbound", "access": "Allow", "protocol": "Tcp",
+              "sourceAddressPrefix": "Internet", "sourcePortRange": "*",
+              "destinationAddressPrefix": "*", "destinationPortRanges": ["80", "443"]
+            }
+          },
+          {
+            "name": "http3",
+            "properties": {
+              "priority": 105, "direction": "Inbound", "access": "Allow", "protocol": "Udp",
+              "sourceAddressPrefix": "Internet", "sourcePortRange": "*",
+              "destinationAddressPrefix": "*", "destinationPortRange": "443"
+            }
+          },
+          {
+            "name": "ssh-so-bastion",
+            "properties": {
+              "description": "SSH só pelo Bastion Developer (entra pelo IP de plataforma do Azure); da internet fica fechado.",
+              "priority": 110, "direction": "Inbound", "access": "Allow", "protocol": "Tcp",
+              "sourceAddressPrefix": "168.63.129.16", "sourcePortRange": "*",
+              "destinationAddressPrefix": "*", "destinationPortRange": "22"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/virtualNetworks",
+      "apiVersion": "2024-05-01",
+      "name": "guardiao-vnet",
+      "location": "[parameters('location')]",
+      "properties": {
+        "addressSpace": { "addressPrefixes": ["10.0.0.0/16"] },
+        "subnets": [{ "name": "default", "properties": { "addressPrefix": "10.0.0.0/24" } }]
+      }
+    },
+    {
+      "type": "Microsoft.Network/publicIPAddresses",
+      "apiVersion": "2024-05-01",
+      "name": "guardiao-ip",
+      "location": "[parameters('location')]",
+      "sku": { "name": "Standard" },
+      "properties": {
+        "publicIPAllocationMethod": "Static",
+        "dnsSettings": { "domainNameLabel": "[parameters('nomeDns')]" }
+      }
+    },
+    {
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2024-05-01",
+      "name": "guardiao-nic",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', 'guardiao-vnet')]",
+        "[resourceId('Microsoft.Network/publicIPAddresses', 'guardiao-ip')]",
+        "[resourceId('Microsoft.Network/networkSecurityGroups', 'guardiao-nsg')]"
+      ],
+      "properties": {
+        "networkSecurityGroup": { "id": "[resourceId('Microsoft.Network/networkSecurityGroups', 'guardiao-nsg')]" },
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "subnet": { "id": "[variables('subnetId')]" },
+              "publicIPAddress": { "id": "[resourceId('Microsoft.Network/publicIPAddresses', 'guardiao-ip')]" }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2024-07-01",
+      "name": "[variables('vm')]",
+      "location": "[parameters('location')]",
+      "dependsOn": ["[resourceId('Microsoft.Network/networkInterfaces', 'guardiao-nic')]"],
+      "properties": {
+        "hardwareProfile": { "vmSize": "[parameters('tamanho')]" },
+        "securityProfile": {
+          "securityType": "TrustedLaunch",
+          "uefiSettings": { "secureBootEnabled": true, "vTpmEnabled": true }
+        },
+        "storageProfile": {
+          "diskControllerType": "SCSI",
+          "imageReference": { "publisher": "Canonical", "offer": "ubuntu-24_04-lts", "sku": "server", "version": "latest" },
+          "osDisk": {
+            "name": "guardiao-disco",
+            "createOption": "FromImage",
+            "diskSizeGB": 64,
+            "managedDisk": { "storageAccountType": "Premium_LRS" },
+            "deleteOption": "Delete"
+          }
+        },
+        "osProfile": {
+          "computerName": "[variables('vm')]",
+          "adminUsername": "azureuser",
+          "customData": "[parameters('customData')]",
+          "linuxConfiguration": {
+            "disablePasswordAuthentication": true,
+            "ssh": {
+              "publicKeys": [{ "path": "/home/azureuser/.ssh/authorized_keys", "keyData": "[parameters('chavePublica')]" }]
+            }
+          }
+        },
+        "networkProfile": { "networkInterfaces": [{ "id": "[resourceId('Microsoft.Network/networkInterfaces', 'guardiao-nic')]" }] },
+        "diagnosticsProfile": { "bootDiagnostics": { "enabled": true } }
+      }
+    },
+    {
+      "type": "Microsoft.Network/bastionHosts",
+      "apiVersion": "2024-05-01",
+      "name": "guardiao-bastion",
+      "location": "[parameters('location')]",
+      "sku": { "name": "Developer" },
+      "dependsOn": ["[resourceId('Microsoft.Network/virtualNetworks', 'guardiao-vnet')]"],
+      "properties": {
+        "virtualNetwork": { "id": "[resourceId('Microsoft.Network/virtualNetworks', 'guardiao-vnet')]" }
+      }
+    }
+  ],
+  "outputs": {
+    "dominio": { "type": "string", "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses', 'guardiao-ip')).dnsSettings.fqdn]" }
+  }
+}
