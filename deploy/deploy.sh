@@ -1,12 +1,14 @@
 #!/bin/sh
 # Deploy manual na VM: baixa o código novo, faz backup do banco, reconstrói e confere se a API subiu.
-# Uso (na VM):  /opt/guardiao/deploy/deploy.sh
+# Uso (na VM):  /opt/guardiao/deploy/deploy.sh [commit]
+# Sem commit, vai para o último do main. O CI passa o commit exato que testou.
 set -eu
 cd "$(dirname "$0")/.."
 export COMPOSE_FILE=docker-compose.prod.yml
 
 echo "==> Atualizando o código"
-git pull --ff-only
+git fetch --quiet origin main
+git merge --ff-only "${1:-origin/main}"
 git log -1 --oneline
 
 # No primeiro deploy ainda não existe banco para copiar.

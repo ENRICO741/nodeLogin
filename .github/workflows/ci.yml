@@ -39,3 +39,39 @@ jobs:
       - name: Frontend (testes e build)
         working-directory: frontend
         run: npm ci && npm run test:cobertura && npm run build
+
+  # Push no main com tudo verde: roda o deploy.sh na VM pelo Run Command do Azure.
+  # A porta 22 continua fechada para a internet; o login no Azure é por OIDC (sem segredo guardado).
+  # Fica pulado até as variables AZURE_* existirem no repositório.
+  deploy:
+    needs: verificar
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.AZURE_CLIENT_ID != ''
+    runs-on: ubuntu-latest
+    environment:
+      name: producao
+      url: https://guardiaoimpacta.brazilsouth.cloudapp.azure.com
+    # Um deploy por vez, na ordem dos pushes (nunca cancela um que já começou).
+    concurrency:
+      group: deploy-producao
+      cancel-in-progress: false
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy na VM
+        env:
+          COMMIT: ${{ github.sha }}
+        run: |
+          # Atualiza o código antes de rodar o deploy.sh: o sh lê o script aos poucos e não pode vê-lo mudar no meio.
+          # O Run Command devolve sucesso mesmo se o script falhar: o resultado vem pela saída.
+          saida=$(az vm run-command invoke -g TCC -n guardiao-vm --command-id RunShellScript \
+            --scripts "sudo -iu azureuser sh -c 'cd /opt/guardiao && git fetch -q origin main && git merge -q --ff-only $COMMIT && deploy/deploy.sh $COMMIT'" \
+            --query 'value[0].message' -o tsv)
+          echo "$saida"
+          echo "$saida" | grep -q '==> Deploy concluído'
