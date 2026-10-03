@@ -10,7 +10,7 @@ packages: [git, openssl]
 runcmd:
   - curl -fsSL https://get.docker.com | sh
   - usermod -aG docker azureuser
-  - git clone __REPO__ /opt/guardiao
+  - git clone -b main __REPO__ /opt/guardiao
   # .env com o domínio e segredos gerados aqui mesmo (não saem da VM). Falta só o SMTP.
   - |
     cd /opt/guardiao

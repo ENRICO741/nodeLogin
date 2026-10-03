@@ -8,7 +8,8 @@ cd "$(dirname "$0")"
 : "${NOME_DNS:?defina NOME_DNS, ex.: NOME_DNS=guardiao-tcc (vira o endereço do app)}"
 GRUPO="${GRUPO:-guardiao}"
 REGIAO="${REGIAO:-brazilsouth}"
-TAMANHO="${TAMANHO:-Standard_B1s}" # B1s: grátis por 12 meses na conta gratuita
+# B2ats_v2 (2 vCPU AMD, 1 GB + 2 GB de swap): grátis por 12 meses na conta gratuita/estudante; ~US$ 11/mês fora dela.
+TAMANHO="${TAMANHO:-Standard_B2ats_v2}"
 REPO="${REPO:-$(git remote get-url origin)}"
 VM=guardiao-vm
 DOMINIO="$NOME_DNS.$REGIAO.cloudapp.azure.com"
@@ -24,6 +25,7 @@ echo "==> VM $TAMANHO (leva uns 2 minutos)"
 az vm create -g "$GRUPO" -n "$VM" \
   --image Canonical:ubuntu-24_04-lts:server:latest \
   --size "$TAMANHO" \
+  --os-disk-size-gb 64 --storage-sku Premium_LRS \
   --admin-username azureuser \
   --generate-ssh-keys \
   --public-ip-sku Standard \
