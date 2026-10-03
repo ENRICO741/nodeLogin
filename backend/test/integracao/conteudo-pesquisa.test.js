@@ -20,17 +20,17 @@ const questoesDe = async (aulaId) =>
 describe('importação para o banco', () => {
   test('cria, atualiza sem duplicar, desativa pergunta removida e troca a ordem entre aulas', async () => {
     const raiz = criarConteudo({
-      '90-phishing': {
+      '90-teste-phishing': {
         html: aulaHtml({
           titulo: 'Phishing',
           perguntas: [pergunta({ chave: 'a' }), pergunta({ chave: 'b' })],
         }),
       },
-      '91-senhas': { html: aulaHtml({ titulo: 'Senhas' }) },
+      '91-teste-senhas': { html: aulaHtml({ titulo: 'Senhas' }) },
     });
     const primeira = await importarConteudo(raiz);
     assert.deepEqual([primeira.criadas, primeira.atualizadas, primeira.inalteradas], [2, 0, 0]);
-    const phishing = await aulaPorSlug('phishing');
+    const phishing = await aulaPorSlug('teste-phishing');
     assert.deepEqual(await questoesDe(phishing.id), [
       { chave: 'a', ordem: 1, ativo: true, resposta_correta: 'b' },
       { chave: 'b', ordem: 2, ativo: true, resposta_correta: 'b' },
@@ -41,17 +41,17 @@ describe('importação para o banco', () => {
 
     // Troca a ordem (90 ↔ 91), muda gabarito de "a" e remove "b".
     escreverConteudo(raiz, {
-      '91-phishing': {
+      '91-teste-phishing': {
         html: aulaHtml({ titulo: 'Phishing 2', perguntas: [pergunta({ chave: 'a', correta: 3 })] }),
       },
-      '90-senhas': { html: aulaHtml({ titulo: 'Senhas' }) },
+      '90-teste-senhas': { html: aulaHtml({ titulo: 'Senhas' }) },
     });
     const terceira = await importarConteudo(raiz);
     assert.deepEqual([terceira.criadas, terceira.atualizadas], [0, 2]);
-    const depois = await aulaPorSlug('phishing');
+    const depois = await aulaPorSlug('teste-phishing');
     assert.equal(depois.id, phishing.id, 'mesma aula (identidade pelo slug)');
     assert.deepEqual([depois.titulo, depois.ordem], ['Phishing 2', 91]);
-    assert.equal((await aulaPorSlug('senhas')).ordem, 90);
+    assert.equal((await aulaPorSlug('teste-senhas')).ordem, 90);
     assert.deepEqual(await questoesDe(phishing.id), [
       { chave: 'a', ordem: 1, ativo: true, resposta_correta: 'd' },
       { chave: 'b', ordem: 2, ativo: false, resposta_correta: 'b' },
@@ -59,13 +59,13 @@ describe('importação para o banco', () => {
 
     // Pergunta volta ao arquivo: reativada.
     escreverConteudo(raiz, {
-      '91-phishing': {
+      '91-teste-phishing': {
         html: aulaHtml({
           titulo: 'Phishing 2',
           perguntas: [pergunta({ chave: 'a', correta: 3 }), pergunta({ chave: 'b' })],
         }),
       },
-      '90-senhas': { html: aulaHtml({ titulo: 'Senhas' }) },
+      '90-teste-senhas': { html: aulaHtml({ titulo: 'Senhas' }) },
     });
     await importarConteudo(raiz);
     assert.equal((await questoesDe(phishing.id))[1].ativo, true);
@@ -123,27 +123,27 @@ describe('importação para o banco', () => {
 describe('imagens das aulas', () => {
   test('servidas sem login, com cache; inexistente ou fora da pasta não vaza nada (cai no login)', async () => {
     const img = await request(app)
-      .get('/api/conteudo/aulas/02-dados-pessoais-e-sensiveis/imagens/tipos-de-dados.svg')
+      .get('/api/conteudo/aulas/02-o-que-estamos-protegendo/imagens/capa.jpg')
       .expect(200);
-    assert.match(img.headers['content-type'], /image\/svg\+xml/);
+    assert.match(img.headers['content-type'], /image\/jpeg/);
     assert.match(img.headers['cache-control'], /max-age=86400/);
     await request(app)
-      .get('/api/conteudo/aulas/02-dados-pessoais-e-sensiveis/imagens/nao-existe.png')
+      .get('/api/conteudo/aulas/02-o-que-estamos-protegendo/imagens/nao-existe.png')
       .expect(401);
     await request(app).get('/api/conteudo/aulas/..%2F..%2Fpackage.json').expect(401);
     // O HTML da aula traz o gabarito: não pode ser servido.
-    await request(app).get('/api/conteudo/aulas/02-dados-pessoais-e-sensiveis/aula.html').expect(401);
+    await request(app).get('/api/conteudo/aulas/02-o-que-estamos-protegendo/aula.html').expect(401);
   });
 
   test('a aula real aponta a imagem para a URL pública', async () => {
     const u = await novoUsuario();
-    const aula = (await u.api('get', `/api/aulas/${(await aulaPorSlug('dados-pessoais-e-sensiveis')).id}`))
+    const aula = (await u.api('get', `/api/aulas/${(await aulaPorSlug('o-que-estamos-protegendo')).id}`))
       .body;
     assert.match(
       aula.conteudo_html,
-      /<img src="\/api\/conteudo\/aulas\/02-dados-pessoais-e-sensiveis\/imagens\/tipos-de-dados\.svg"/,
+      /<img src="\/api\/conteudo\/aulas\/02-o-que-estamos-protegendo\/imagens\/capa\.jpg"/,
     );
-    assert.match(aula.conteudo_html, /<aside class="atencao">/);
+    assert.match(aula.conteudo_html, /<aside class="dica">/);
   });
 });
 

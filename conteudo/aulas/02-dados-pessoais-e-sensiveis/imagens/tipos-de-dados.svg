@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 260" font-family="system-ui, sans-serif">
-  <rect width="480" height="260" rx="16" fill="#f1f5f9"/>
-  <ellipse cx="240" cy="130" rx="210" ry="110" fill="#dbeafe" stroke="#1e3a8a" stroke-width="3"/>
-  <text x="240" y="52" text-anchor="middle" font-size="20" font-weight="700" fill="#1e3a8a">Dados pessoais</text>
-  <text x="240" y="76" text-anchor="middle" font-size="14" fill="#334155">nome, CPF, e-mail, endereço…</text>
-  <ellipse cx="240" cy="160" rx="120" ry="60" fill="#fef3c7" stroke="#b45309" stroke-width="3"/>
-  <text x="240" y="156" text-anchor="middle" font-size="18" font-weight="700" fill="#78350f">Dados sensíveis</text>
-  <text x="240" y="180" text-anchor="middle" font-size="13" fill="#78350f">saúde, biometria, religião…</text>
-</svg>

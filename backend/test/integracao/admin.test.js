@@ -289,7 +289,7 @@ describe('GET /api/admin/estatisticas', () => {
       [0, 0, null],
     );
 
-    assert.equal(s.questoesAula.length, 6);
+    assert.equal(s.questoesAula.length, 2);
     assert.equal(s.questoesAula.find((q) => q.questao_id === detalhe.questoes[0].id).total_acertos, 1);
 
     assert.deepEqual(Object.keys(s.usuariosAula[0]).sort(), [

@@ -51,12 +51,13 @@ describe('scripts de banco', () => {
       assert.equal(migracao.codigo, 0, migracao.saida);
       assert.match(migracao.saida, /"mensagem":"migração aplicada","nome":"001_schema_inicial.sql"/);
       assert.match(migracao.saida, /"nome":"002_aulas_arquivo_e_pesquisa.sql"/);
+      assert.match(migracao.saida, /"nome":"003_aulas_lgpd_substituidas.sql"/);
       const env = { DATABASE_URL: url.href, NODE_ENV: 'development' };
       const importacao = await rodarNode(['src/scripts/importar-aulas.js'], env);
       assert.equal(importacao.codigo, 0, importacao.saida);
-      assert.match(importacao.saida, /✓ 3 aula\(s\): 3 nova\(s\), 0 atualizada\(s\), 0 sem mudança/);
+      assert.match(importacao.saida, /✓ 15 aula\(s\): 15 nova\(s\), 0 atualizada\(s\), 0 sem mudança/);
       const repetida = await rodarNode(['src/scripts/importar-aulas.js'], env);
-      assert.match(repetida.saida, /0 nova\(s\), 0 atualizada\(s\), 3 sem mudança/);
+      assert.match(repetida.saida, /0 nova\(s\), 0 atualizada\(s\), 15 sem mudança/);
       const seed = await rodarNode(['src/db/seed.js'], env);
       assert.match(seed.saida, /"mensagem":"seed aplicado","trivia":10/);
     } finally {

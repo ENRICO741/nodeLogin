@@ -38,17 +38,20 @@ describe('GET /api/aulas', () => {
   test('lista aulas ativas em ordem, com total de questões e status de conclusão', async () => {
     const u = await novoUsuario();
     const aulas = (await u.api('get', '/api/aulas').expect(200)).body;
+    const ordens = aulas.map((a) => a.ordem);
     assert.deepEqual(
-      aulas.map((a) => a.ordem),
-      [1, 2, 3],
+      ordens,
+      [...ordens].sort((x, y) => x - y),
     );
-    assert.ok(aulas.every((a) => a.total_questoes === 2 && a.concluida === false));
+    assert.equal(aulas[0].total_questoes, 2);
+    assert.ok(aulas.every((a) => a.concluida === false));
     assert.equal(aulas[0].conteudo_html, undefined, 'lista não traz o conteúdo inteiro');
   });
 
   test('aula desativada some da lista e questões desativadas não contam', async () => {
     const u = await novoUsuario();
-    const [a1, a2] = (await u.api('get', '/api/aulas')).body;
+    // a2 = primeira aula (a que tem questões); a1 = a segunda.
+    const [a2, a1] = (await u.api('get', '/api/aulas')).body;
     await pool.query('UPDATE aulas SET ativo = false WHERE id = $1', [a1.id]);
     await pool.query(
       'UPDATE questoes_aula SET ativo = false WHERE id = (SELECT id FROM questoes_aula WHERE aula_id = $1 LIMIT 1)',
@@ -177,7 +180,7 @@ describe('POST /api/visitas/:id/respostas', () => {
 
   test('questão de outra aula, desativada ou inexistente dá 404', async () => {
     const u = await novoUsuario();
-    const [a1, a2] = (await u.api('get', '/api/aulas')).body;
+    const [a2, a1] = (await u.api('get', '/api/aulas')).body;
     const outra = (await u.api('get', `/api/aulas/${a2.id}`)).body.questoes[0];
     const visita = (await u.api('post', `/api/aulas/${a1.id}/visitas`)).body;
     const res = await u
