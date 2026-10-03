@@ -40,7 +40,7 @@ services:
       APP_URL: http://localhost:5173
       SMTP_HOST: mailpit
       SMTP_PORT: 1025
-      SMTP_REMETENTE: Guardião Digital <no-reply@guardiao.local>
+      SMTP_REMETENTE: Guardião Impacta <no-reply@guardiao.local>
     ports:
       - '4000:4000'
     depends_on:

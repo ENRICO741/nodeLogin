@@ -10,7 +10,7 @@ export default defineConfig({
       includeAssets: ['favicon.ico', 'apple-touch-icon-180x180.png', 'logo.svg'],
       manifest: {
         id: '/',
-        name: 'Guardião Digital',
+        name: 'Guardião Impacta',
         short_name: 'Guardião',
         description: 'Aprenda segurança da informação e proteção de dados no dia a dia da empresa.',
         lang: 'pt-BR',

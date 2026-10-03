@@ -1,4 +1,4 @@
-# Guardião Digital
+# Guardião Impacta
 
 PWA de conscientização em segurança da informação (TCC). Visão geral e arquitetura: [README.md](README.md).
 

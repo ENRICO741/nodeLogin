@@ -83,7 +83,7 @@ export function Layout() {
       <header className={styles.cabecalho}>
         <span className={styles.marca}>
           <img src="/logo.svg" alt="" width="28" height="28" />
-          Guardião Digital
+          Guardião Impacta
         </span>
         <span className={styles.acoes}>
           <span className={styles.pontos} aria-label={`${usuario.pontuacao_total} pontos`}>

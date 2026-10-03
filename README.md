@@ -1,6 +1,6 @@
-# Guardião Digital
+# Guardião Impacta
 
-O Guardião Digital é um PWA mobile-first de **conscientização em segurança da informação** para o ambiente corporativo.
+O Guardião Impacta é um PWA mobile-first de **conscientização em segurança da informação** para o ambiente corporativo.
 
 - O usuário estuda **aulas** e responde às perguntas de cada uma.
 - Pode jogar **trivia** em três níveis de dificuldade.

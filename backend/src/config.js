@@ -16,7 +16,7 @@ const esquema = z.object({
   SMTP_PORT: z.coerce.number().int().default(587),
   SMTP_USER: z.string().optional(),
   SMTP_SENHA: z.string().optional(),
-  SMTP_REMETENTE: z.string().default('Guardião Digital <no-reply@localhost>'),
+  SMTP_REMETENTE: z.string().default('Guardião Impacta <no-reply@localhost>'),
   CONTEUDO_DIR: z.string().default(path.resolve(__dirname, '..', '..', 'conteudo')),
   PESQUISA_SEGREDO: z.string().min(16, 'PESQUISA_SEGREDO precisa de pelo menos 16 caracteres').optional(),
 });

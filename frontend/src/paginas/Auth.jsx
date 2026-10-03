@@ -13,7 +13,7 @@ function TelaAuth({ titulo, subtitulo, children, rodape }) {
     <main className={styles.tela}>
       <div className={styles.marca}>
         <img src="/logo.svg" alt="" width="56" height="56" />
-        <span>Guardião Digital</span>
+        <span>Guardião Impacta</span>
       </div>
       <section className={`cartao ${styles.cartao}`} aria-labelledby="titulo-auth">
         <h1 id="titulo-auth">{titulo}</h1>
