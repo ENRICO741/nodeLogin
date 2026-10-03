@@ -59,13 +59,33 @@ describe('Entrar', () => {
 });
 
 describe('Cadastro', () => {
-  const preencher = async () => {
+  const preencher = async (confirmacao = 'senha-forte-123') => {
     await userEvent.type(await screen.findByLabelText('Nome'), 'Maria Silva');
     await userEvent.type(screen.getByLabelText('Apelido'), 'maria');
     await userEvent.type(screen.getByLabelText('E-mail'), 'maria@empresa.com');
     await userEvent.type(screen.getByLabelText('Senha'), 'senha-forte-123');
+    await userEvent.type(screen.getByLabelText('Confirme a senha'), confirmacao);
     await userEvent.click(screen.getByRole('button', { name: 'Criar conta' }));
   };
+
+  it('senhas diferentes não chamam a API', async () => {
+    const { servidor } = await renderizarApp('/cadastro', { usuario: null, rotas: {} });
+    await preencher('outra-coisa');
+    expect(await screen.findByText('As senhas não conferem')).toBeInTheDocument();
+    expect(servidor.enviados('POST /auth/cadastro')).toEqual([]);
+  });
+
+  it('botão do olho mostra e oculta a senha', async () => {
+    await renderizarApp('/cadastro', { usuario: null });
+    const senha = await screen.findByLabelText('Senha');
+    const [olho] = screen.getAllByRole('button', { name: 'Mostrar senha' });
+    expect(senha).toHaveAttribute('type', 'password');
+    await userEvent.click(olho);
+    expect(senha).toHaveAttribute('type', 'text');
+    expect(olho).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(olho);
+    expect(senha).toHaveAttribute('type', 'password');
+  });
 
   it('cria a conta e entra', async () => {
     const { servidor } = await renderizarApp('/cadastro', {

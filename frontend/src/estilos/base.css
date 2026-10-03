@@ -205,6 +205,23 @@ a {
   border: 1px solid var(--cor-borda-campo);
   border-radius: var(--raio-sm);
 }
+.campo__senha {
+  position: relative;
+}
+.campo__senha input {
+  padding-right: var(--alvo-toque);
+}
+.campo__senha button {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: var(--alvo-toque);
+  display: grid;
+  place-items: center;
+  color: var(--cor-texto-suave);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
 .campo textarea {
   min-height: 7rem;
   resize: vertical;

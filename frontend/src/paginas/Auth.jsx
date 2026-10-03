@@ -76,9 +76,14 @@ export function Entrar() {
 
 export function Cadastro() {
   const { cadastrar } = useAuth();
+  const [erroConfirmacao, setErroConfirmacao] = useState(null);
   // Checkbox marcado chega como "on" no FormData; a API espera booleano.
-  const { enviando, erro, porCampo, enviar } = useEnvio(({ consentiu_pesquisa, ...dados }) =>
-    cadastrar({ ...dados, consentiu_pesquisa: consentiu_pesquisa === 'on' }),
+  const { enviando, erro, porCampo, enviar } = useEnvio(
+    async ({ consentiu_pesquisa, confirmacao, ...dados }) => {
+      setErroConfirmacao(dados.senha === confirmacao ? null : 'As senhas não conferem');
+      if (dados.senha !== confirmacao) return;
+      await cadastrar({ ...dados, consentiu_pesquisa: consentiu_pesquisa === 'on' });
+    },
   );
 
   return (
@@ -111,6 +116,14 @@ export function Cadastro() {
           required
           ajuda={`Pelo menos ${MINIMO_SENHA} caracteres. Uma frase longa é mais segura que uma senha curta e complexa.`}
           erro={porCampo.senha}
+        />
+        <Campo
+          label="Confirme a senha"
+          name="confirmacao"
+          type="password"
+          autoComplete="new-password"
+          required
+          erro={erroConfirmacao}
         />
         <label className="campo-check">
           <input type="checkbox" name="consentiu_pesquisa" />
