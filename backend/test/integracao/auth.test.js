@@ -17,6 +17,7 @@ const cadastro = (extra) =>
     ...extra,
   });
 const camposComErro = (res) => res.body.erro.detalhes.map((d) => d.campo);
+const SENHA_72_BYTES = 'é'.repeat(36); // 36 caracteres, 72 bytes
 
 describe('POST /api/auth/cadastro', () => {
   test('cria usuário comum, devolve token e nunca devolve o hash da senha', async () => {
@@ -48,6 +49,9 @@ describe('POST /api/auth/cadastro', () => {
     const curta = await cadastro({ senha: '1234567' }).expect(400);
     assert.match(curta.body.erro.detalhes[0].mensagem, /pelo menos 8/);
     await cadastro({ senha: 'x'.repeat(73) }).expect(400);
+    // Limite em bytes (o bcrypt ignora o que passa de 72): com acento, 37 caracteres já são 73 bytes.
+    await cadastro({ senha: SENHA_72_BYTES + 'A' }).expect(400);
+    await cadastro({ senha: SENHA_72_BYTES }).expect(201);
     await cadastro({ senha: '12345678' }).expect(201);
   });
 
@@ -273,6 +277,11 @@ describe('recuperação de senha', () => {
     );
     assert.equal(curto.body.erro.codigo, 'VALIDACAO');
     await post('/api/auth/redefinir-senha', { token: 'x'.repeat(43), senha: '123' }).expect(400);
+    const longa = await post('/api/auth/redefinir-senha', {
+      token: 'x'.repeat(43),
+      senha: SENHA_72_BYTES + 'A',
+    }).expect(400);
+    assert.equal(longa.body.erro.codigo, 'VALIDACAO');
   });
 
   test('falha no envio do e-mail não quebra a resposta', async () => {

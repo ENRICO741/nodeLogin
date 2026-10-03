@@ -8,6 +8,8 @@ const {
   esquemaQuestao,
   esquemaResposta,
   idDaRota,
+  senha,
+  esquemaPapel,
 } = require('../../src/lib/validacao');
 
 const UUID = '3f2b8c1e-9a4d-4e6f-8b2a-1c3d5e7f9a0b';
@@ -158,5 +160,58 @@ describe('idDaRota', () => {
         (e) => e.issues[0].message === 'Identificador inválido',
       );
     }
+  });
+});
+
+describe('senha', () => {
+  test('aceita 8 e 72 caracteres ASCII (limites exatos)', () => {
+    assert.equal(senha.parse('12345678'), '12345678');
+    assert.equal(senha.parse('x'.repeat(72)), 'x'.repeat(72));
+  });
+  test('recusa 7 caracteres com mensagem clara', () => {
+    const r = senha.safeParse('1234567');
+    assert.equal(r.success, false);
+    assert.deepEqual(
+      r.error.issues.map((i) => i.message),
+      ['A senha precisa de pelo menos 8 caracteres'],
+    );
+  });
+  test('recusa 73 caracteres ASCII', () => {
+    assert.throws(() => senha.parse('x'.repeat(73)));
+  });
+  test('preserva espaços nas pontas e unicode (sem trim)', () => {
+    assert.equal(senha.parse('  abcdefgh  '), '  abcdefgh  ');
+    assert.equal(senha.parse('  🔒senha çã  '), '  🔒senha çã  ');
+  });
+  test('limite é de 72 bytes, não de 72 caracteres (o bcrypt corta em 72 bytes)', () => {
+    assert.equal(Buffer.byteLength('é'.repeat(36)), 72);
+    assert.equal(senha.parse('é'.repeat(36)), 'é'.repeat(36));
+    const r = senha.safeParse('é'.repeat(36) + 'A'); // 37 caracteres, 73 bytes
+    assert.equal(r.success, false);
+    assert.match(r.error.issues[0].message, /longa demais/);
+    assert.throws(() => senha.parse('🔒'.repeat(19))); // 38 unidades, 76 bytes
+  });
+  test('recusa tipos que não são string', () => {
+    for (const valor of [12345678, null, undefined, [], {}]) {
+      assert.throws(() => senha.parse(valor), String(valor));
+    }
+  });
+});
+
+describe('esquemaPapel', () => {
+  test('aceita admin true e false sem mudar nada', () => {
+    assert.deepEqual(esquemaPapel.parse({ admin: true }), { admin: true });
+    assert.deepEqual(esquemaPapel.parse({ admin: false }), { admin: false });
+  });
+  test('recusa corpo ausente, vazio, array e admin que não é boolean', () => {
+    for (const corpo of [undefined, {}, [], { admin: 'true' }, { admin: 1 }, { admin: null }]) {
+      assert.throws(() => esquemaPapel.parse(corpo), JSON.stringify(corpo));
+    }
+  });
+  test('é estrito: campo extra é recusado, não descartado', () => {
+    const r = esquemaPapel.safeParse({ admin: true, papel: 'admin' });
+    assert.equal(r.success, false);
+    assert.equal(r.error.issues[0].code, 'unrecognized_keys');
+    assert.deepEqual(r.error.issues[0].keys, ['papel']);
   });
 });

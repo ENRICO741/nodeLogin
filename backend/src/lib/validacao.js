@@ -32,4 +32,22 @@ const esquemaResposta = z.object({
 
 const idDaRota = (req) => z.uuid({ error: 'Identificador inválido' }).parse(req.params.id);
 
-module.exports = { texto, textoOpcional, urlHttps, esquemaQuestao, esquemaResposta, idDaRota };
+// Sem trim: a senha vale exatamente como digitada. O limite é em bytes porque o bcrypt ignora tudo
+// depois do 72º byte (com acento ou emoji, duas senhas diferentes virariam a mesma).
+const senha = z
+  .string()
+  .min(8, 'A senha precisa de pelo menos 8 caracteres')
+  .refine((s) => Buffer.byteLength(s) <= 72, 'A senha é longa demais (máximo de 72 bytes)');
+
+const esquemaPapel = z.strictObject({ admin: z.boolean() });
+
+module.exports = {
+  texto,
+  textoOpcional,
+  urlHttps,
+  esquemaQuestao,
+  esquemaResposta,
+  idDaRota,
+  senha,
+  esquemaPapel,
+};

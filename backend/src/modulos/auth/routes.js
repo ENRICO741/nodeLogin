@@ -3,9 +3,8 @@ const { z } = require('zod');
 const service = require('./service');
 const { autenticar } = require('../../middleware/autenticacao');
 const { limiteAuth, limiteRecuperacaoIp, limiteRecuperacaoEmail } = require('../../middleware/limites');
-const { texto } = require('../../lib/validacao');
+const { texto, senha } = require('../../lib/validacao');
 
-const senha = z.string().min(8, 'A senha precisa de pelo menos 8 caracteres').max(72);
 const email = z.email('E-mail inválido').max(254);
 
 const esquemaCadastro = z.object({

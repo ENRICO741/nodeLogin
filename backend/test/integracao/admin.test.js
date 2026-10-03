@@ -1,6 +1,17 @@
-const { describe, test, before, after } = require('node:test');
+const { describe, test, before, after, beforeEach, afterEach, mock } = require('node:test');
 const assert = require('node:assert/strict');
-const { pool, prepararBanco, novoUsuario, novoAdmin, gabarito } = require('../ajuda');
+const {
+  app,
+  request,
+  pool,
+  prepararBanco,
+  novoUsuario,
+  novoAdmin,
+  tornarAdmin,
+  autenticado,
+  gabarito,
+} = require('../ajuda');
+const logger = require('../../src/lib/logger');
 
 let admin;
 before(async () => {
@@ -47,6 +58,9 @@ describe('acesso', () => {
       ['post', '/api/admin/questoes-trivia'],
       ['patch', `/api/admin/questoes-trivia/${UUID_INEXISTENTE}`],
       ['delete', `/api/admin/questoes-trivia/${UUID_INEXISTENTE}`],
+      ['get', '/api/admin/usuarios'],
+      ['put', `/api/admin/usuarios/${UUID_INEXISTENTE}/senha`],
+      ['patch', `/api/admin/usuarios/${UUID_INEXISTENTE}`],
     ];
     for (const [metodo, url] of rotas) {
       const res = await u.api(metodo, url).send({}).expect(403);
@@ -244,6 +258,357 @@ describe('questões de trivia', () => {
       .send({ pontos: 1 })
       .expect(404);
     await admin.api('delete', `/api/admin/questoes-trivia/${UUID_INEXISTENTE}`).expect(404);
+  });
+});
+
+describe('usuários', () => {
+  test('lista ativos (admins e usuários) só com nome, e-mail, foto e papel', async () => {
+    const u = await novoUsuario({ nome: 'Ana Lista' });
+    const inativo = await novoUsuario();
+    await pool.query('UPDATE usuarios SET ativo = false WHERE id = $1', [inativo.usuario.id]);
+
+    const lista = (await admin.api('get', '/api/admin/usuarios').expect(200)).body;
+    assert.deepEqual(Object.keys(lista[0]).sort(), ['email', 'foto_perfil_url', 'id', 'nome', 'papel']);
+    assert.equal(lista.find((x) => x.id === admin.usuario.id).papel, 'admin');
+    assert.deepEqual(
+      lista.find((x) => x.id === u.usuario.id),
+      {
+        id: u.usuario.id,
+        nome: 'Ana Lista',
+        email: u.email,
+        foto_perfil_url: null,
+        papel: 'usuario',
+      },
+    );
+    assert.ok(!lista.some((x) => x.id === inativo.usuario.id), 'inativo não aparece');
+    const posicao = (id) => lista.findIndex((x) => x.id === id);
+    assert.ok(posicao(u.usuario.id) < posicao(admin.usuario.id), 'ordenado por nome');
+  });
+
+  test('redefinir senha: troca a senha, derruba as sessões e invalida links de recuperação', async () => {
+    const u = await novoUsuario();
+    await pool.query(
+      `INSERT INTO tokens_recuperacao_senha (usuario_id, token_hash, expira_em)
+       VALUES ($1, repeat('a', 64), now() + interval '30 minutes')`,
+      [u.usuario.id],
+    );
+
+    const res = await admin
+      .api('put', `/api/admin/usuarios/${u.usuario.id}/senha`)
+      .send({ senha: 'nova-senha-456' })
+      .expect(204);
+    assert.equal(res.text, '');
+
+    const login = (senha) => request(app).post('/api/auth/login').send({ identificador: u.email, senha });
+    await login('nova-senha-456').expect(200);
+    await login(u.senha).expect(401);
+    await u.api('get', '/api/auth/me').expect(401);
+    const { rows } = await pool.query(
+      'SELECT count(*)::int AS n FROM tokens_recuperacao_senha WHERE usuario_id = $1 AND NOT usado',
+      [u.usuario.id],
+    );
+    assert.equal(rows[0].n, 0);
+  });
+
+  test('redefinir senha: senha curta dá 400; inexistente ou inativo dá 404; id inválido dá 400', async () => {
+    const u = await novoUsuario();
+    const inativo = await novoUsuario();
+    await pool.query('UPDATE usuarios SET ativo = false WHERE id = $1', [inativo.usuario.id]);
+    const put = (id, senha = 'nova-senha-456') =>
+      admin.api('put', `/api/admin/usuarios/${id}/senha`).send({ senha });
+
+    const curta = await put(u.usuario.id, 'curta').expect(400);
+    assert.match(JSON.stringify(curta.body), /pelo menos 8 caracteres/);
+    await put(u.usuario.id, 'x'.repeat(73)).expect(400);
+    await u.api('get', '/api/auth/me').expect(200);
+    await put(UUID_INEXISTENTE).expect(404);
+    await put(inativo.usuario.id).expect(404);
+    await put('abc').expect(400);
+  });
+
+  test('papel: promove e rebaixa com efeito imediato; repetir dá o mesmo resultado', async () => {
+    const u = await novoUsuario();
+    const patch = (valor) => admin.api('patch', `/api/admin/usuarios/${u.usuario.id}`).send({ admin: valor });
+    await u.api('get', '/api/admin/usuarios').expect(403);
+
+    const promovido = (await patch(true).expect(200)).body;
+    assert.deepEqual(promovido, {
+      id: u.usuario.id,
+      nome: u.nome,
+      email: u.email,
+      foto_perfil_url: null,
+      papel: 'admin',
+    });
+    await u.api('get', '/api/admin/usuarios').expect(200);
+    assert.deepEqual((await patch(true).expect(200)).body, promovido);
+
+    const rebaixado = (await patch(false).expect(200)).body;
+    assert.deepEqual(rebaixado, { ...promovido, papel: 'usuario' });
+    await u.api('get', '/api/admin/usuarios').expect(403);
+    await u.api('get', '/api/auth/me').expect(200); // perde o acesso, mas a sessão continua
+    assert.deepEqual((await patch(false).expect(200)).body, rebaixado);
+  });
+
+  test('papel: não altera o próprio; 404, id inválido e corpo inválido', async () => {
+    const proprio = await admin
+      .api('patch', `/api/admin/usuarios/${admin.usuario.id}`)
+      .send({ admin: false });
+    assert.equal(proprio.status, 409);
+    assert.equal(proprio.body.erro.codigo, 'PROPRIO_PAPEL');
+    await admin
+      .api('patch', `/api/admin/usuarios/${admin.usuario.id.toUpperCase()}`)
+      .send({ admin: false })
+      .expect(409);
+
+    const inativo = await novoUsuario();
+    await pool.query('UPDATE usuarios SET ativo = false WHERE id = $1', [inativo.usuario.id]);
+    // Rebaixar (que passa pela trava dos admins) também dá 404, e não "último admin".
+    for (const id of [UUID_INEXISTENTE, inativo.usuario.id]) {
+      for (const valor of [true, false]) {
+        const res = await admin.api('patch', `/api/admin/usuarios/${id}`).send({ admin: valor }).expect(404);
+        assert.equal(res.body.erro.codigo, 'NAO_ENCONTRADO');
+      }
+    }
+    await admin.api('patch', '/api/admin/usuarios/abc').send({ admin: true }).expect(400);
+
+    const u = await novoUsuario();
+    for (const corpo of [{}, { admin: 'true' }, { admin: true, papel: 'admin' }]) {
+      await admin.api('patch', `/api/admin/usuarios/${u.usuario.id}`).send(corpo).expect(400);
+    }
+    const { rows } = await pool.query('SELECT papel FROM usuarios WHERE id = ANY($1)', [
+      [admin.usuario.id, inativo.usuario.id, u.usuario.id],
+    ]);
+    assert.deepEqual(rows.map((r) => r.papel).sort(), ['admin', 'usuario', 'usuario']);
+  });
+
+  test('lista: ordem ignora maiúsculas e desempata pelo id', async () => {
+    // Sem lower(nome), a ordem depende da collation: em "C" (a do Postgres de dev) "Zeca" vem antes de
+    // "bia"; em en_US da glibc, "zeca" vem antes de "Zeca". Com lower(nome), id as duas dão bia, Zeca, zeca.
+    const ids = [1, 2, 3].map((n) => `00000000-0000-4000-8000-00000000000${n}`);
+    await pool.query(
+      `INSERT INTO usuarios (id, nome, apelido, email, senha_hash) VALUES
+         ($1, 'Zeca', 'zeca_maiusculo', 'zeca1@exemplo.com', 'x'),
+         ($2, 'zeca', 'zeca_minusculo', 'zeca2@exemplo.com', 'x'),
+         ($3, 'bia', 'bia_ordem', 'bia@exemplo.com', 'x')`,
+      ids,
+    );
+    const lista = (await admin.api('get', '/api/admin/usuarios').expect(200)).body;
+    assert.deepEqual(
+      lista.filter((x) => ids.includes(x.id)).map((x) => x.id),
+      [ids[2], ids[0], ids[1]],
+    );
+  });
+
+  describe('redefinir senha: limites e corpo', () => {
+    const put = (id, corpo) => admin.api('put', `/api/admin/usuarios/${id}/senha`).send(corpo);
+    const login = (email, senha) =>
+      request(app).post('/api/auth/login').send({ identificador: email, senha });
+
+    test('aceita 8 e 72 caracteres ASCII; 7 ou 73 dão 400 e a sessão continua', async () => {
+      const u = await novoUsuario();
+      const SENHA_72 = 'x'.repeat(72);
+      await put(u.usuario.id, { senha: 'x'.repeat(7) }).expect(400);
+      const longa = await put(u.usuario.id, { senha: SENHA_72 + 'x' }).expect(400);
+      assert.match(JSON.stringify(longa.body), /longa demais/);
+      await u.api('get', '/api/auth/me').expect(200);
+      for (const senha of ['x'.repeat(8), SENHA_72]) {
+        await put(u.usuario.id, { senha }).expect(204);
+        await login(u.email, senha).expect(200);
+      }
+    });
+
+    test('limite é de 72 bytes: acento conta 2 e o 73º byte dá 400', async () => {
+      // bcrypt ignora o que passa do 72º byte: sem esse limite, X+"A" e X+"B" seriam a mesma senha.
+      const u = await novoUsuario();
+      const SENHA_72_BYTES = 'é'.repeat(36); // 36 caracteres, 72 bytes
+      const res = await put(u.usuario.id, { senha: SENHA_72_BYTES + 'A' }).expect(400);
+      assert.match(JSON.stringify(res.body), /longa demais/);
+      await u.api('get', '/api/auth/me').expect(200);
+      await login(u.email, u.senha).expect(200);
+
+      await put(u.usuario.id, { senha: SENHA_72_BYTES }).expect(204);
+      await login(u.email, SENHA_72_BYTES).expect(200);
+      await login(u.email, SENHA_72_BYTES.slice(0, -1)).expect(401);
+    });
+
+    test('aceita aspas, aspas simples e barra invertida, e o login com ela funciona', async () => {
+      const u = await novoUsuario();
+      const senha = `"'\\'; DROP TABLE usuarios; --`;
+      await put(u.usuario.id, { senha }).expect(204);
+      await login(u.email, senha).expect(200);
+      await login(u.email, u.senha).expect(401);
+    });
+
+    test('guarda a senha exatamente como enviada (espaços nas pontas e unicode)', async () => {
+      const u = await novoUsuario();
+      const senha = '  Sénha çã-1  ';
+      await put(u.usuario.id, { senha }).expect(204);
+      await login(u.email, senha.trim()).expect(401);
+      await login(u.email, senha).expect(200);
+    });
+
+    test('corpo ausente, JSON null, array ou senha que não é string dão 400 e não mudam nada', async () => {
+      const u = await novoUsuario();
+      const antes = (await pool.query('SELECT senha_alterada_em FROM usuarios WHERE id = $1', [u.usuario.id]))
+        .rows[0];
+      const url = `/api/admin/usuarios/${u.usuario.id}/senha`;
+
+      await admin.api('put', url).expect(400);
+      const nulo = await admin
+        .api('put', url)
+        .set('Content-Type', 'application/json')
+        .send('null')
+        .expect(400);
+      assert.equal(nulo.body.erro.codigo, 'JSON_INVALIDO');
+      for (const corpo of [[], { senha: 12345678 }, { senha: null }]) {
+        const res = await put(u.usuario.id, corpo).expect(400);
+        assert.equal(res.body.erro.codigo, 'VALIDACAO', JSON.stringify(corpo));
+      }
+
+      const depois = (
+        await pool.query('SELECT senha_alterada_em FROM usuarios WHERE id = $1', [u.usuario.id])
+      ).rows[0];
+      assert.deepEqual(depois, antes);
+      await u.api('get', '/api/auth/me').expect(200);
+    });
+
+    test('campos extras no corpo são ignorados (não muda papel, ativo nem e-mail)', async () => {
+      const u = await novoUsuario();
+      await put(u.usuario.id, {
+        senha: 'nova-senha-456',
+        papel: 'admin',
+        ativo: false,
+        email: 'x@y.com',
+      }).expect(204);
+      const { rows } = await pool.query('SELECT papel, ativo, email FROM usuarios WHERE id = $1', [
+        u.usuario.id,
+      ]);
+      assert.deepEqual(rows[0], { papel: 'usuario', ativo: true, email: u.email });
+    });
+
+    test('admin pode redefinir a própria senha: a sessão dele cai e o login novo continua admin', async () => {
+      const a = await novoAdmin();
+      await a
+        .api('put', `/api/admin/usuarios/${a.usuario.id}/senha`)
+        .send({ senha: 'nova-senha-456' })
+        .expect(204);
+      await a.api('get', '/api/auth/me').expect(401);
+      const sessao = (await login(a.email, 'nova-senha-456').expect(200)).body;
+      assert.equal(sessao.usuario.papel, 'admin');
+      await autenticado(sessao.token)('get', '/api/admin/usuarios').expect(200);
+    });
+  });
+
+  test('uuid em maiúsculas de outro usuário: senha e papel funcionam e o id volta minúsculo', async () => {
+    const u = await novoUsuario();
+    const ID = u.usuario.id.toUpperCase();
+    await admin.api('put', `/api/admin/usuarios/${ID}/senha`).send({ senha: 'nova-senha-456' }).expect(204);
+    await request(app)
+      .post('/api/auth/login')
+      .send({ identificador: u.email, senha: 'nova-senha-456' })
+      .expect(200);
+    const res = await admin.api('patch', `/api/admin/usuarios/${ID}`).send({ admin: true }).expect(200);
+    assert.equal(res.body.id, u.usuario.id);
+    assert.equal(res.body.papel, 'admin');
+  });
+
+  test('papel: corpo ausente, JSON null ou array dão 400 e não mudam o papel', async () => {
+    const u = await novoUsuario();
+    const url = `/api/admin/usuarios/${u.usuario.id}`;
+    await admin.api('patch', url).expect(400);
+    const nulo = await admin
+      .api('patch', url)
+      .set('Content-Type', 'application/json')
+      .send('null')
+      .expect(400);
+    assert.equal(nulo.body.erro.codigo, 'JSON_INVALIDO');
+    await admin.api('patch', url).send([]).expect(400);
+    const { rows } = await pool.query('SELECT papel FROM usuarios WHERE id = $1', [u.usuario.id]);
+    assert.equal(rows[0].papel, 'usuario');
+  });
+
+  describe('registro das ações', () => {
+    let info;
+    beforeEach(() => (info = mock.method(logger, 'info')));
+    afterEach(() => info.mock.restore());
+    // O log de acesso ("http") também passa por logger.info; aqui só interessa a auditoria.
+    const auditoria = () => info.mock.calls.filter((c) => c.arguments[0] !== 'http');
+
+    test('só ids (e o papel novo): nunca a senha, o hash ou o e-mail', async () => {
+      const u = await novoUsuario();
+      const senha = 'Senha-secreta-do-log-1';
+      await admin.api('put', `/api/admin/usuarios/${u.usuario.id}/senha`).send({ senha }).expect(204);
+      await admin.api('patch', `/api/admin/usuarios/${u.usuario.id}`).send({ admin: true }).expect(200);
+
+      const extras = auditoria().map((c) => c.arguments[1]);
+      assert.deepEqual(extras, [
+        { admin_id: admin.usuario.id, usuario_id: u.usuario.id },
+        { admin_id: admin.usuario.id, usuario_id: u.usuario.id, papel: 'admin' },
+      ]);
+      const tudo = JSON.stringify(info.mock.calls.map((c) => c.arguments));
+      for (const proibido of [senha, '$2b$', u.email]) assert.ok(!tudo.includes(proibido), proibido);
+    });
+
+    test('nada é registrado quando a operação falha', async () => {
+      const u = await novoUsuario();
+      await admin
+        .api('put', `/api/admin/usuarios/${u.usuario.id}/senha`)
+        .send({ senha: 'curta' })
+        .expect(400);
+      await admin
+        .api('put', `/api/admin/usuarios/${UUID_INEXISTENTE}/senha`)
+        .send({ senha: 'nova-senha-456' })
+        .expect(404);
+      await admin.api('patch', `/api/admin/usuarios/${admin.usuario.id}`).send({ admin: false }).expect(409);
+      await admin.api('patch', `/api/admin/usuarios/${UUID_INEXISTENTE}`).send({ admin: true }).expect(404);
+      assert.deepEqual(auditoria(), []);
+    });
+  });
+
+  test('papel: rebaixar nunca deixa o sistema sem admin ativo (409 ULTIMO_ADMIN)', async () => {
+    await pool.query("UPDATE usuarios SET papel = 'usuario' WHERE papel = 'admin'");
+    const a = await novoAdmin();
+    const b = await novoAdmin();
+
+    // Segura as linhas dos admins enquanto o pedido de b (já autenticado) rebaixa a; nesse meio-tempo
+    // b é rebaixado. Quando o pedido seguir, a é o único admin e não pode sair.
+    const c = await pool.connect();
+    let aberta = false;
+    try {
+      await c.query('BEGIN');
+      aberta = true;
+      await c.query("SELECT 1 FROM usuarios WHERE papel = 'admin' AND ativo FOR UPDATE");
+      const pedido = b
+        .api('patch', `/api/admin/usuarios/${a.usuario.id}`)
+        .send({ admin: false })
+        .then((r) => r);
+      // Consulta por outra conexão: dentro da transação de `c` o pg_stat_activity congela na 1ª leitura.
+      for (let i = 0; ; i++) {
+        const { rows } = await pool.query(
+          "SELECT count(*)::int AS n FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND datname = current_database()",
+        );
+        if (rows[0].n > 0) break;
+        if (i > 200) throw new Error('o pedido não chegou a esperar pela trava');
+        await new Promise((r) => setTimeout(r, 25));
+      }
+      await c.query("UPDATE usuarios SET papel = 'usuario' WHERE id = $1", [b.usuario.id]);
+      await c.query('COMMIT');
+      aberta = false;
+
+      const res = await pedido;
+      assert.equal(res.status, 409);
+      assert.equal(res.body.erro.codigo, 'ULTIMO_ADMIN');
+    } finally {
+      // Sem isso, uma falha devolve ao pool uma conexão segurando as travas (deadlock nos testes seguintes).
+      if (aberta) await c.query('ROLLBACK');
+      c.release();
+    }
+    const { rows } = await pool.query("SELECT id FROM usuarios WHERE papel = 'admin' AND ativo");
+    assert.deepEqual(
+      rows.map((r) => r.id),
+      [a.usuario.id],
+    );
+    await tornarAdmin(admin.email);
   });
 });
 

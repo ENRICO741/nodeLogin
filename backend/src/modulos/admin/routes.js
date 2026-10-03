@@ -152,5 +152,6 @@ router.delete('/questoes-trivia/:id', async (req, res) => {
 });
 
 router.use('/pesquisa', require('./pesquisa'));
+router.use('/usuarios', require('./usuarios'));
 
 module.exports = router;

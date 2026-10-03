@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { ArrowLeft, BarChart3, BookOpen, ChevronRight, Zap } from 'lucide-react';
+import { ArrowLeft, BarChart3, BookOpen, ChevronRight, Users, Zap } from 'lucide-react';
 import styles from './Admin.module.css';
 
 const SECOES = [
@@ -20,6 +20,12 @@ const SECOES = [
     titulo: 'Questões de trivia',
     descricao: 'Criar e editar perguntas por dificuldade',
     Icone: Zap,
+  },
+  {
+    para: '/admin/usuarios',
+    titulo: 'Usuários',
+    descricao: 'Acesso de administrador e redefinição de senha',
+    Icone: Users,
   },
 ];
 

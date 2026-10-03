@@ -15,6 +15,7 @@ import { PainelAdmin } from './paginas/admin/Admin';
 import { Estatisticas } from './paginas/admin/Estatisticas';
 import { AdminAula, AdminAulas } from './paginas/admin/AdminAulas';
 import { AdminTrivia } from './paginas/admin/AdminTrivia';
+import { AdminUsuarios } from './paginas/admin/AdminUsuarios';
 
 export function App() {
   return (
@@ -45,6 +46,7 @@ export function App() {
                   <Route path="aulas" element={<AdminAulas />} />
                   <Route path="aulas/:id" element={<AdminAula />} />
                   <Route path="trivia" element={<AdminTrivia />} />
+                  <Route path="usuarios" element={<AdminUsuarios />} />
                 </Route>
               </Route>
             </Route>

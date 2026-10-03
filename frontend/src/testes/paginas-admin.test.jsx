@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ADMIN, erroApi, renderizarApp, sequencia, USUARIO } from './utils';
 
@@ -36,19 +36,34 @@ async function preencherQuestao({ enunciado = 'Nova pergunta?', correta = 'c', i
   if (imagem) await userEvent.type(screen.getByLabelText('Imagem (opcional)'), imagem);
 }
 
-describe('acesso à área admin', () => {
-  it('usuário comum é mandado para as aulas', async () => {
-    await renderizarApp('/admin/estatisticas', { usuario: USUARIO, rotas: { 'GET /aulas': [] } });
-    expect(await screen.findByRole('heading', { name: 'Aulas' })).toBeInTheDocument();
-  });
+// Rota que só responde quando o teste chamar liberar(valor).
+function pendente() {
+  let liberar;
+  const rota = () =>
+    new Promise((resolver) => {
+      liberar = resolver;
+    });
+  return { rota, liberar: (valor) => act(async () => liberar(valor)) };
+}
 
-  it('painel lista as três seções com links', async () => {
+describe('acesso à área admin', () => {
+  it.each(['/admin/estatisticas', '/admin/usuarios'])(
+    'usuário comum em %s é mandado para as aulas sem chamar a API de admin',
+    async (caminho) => {
+      const { servidor } = await renderizarApp(caminho, { usuario: USUARIO, rotas: { 'GET /aulas': [] } });
+      expect(await screen.findByRole('heading', { name: 'Aulas' })).toBeInTheDocument();
+      expect(servidor.mock.calls.filter(([url]) => url.startsWith('/api/admin'))).toEqual([]);
+    },
+  );
+
+  it('painel lista as seções com links', async () => {
     await comoAdmin('/admin');
     expect(screen.getByRole('heading', { name: 'Administração' })).toBeInTheDocument();
     for (const [nome, href] of [
       [/Estatísticas/, '/admin/estatisticas'],
       [/Criar e editar aulas/, '/admin/aulas'],
       [/Questões de trivia/, '/admin/trivia'],
+      [/Acesso de administrador e redefinição/, '/admin/usuarios'],
     ]) {
       expect(screen.getByRole('link', { name: nome })).toHaveAttribute('href', href);
     }
@@ -471,6 +486,364 @@ describe('Questões de trivia (admin)', () => {
 
   it('erro de carregamento', async () => {
     await comoAdmin('/admin/trivia', { 'GET /admin/questoes-trivia': erroApi(500, 'E', 'Falhou') });
+    expect(await screen.findByRole('alert')).toHaveTextContent('Falhou');
+  });
+});
+
+describe('Usuários (admin)', () => {
+  const MARIA = {
+    id: 'u1',
+    nome: 'Maria Silva',
+    email: 'maria@empresa.com',
+    foto_perfil_url: null,
+    papel: 'usuario',
+  };
+  const BRUNO = {
+    id: 'b1',
+    nome: 'Bruno Lima',
+    email: 'bruno@empresa.com',
+    foto_perfil_url: null,
+    papel: 'admin',
+  };
+  // A primeira linha é a do admin logado (ADMIN, id a1).
+  const LISTA = [
+    {
+      id: 'a1',
+      nome: 'Ana Admin',
+      email: 'ana@empresa.com',
+      foto_perfil_url: 'https://x.com/ana.png',
+      papel: 'admin',
+    },
+    BRUNO,
+    MARIA,
+  ];
+  const nomes = () =>
+    screen
+      .getAllByRole('row')
+      .slice(1)
+      .map((tr) => within(tr).getAllByRole('cell')[1].textContent);
+  const caixa = (nome) => screen.getByRole('checkbox', { name: `Administrador: ${nome}` });
+  const linha = (nome) => screen.getByRole('cell', { name: nome }).closest('tr');
+  const botaoSenha = (nome) => screen.getByRole('button', { name: `Redefinir senha de ${nome}` });
+  const formSenha = (nome) => screen.queryByRole('form', { name: `Nova senha de ${nome}` });
+
+  it('lista todos em tabela e filtra por papel', async () => {
+    await comoAdmin('/admin/usuarios', { 'GET /admin/usuarios': LISTA });
+    expect(await screen.findByText('maria@empresa.com')).toBeInTheDocument();
+    expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toEqual([
+      'Foto',
+      'Nome',
+      'E-mail',
+      'Administrador',
+      'Senha',
+    ]);
+    expect(nomes()).toEqual(['Ana Admin', 'Bruno Lima', 'Maria Silva']);
+    expect(caixa('Bruno Lima')).toBeChecked();
+    expect(caixa('Maria Silva')).not.toBeChecked();
+    for (const th of screen.getAllByRole('columnheader')) expect(th).toHaveAttribute('scope', 'col');
+    expect(document.querySelector('img[src="https://x.com/ana.png"]')).toBeInTheDocument();
+    // sem foto: a inicial no lugar da imagem
+    const linhaMaria = linha('Maria Silva');
+    expect(linhaMaria.querySelector('img')).toBeNull();
+    expect(within(linhaMaria).getAllByRole('cell')[0].textContent).toBe('M');
+
+    await userEvent.selectOptions(screen.getByLabelText('Mostrar'), 'admin');
+    expect(nomes()).toEqual(['Ana Admin', 'Bruno Lima']);
+    await userEvent.selectOptions(screen.getByLabelText('Mostrar'), 'usuario');
+    expect(nomes()).toEqual(['Maria Silva']);
+  });
+
+  it('a própria linha fica desabilitada, com explicação', async () => {
+    await comoAdmin('/admin/usuarios', { 'GET /admin/usuarios': LISTA });
+    await screen.findByText('maria@empresa.com');
+    expect(caixa('Ana Admin')).toBeDisabled();
+    expect(caixa('Ana Admin')).toHaveAccessibleDescription(/não pode alterar o próprio papel/);
+    expect(caixa('Maria Silva')).toBeEnabled();
+  });
+
+  it('marcar e confirmar dá privilégio de admin', async () => {
+    const confirmar = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const { servidor } = await comoAdmin('/admin/usuarios', {
+      'GET /admin/usuarios': LISTA,
+      'PATCH /admin/usuarios/u1': { ...MARIA, papel: 'admin' },
+    });
+    await screen.findByText('maria@empresa.com');
+    await userEvent.click(caixa('Maria Silva'));
+    expect(confirmar).toHaveBeenCalledWith(
+      'Dar privilégio de administrador a Maria Silva (maria@empresa.com)? Essa pessoa poderá editar o conteúdo e ver estatísticas e dados de todos os usuários.',
+    );
+    await waitFor(() => expect(caixa('Maria Silva')).toBeChecked());
+    expect(servidor.enviados('PATCH /admin/usuarios/u1')).toEqual([{ admin: true }]);
+  });
+
+  it('cancelar a confirmação não muda a caixa nem chama a API', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const { servidor } = await comoAdmin('/admin/usuarios', { 'GET /admin/usuarios': LISTA });
+    await screen.findByText('maria@empresa.com');
+    await userEvent.click(caixa('Maria Silva'));
+    expect(caixa('Maria Silva')).not.toBeChecked();
+    expect(servidor.enviados('PATCH /admin/usuarios/u1')).toHaveLength(0);
+  });
+
+  it('desmarcar e confirmar remove o privilégio', async () => {
+    const confirmar = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const { servidor } = await comoAdmin('/admin/usuarios', {
+      'GET /admin/usuarios': LISTA,
+      'PATCH /admin/usuarios/b1': { ...BRUNO, papel: 'usuario' },
+    });
+    await screen.findByText('maria@empresa.com');
+    await userEvent.click(caixa('Bruno Lima'));
+    expect(confirmar).toHaveBeenCalledWith(
+      'Remover o privilégio de administrador de Bruno Lima (bruno@empresa.com)?',
+    );
+    await waitFor(() => expect(caixa('Bruno Lima')).not.toBeChecked());
+    expect(servidor.enviados('PATCH /admin/usuarios/b1')).toEqual([{ admin: false }]);
+  });
+
+  it('erro da API mostra aviso e a caixa volta ao estado real', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await comoAdmin('/admin/usuarios', {
+      'GET /admin/usuarios': LISTA,
+      'PATCH /admin/usuarios/b1': erroApi(409, 'ULTIMO_ADMIN', 'É preciso manter ao menos um administrador'),
+    });
+    await screen.findByText('maria@empresa.com');
+    await userEvent.click(caixa('Bruno Lima'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('É preciso manter ao menos um administrador');
+    expect(caixa('Bruno Lima')).toBeChecked();
+    expect(caixa('Bruno Lima')).toBeEnabled();
+  });
+
+  it('enquanto um papel é salvo, as caixas ficam aria-disabled e outro clique não envia nada', async () => {
+    const confirmar = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const patch = pendente();
+    const { servidor } = await comoAdmin('/admin/usuarios', {
+      'GET /admin/usuarios': LISTA,
+      'PATCH /admin/usuarios/u1': patch.rota,
+      'PATCH /admin/usuarios/b1': { ...BRUNO, papel: 'usuario' },
+    });
+    await screen.findByText('maria@empresa.com');
+    await userEvent.click(caixa('Maria Silva'));
+    await waitFor(() => expect(caixa('Bruno Lima')).toHaveAttribute('aria-disabled', 'true'));
+    expect(caixa('Maria Silva')).toHaveAttribute('aria-disabled', 'true');
+
+    await userEvent.click(caixa('Bruno Lima'));
+    expect(confirmar).toHaveBeenCalledTimes(1);
+    expect(servidor.enviados('PATCH /admin/usuarios/b1')).toHaveLength(0);
+    expect(caixa('Bruno Lima')).toBeChecked();
+
+    await patch.liberar({ ...MARIA, papel: 'admin' });
+    expect(caixa('Maria Silva')).toBeChecked();
+    expect(caixa('Maria Silva')).not.toHaveAttribute('aria-disabled');
+    expect(caixa('Bruno Lima')).not.toHaveAttribute('aria-disabled');
+    expect(servidor.enviados('PATCH /admin/usuarios/u1')).toEqual([{ admin: true }]);
+  });
+
+  it('promovido some do filtro de usuários padrão e aparece entre os administradores', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await comoAdmin('/admin/usuarios', {
+      'GET /admin/usuarios': LISTA,
+      'PATCH /admin/usuarios/u1': { ...MARIA, papel: 'admin' },
+    });
+    await screen.findByText('maria@empresa.com');
+    await userEvent.selectOptions(screen.getByLabelText('Mostrar'), 'usuario');
+    await userEvent.click(caixa('Maria Silva'));
+    expect(await screen.findByText('Nenhum usuário neste filtro')).toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+
+    await userEvent.selectOptions(screen.getByLabelText('Mostrar'), 'admin');
+    expect(nomes()).toEqual(['Ana Admin', 'Bruno Lima', 'Maria Silva']);
+    expect(caixa('Maria Silva')).toBeChecked();
+  });
+
+  it('um novo envio de papel apaga o erro anterior', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await comoAdmin('/admin/usuarios', {
+      'GET /admin/usuarios': LISTA,
+      'PATCH /admin/usuarios/b1': sequencia(erroApi(500, 'E', 'Falhou'), { ...BRUNO, papel: 'usuario' }),
+    });
+    await screen.findByText('maria@empresa.com');
+    await userEvent.click(caixa('Bruno Lima'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Falhou');
+    await userEvent.click(caixa('Bruno Lima'));
+    await waitFor(() => expect(caixa('Bruno Lima')).not.toBeChecked());
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  async function abrirSenha(rotas = {}) {
+    const resultado = await comoAdmin('/admin/usuarios', { 'GET /admin/usuarios': LISTA, ...rotas });
+    await userEvent.click(await screen.findByRole('button', { name: 'Redefinir senha de Maria Silva' }));
+    return resultado;
+  }
+  const preencherSenha = async (senha, confirmacao = senha) => {
+    await userEvent.type(screen.getByLabelText('Nova senha'), senha);
+    await userEvent.type(screen.getByLabelText('Confirme a nova senha'), confirmacao);
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+  };
+
+  it('redefinir senha: senhas diferentes mostram erro sem chamar a API', async () => {
+    const confirmar = vi.spyOn(window, 'confirm');
+    const { servidor } = await abrirSenha();
+    await preencherSenha('senha-nova-1', 'senha-nova-2');
+    expect(screen.getByText('As senhas não conferem')).toBeInTheDocument();
+    expect(confirmar).not.toHaveBeenCalled();
+    expect(servidor.enviados('PUT /admin/usuarios/u1/senha')).toHaveLength(0);
+  });
+
+  it('redefinir senha: cancelar a confirmação não chama a API', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const { servidor } = await abrirSenha();
+    await preencherSenha('senha-nova-1');
+    expect(servidor.enviados('PUT /admin/usuarios/u1/senha')).toHaveLength(0);
+    expect(screen.getByLabelText('Nova senha')).toBeInTheDocument();
+  });
+
+  it('redefinir senha: erro de campo aparece no campo; sucesso envia a senha e mostra aviso', async () => {
+    const confirmar = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const { servidor } = await abrirSenha({
+      'PUT /admin/usuarios/u1/senha': sequencia(
+        erroApi(400, 'VALIDACAO', 'Dados inválidos', [
+          { campo: 'senha', mensagem: 'A senha deve ter pelo menos 8 caracteres' },
+        ]),
+        { status: 204 },
+      ),
+    });
+    await preencherSenha('curta');
+    expect(await screen.findByText('A senha deve ter pelo menos 8 caracteres')).toBeInTheDocument();
+
+    await userEvent.clear(screen.getByLabelText('Nova senha'));
+    await userEvent.clear(screen.getByLabelText('Confirme a nova senha'));
+    await preencherSenha('senha-nova-1');
+    expect(confirmar).toHaveBeenLastCalledWith(
+      'Definir uma nova senha para Maria Silva? A pessoa será desconectada de todos os aparelhos.',
+    );
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Senha de Maria Silva redefinida. Informe a nova senha a essa pessoa.',
+    );
+    expect(screen.queryByLabelText('Nova senha')).not.toBeInTheDocument();
+    expect(servidor.enviados('PUT /admin/usuarios/u1/senha')).toEqual([
+      { senha: 'curta' },
+      { senha: 'senha-nova-1' },
+    ]);
+  });
+
+  it('redefinir senha: corrigir a confirmação apaga o erro e envia uma vez', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const put = pendente();
+    const { servidor } = await abrirSenha({ 'PUT /admin/usuarios/u1/senha': put.rota });
+    await preencherSenha('senha-nova-1', 'senha-nova-2');
+    expect(screen.getByText('As senhas não conferem')).toBeInTheDocument();
+
+    await userEvent.clear(screen.getByLabelText('Confirme a nova senha'));
+    await userEvent.type(screen.getByLabelText('Confirme a nova senha'), 'senha-nova-1');
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    // o form segue aberto enquanto o PUT não volta: o erro sumiu de fato, não por desmontar
+    expect(screen.getByRole('button', { name: 'Salvando…' })).toBeInTheDocument();
+    expect(screen.queryByText('As senhas não conferem')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Confirme a nova senha')).not.toHaveAttribute('aria-invalid');
+    expect(servidor.enviados('PUT /admin/usuarios/u1/senha')).toEqual([{ senha: 'senha-nova-1' }]);
+    await put.liberar({ status: 204 });
+  });
+
+  it('redefinir senha: enquanto salva, o botão fica desabilitado e Enter não reenvia', async () => {
+    const confirmar = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const put = pendente();
+    const { servidor } = await abrirSenha({ 'PUT /admin/usuarios/u1/senha': put.rota });
+    await preencherSenha('senha-nova-1');
+    expect(screen.getByRole('button', { name: 'Salvando…' })).toBeDisabled();
+
+    await userEvent.type(screen.getByLabelText('Confirme a nova senha'), '{Enter}');
+    expect(confirmar).toHaveBeenCalledTimes(1);
+    expect(servidor.enviados('PUT /admin/usuarios/u1/senha')).toHaveLength(1);
+
+    await put.liberar({ status: 204 });
+    expect(screen.getByRole('status')).toHaveTextContent('Senha de Maria Silva redefinida');
+  });
+
+  it('redefinir senha: erro sem detalhes aparece no form, que volta a aceitar envio', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await abrirSenha({
+      'PUT /admin/usuarios/u1/senha': erroApi(404, 'NAO_ENCONTRADO', 'Usuário não encontrado'),
+    });
+    await preencherSenha('senha-nova-1');
+    const form = formSenha('Maria Silva');
+    expect(await within(form).findByRole('alert')).toHaveTextContent('Usuário não encontrado');
+    expect(screen.getByLabelText('Nova senha')).not.toHaveAttribute('aria-invalid');
+    expect(screen.getByLabelText('Confirme a nova senha')).not.toHaveAttribute('aria-invalid');
+    expect(within(form).getByRole('button', { name: 'Salvar' })).toBeEnabled();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('redefinir senha: abre com foco no campo; cancelar devolve o foco e descarta o digitado', async () => {
+    await abrirSenha();
+    const botao = botaoSenha('Maria Silva');
+    expect(botao).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByLabelText('Nova senha')).toHaveFocus();
+    await userEvent.type(screen.getByLabelText('Nova senha'), 'senha-nova-1');
+    await userEvent.type(screen.getByLabelText('Confirme a nova senha'), 'senha-nova-1');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(formSenha('Maria Silva')).not.toBeInTheDocument();
+    expect(botao).toHaveFocus();
+    expect(botao).toHaveAttribute('aria-expanded', 'false');
+
+    await userEvent.click(botao);
+    expect(screen.getByLabelText('Nova senha')).toHaveValue('');
+    expect(screen.getByLabelText('Confirme a nova senha')).toHaveValue('');
+  });
+
+  it('redefinir senha: só um formulário aberto por vez', async () => {
+    await abrirSenha();
+    await userEvent.click(botaoSenha('Bruno Lima'));
+    expect(formSenha('Maria Silva')).not.toBeInTheDocument();
+    expect(formSenha('Bruno Lima')).toBeInTheDocument();
+    expect(screen.getAllByLabelText('Nova senha')).toHaveLength(1);
+    expect(botaoSenha('Maria Silva')).toHaveAttribute('aria-expanded', 'false');
+    expect(botaoSenha('Bruno Lima')).toHaveAttribute('aria-expanded', 'true');
+
+    await userEvent.click(botaoSenha('Bruno Lima'));
+    expect(formSenha('Bruno Lima')).not.toBeInTheDocument();
+    expect(botaoSenha('Bruno Lima')).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('redefinir senha: a resposta atrasada de uma pessoa não fecha o form de outra', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const put = pendente();
+    await abrirSenha({ 'PUT /admin/usuarios/u1/senha': put.rota });
+    await preencherSenha('senha-nova-1');
+    await userEvent.click(botaoSenha('Bruno Lima'));
+    const campoBruno = within(formSenha('Bruno Lima')).getByLabelText('Nova senha');
+    await userEvent.type(campoBruno, 'abc');
+    expect(campoBruno).toHaveFocus();
+
+    await put.liberar({ status: 204 });
+    expect(screen.getByRole('status')).toHaveTextContent('Senha de Maria Silva redefinida');
+    expect(formSenha('Bruno Lima')).toBeInTheDocument();
+    expect(campoBruno).toHaveFocus();
+    expect(campoBruno).toHaveValue('abc');
+  });
+
+  it('abrir outro formulário de senha apaga o aviso anterior', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await abrirSenha({ 'PUT /admin/usuarios/u1/senha': { status: 204 } });
+    await preencherSenha('senha-nova-1');
+    expect(await screen.findByRole('status')).toHaveTextContent('Senha de Maria Silva redefinida');
+    await userEvent.click(botaoSenha('Bruno Lima'));
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('redefinir a própria senha encerra a sessão', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await comoAdmin('/admin/usuarios', {
+      'GET /admin/usuarios': LISTA,
+      'PUT /admin/usuarios/a1/senha': { status: 204 },
+    });
+    await userEvent.click(await screen.findByRole('button', { name: 'Redefinir senha de Ana Admin' }));
+    await preencherSenha('senha-nova-1');
+    expect(await screen.findByRole('heading', { name: 'Entrar' })).toBeInTheDocument();
+  });
+
+  it('erro de carregamento', async () => {
+    await comoAdmin('/admin/usuarios', { 'GET /admin/usuarios': erroApi(500, 'E', 'Falhou') });
     expect(await screen.findByRole('alert')).toHaveTextContent('Falhou');
   });
 });
