@@ -275,6 +275,16 @@ describe('GET /api/admin/estatisticas', () => {
       .api('post', `/api/trivia/rodadas/${rodada.id}/respostas`)
       .send({ questao_id: rodada.questoes[0].id, alternativa: 'a' });
 
+    // Atividade do admin não entra nas métricas.
+    const visitaAdmin = (await admin.api('post', `/api/aulas/${aula.id}/visitas`)).body;
+    await admin
+      .api('post', `/api/visitas/${visitaAdmin.id}/respostas`)
+      .send({ questao_id: detalhe.questoes[0].id, alternativa: certas[detalhe.questoes[0].id] });
+    const rodadaAdmin = (await admin.api('post', '/api/trivia/rodadas').send({ dificuldade: 'facil' })).body;
+    await admin
+      .api('post', `/api/trivia/rodadas/${rodadaAdmin.id}/respostas`)
+      .send({ questao_id: rodadaAdmin.questoes[0].id, alternativa: 'a' });
+
     const s = (await admin.api('get', '/api/admin/estatisticas').expect(200)).body;
 
     const porAula = s.aulas.find((a) => a.aula_id === aula.id);
@@ -300,7 +310,10 @@ describe('GET /api/admin/estatisticas', () => {
       'total_respostas',
       'total_tentativas',
     ]);
-    assert.equal(s.usuariosAula[0].apelido, u.apelido);
+    assert.deepEqual(
+      s.usuariosAula.map((x) => x.apelido),
+      [u.apelido],
+    );
 
     assert.deepEqual(
       s.trivia.map((t) => [t.dificuldade, t.total_tentativas, t.total_concluidas, t.total_respostas]),
