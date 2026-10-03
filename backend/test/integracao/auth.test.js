@@ -189,6 +189,10 @@ describe('recuperação de senha', () => {
     const inexistente = await post('/api/auth/esqueci-senha', { email: 'nao@existe.com' }).expect(200);
     const real = await post('/api/auth/esqueci-senha', { email: u.email }).expect(200);
     assert.deepEqual(inexistente.body, real.body);
+    assert.equal(
+      real.body.mensagem,
+      'Se o e-mail estiver cadastrado, você receberá um link para redefinir a senha. Não encontrou? Verifique a caixa de spam',
+    );
   });
 
   test('e-mail inválido dá 400', async () => {

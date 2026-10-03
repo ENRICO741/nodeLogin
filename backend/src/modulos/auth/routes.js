@@ -38,7 +38,10 @@ router.get('/me', autenticar, (req, res) => {
 
 router.post('/esqueci-senha', limiteRecuperacaoIp, limiteRecuperacaoEmail, async (req, res) => {
   await service.solicitarRecuperacao(z.object({ email }).parse(req.body).email);
-  res.json({ mensagem: 'Se o e-mail estiver cadastrado, você receberá um link para redefinir a senha' });
+  res.json({
+    mensagem:
+      'Se o e-mail estiver cadastrado, você receberá um link para redefinir a senha. Não encontrou? Verifique a caixa de spam',
+  });
 });
 
 router.post('/redefinir-senha', limiteAuth, async (req, res) => {
