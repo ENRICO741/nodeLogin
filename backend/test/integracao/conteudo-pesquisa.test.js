@@ -272,7 +272,7 @@ describe('consentimento para a pesquisa', () => {
         nome: 'Xx',
         apelido: 'xconsent',
         email: 'xconsent@x.com',
-        senha: 'senha-forte-123',
+        senha: 'Senha-forte-123',
         consentiu_pesquisa: 'sim',
       })
       .expect(400);

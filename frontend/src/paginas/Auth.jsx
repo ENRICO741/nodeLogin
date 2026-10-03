@@ -3,10 +3,9 @@ import { Link, useSearchParams } from 'react-router';
 import { useAuth } from '../contexto/Auth';
 import { api } from '../lib/api';
 import { Campo } from '../componentes/Campo';
+import { CampoSenhaNova } from '../componentes/CampoSenhaNova';
 import { Aviso } from '../componentes/Estado';
 import styles from './Auth.module.css';
-
-const MINIMO_SENHA = 8;
 
 function TelaAuth({ titulo, subtitulo, children, rodape }) {
   return (
@@ -107,16 +106,7 @@ export function Cadastro() {
           erro={porCampo.apelido}
         />
         <Campo label="E-mail" name="email" type="email" autoComplete="email" required erro={porCampo.email} />
-        <Campo
-          label="Senha"
-          name="senha"
-          type="password"
-          autoComplete="new-password"
-          minLength={MINIMO_SENHA}
-          required
-          ajuda={`Pelo menos ${MINIMO_SENHA} caracteres. Uma frase longa é mais segura que uma senha curta e complexa.`}
-          erro={porCampo.senha}
-        />
+        <CampoSenhaNova label="Senha" name="senha" erro={porCampo.senha} />
         <Campo
           label="Confirme a senha"
           name="confirmacao"
@@ -204,16 +194,7 @@ export function RedefinirSenha() {
         <form className="pilha" onSubmit={enviar} noValidate>
           <Aviso tipo="erro">{erro && !erro.detalhes.length ? erro.message : null}</Aviso>
           {!token && <Aviso tipo="erro">Link incompleto. Abra o link do e-mail novamente.</Aviso>}
-          <Campo
-            label="Nova senha"
-            name="senha"
-            type="password"
-            autoComplete="new-password"
-            minLength={MINIMO_SENHA}
-            required
-            ajuda={`Pelo menos ${MINIMO_SENHA} caracteres.`}
-            erro={porCampo.senha}
-          />
+          <CampoSenhaNova label="Nova senha" name="senha" erro={porCampo.senha} />
           <Campo
             label="Confirme a nova senha"
             name="confirmacao"

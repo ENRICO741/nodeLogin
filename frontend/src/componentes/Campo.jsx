@@ -41,15 +41,14 @@ export function Campo({ label, erro, ajuda, multilinha, children, ...props }) {
       <label htmlFor={id}>{label}</label>
       {controle}
       {ajuda && (
-        <span id={idAjuda} className="campo__ajuda">
+        <div id={idAjuda} className="campo__ajuda">
           {ajuda}
-        </span>
+        </div>
       )}
-      {erro && (
-        <span id={idErro} className="campo__erro">
-          {erro}
-        </span>
-      )}
+      {/* Sempre montado: o leitor de tela anuncia o erro que aparece enquanto a pessoa digita. */}
+      <span id={`${id}-erro`} className="campo__erro" aria-live="polite">
+        {erro}
+      </span>
     </div>
   );
 }

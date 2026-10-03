@@ -1,6 +1,7 @@
 const { describe, test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
 const { app, request, pool, prepararBanco, novoUsuario, autenticado, capturarEmail } = require('../ajuda');
 const { JWT_SECRET } = require('../env');
 
@@ -13,11 +14,12 @@ const cadastro = (extra) =>
     nome: 'Nome Válido',
     apelido: `ok_${Math.random().toString(36).slice(2, 10)}`,
     email: `ok_${Math.random().toString(36).slice(2, 10)}@exemplo.com`,
-    senha: 'senha-forte-123',
+    senha: 'Senha-forte-123',
     ...extra,
   });
 const camposComErro = (res) => res.body.erro.detalhes.map((d) => d.campo);
-const SENHA_72_BYTES = 'é'.repeat(36); // 36 caracteres, 72 bytes
+const SENHA_72_ASCII = 'Ab1!' + 'x'.repeat(68);
+const SENHA_72_BYTES = 'Ab1!' + 'é'.repeat(34); // 38 caracteres, 72 bytes
 
 describe('POST /api/auth/cadastro', () => {
   test('cria usuário comum, devolve token e nunca devolve o hash da senha', async () => {
@@ -46,13 +48,50 @@ describe('POST /api/auth/cadastro', () => {
   });
 
   test('recusa senha com menos de 8 ou mais de 72 caracteres, e aceita 8 exatos', async () => {
-    const curta = await cadastro({ senha: '1234567' }).expect(400);
-    assert.match(curta.body.erro.detalhes[0].mensagem, /pelo menos 8/);
-    await cadastro({ senha: 'x'.repeat(73) }).expect(400);
-    // Limite em bytes (o bcrypt ignora o que passa de 72): com acento, 37 caracteres já são 73 bytes.
+    const curta = await cadastro({ senha: 'Abcde1!' }).expect(400);
+    assert.deepEqual(curta.body.erro.detalhes, [
+      { campo: 'senha', mensagem: 'A senha precisa de pelo menos 8 caracteres' },
+    ]);
+    const longa = await cadastro({ senha: SENHA_72_ASCII + 'x' }).expect(400);
+    assert.match(longa.body.erro.detalhes[0].mensagem, /Senha muito longa/);
+    await cadastro({ senha: SENHA_72_ASCII }).expect(201);
+    // Limite em bytes (o bcrypt ignora o que passa de 72): com acento, 39 caracteres já são 73 bytes.
     await cadastro({ senha: SENHA_72_BYTES + 'A' }).expect(400);
     await cadastro({ senha: SENHA_72_BYTES }).expect(201);
-    await cadastro({ senha: '12345678' }).expect(201);
+    await cadastro({ senha: 'Abcdef1!' }).expect(201);
+  });
+
+  test('recusa senha sem cada requisito ou com emoji, com a mensagem no campo senha', async () => {
+    for (const [senha, mensagem] of [
+      ['abcdef1!', 'A senha precisa de uma letra maiúscula'],
+      ['ABCDEF1!', 'A senha precisa de uma letra minúscula'],
+      ['Abcdefg!', 'A senha precisa de um número'],
+      ['Abcdefg1', 'A senha precisa de um caractere especial'],
+      ['Abcdef1!🔒', 'A senha não pode ter emoji nem caracteres invisíveis'],
+    ]) {
+      const res = await cadastro({ senha }).expect(400);
+      assert.deepEqual(res.body.erro.detalhes, [{ campo: 'senha', mensagem }], senha);
+    }
+  });
+
+  test('aceita aspas, aspas simples e barra invertida, e o login com ela funciona', async () => {
+    const senha = `Ab1"'\\'; DROP TABLE usuarios; --`;
+    const u = await novoUsuario({ senha });
+    await post('/api/auth/login', { identificador: u.email, senha }).expect(200);
+    await post('/api/auth/login', { identificador: u.email, senha: senha.replaceAll('\\', '') }).expect(401);
+    const { rows } = await pool.query('SELECT count(*)::int AS n FROM usuarios');
+    assert.ok(rows[0].n > 0);
+  });
+
+  test('usuário com senha antiga fraca (anterior à regra) ainda faz login', async () => {
+    const u = await novoUsuario();
+    const fraca = '12345678';
+    await pool.query('UPDATE usuarios SET senha_hash = $2 WHERE id = $1', [
+      u.usuario.id,
+      await bcrypt.hash(fraca, 4),
+    ]);
+    const res = await post('/api/auth/login', { identificador: u.email, senha: fraca }).expect(200);
+    assert.ok(res.body.token);
   });
 
   test('recusa e-mail inválido e nome curto, apontando cada campo', async () => {
@@ -106,8 +145,8 @@ describe('POST /api/auth/login', () => {
   });
 
   test('senha diferencia maiúsculas', async () => {
-    const u = await novoUsuario({ senha: 'SenhaForte123' });
-    await post('/api/auth/login', { identificador: u.email, senha: 'senhaforte123' }).expect(401);
+    const u = await novoUsuario({ senha: 'SenhaForte123!' });
+    await post('/api/auth/login', { identificador: u.email, senha: 'senhaforte123!' }).expect(401);
   });
 
   test('usuário desativado não entra', async () => {
@@ -236,13 +275,35 @@ describe('recuperação de senha', () => {
     await post('/api/auth/esqueci-senha', { email: u.email }).expect(200);
     const { token } = await email;
 
-    await post('/api/auth/redefinir-senha', { token, senha: 'nova-senha-456' }).expect(204);
-    const reuso = await post('/api/auth/redefinir-senha', { token, senha: 'outra-senha-789' }).expect(400);
+    await post('/api/auth/redefinir-senha', { token, senha: 'Nova-senha-456' }).expect(204);
+    const reuso = await post('/api/auth/redefinir-senha', { token, senha: 'Outra-senha-789' }).expect(400);
     assert.equal(reuso.body.erro.codigo, 'TOKEN_INVALIDO');
 
     await u.api('get', '/api/auth/me').expect(401);
     await post('/api/auth/login', { identificador: u.email, senha: u.senha }).expect(401);
-    await post('/api/auth/login', { identificador: u.email, senha: 'nova-senha-456' }).expect(200);
+    await post('/api/auth/login', { identificador: u.email, senha: 'Nova-senha-456' }).expect(200);
+  });
+
+  test('senha nova sem maiúscula ou com emoji dá 400 no campo senha sem gastar o token; aspas e barra entram', async () => {
+    const u = await novoUsuario();
+    const email = capturarEmail();
+    await post('/api/auth/esqueci-senha', { email: u.email }).expect(200);
+    const { token } = await email;
+
+    for (const [senha, mensagem] of [
+      ['nova-senha-456', 'A senha precisa de uma letra maiúscula'],
+      ['Nova-senha-456👍🏽', 'A senha não pode ter emoji nem caracteres invisíveis'],
+    ]) {
+      const res = await post('/api/auth/redefinir-senha', { token, senha }).expect(400);
+      assert.equal(res.body.erro.codigo, 'VALIDACAO');
+      assert.deepEqual(res.body.erro.detalhes, [{ campo: 'senha', mensagem }], senha);
+    }
+    await u.api('get', '/api/auth/me').expect(200);
+
+    const senha = `Nova"senha'\\456`;
+    await post('/api/auth/redefinir-senha', { token, senha }).expect(204);
+    await post('/api/auth/login', { identificador: u.email, senha }).expect(200);
+    await post('/api/auth/login', { identificador: u.email, senha: u.senha }).expect(401);
   });
 
   test('pedir de novo invalida o link anterior', async () => {
@@ -254,8 +315,8 @@ describe('recuperação de senha', () => {
     await post('/api/auth/esqueci-senha', { email: u.email });
     const segundo = (await email).token;
 
-    await post('/api/auth/redefinir-senha', { token: primeiro, senha: 'nova-senha-456' }).expect(400);
-    await post('/api/auth/redefinir-senha', { token: segundo, senha: 'nova-senha-456' }).expect(204);
+    await post('/api/auth/redefinir-senha', { token: primeiro, senha: 'Nova-senha-456' }).expect(400);
+    await post('/api/auth/redefinir-senha', { token: segundo, senha: 'Nova-senha-456' }).expect(204);
   });
 
   test('token expirado é recusado', async () => {
@@ -267,12 +328,12 @@ describe('recuperação de senha', () => {
       "UPDATE tokens_recuperacao_senha SET expira_em = now() - interval '1 second' WHERE usuario_id = $1",
       [u.usuario.id],
     );
-    await post('/api/auth/redefinir-senha', { token, senha: 'nova-senha-456' }).expect(400);
+    await post('/api/auth/redefinir-senha', { token, senha: 'Nova-senha-456' }).expect(400);
   });
 
   test('token inventado, curto demais ou senha fraca dão erro', async () => {
-    await post('/api/auth/redefinir-senha', { token: 'x'.repeat(43), senha: 'nova-senha-456' }).expect(400);
-    const curto = await post('/api/auth/redefinir-senha', { token: 'abc', senha: 'nova-senha-456' }).expect(
+    await post('/api/auth/redefinir-senha', { token: 'x'.repeat(43), senha: 'Nova-senha-456' }).expect(400);
+    const curto = await post('/api/auth/redefinir-senha', { token: 'abc', senha: 'Nova-senha-456' }).expect(
       400,
     );
     assert.equal(curto.body.erro.codigo, 'VALIDACAO');

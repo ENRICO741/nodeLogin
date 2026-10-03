@@ -233,6 +233,24 @@ a {
   font-size: var(--texto-sm);
   color: var(--cor-texto-suave);
 }
+.requisitos-senha {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.requisitos-senha li {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-1);
+}
+.requisitos-senha li.requisitos-senha__ok {
+  color: var(--cor-sucesso);
+}
+.campo__erro:empty {
+  display: none;
+}
 .campo__erro {
   font-size: var(--texto-sm);
   color: var(--cor-erro);

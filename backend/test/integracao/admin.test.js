@@ -295,12 +295,12 @@ describe('usuários', () => {
 
     const res = await admin
       .api('put', `/api/admin/usuarios/${u.usuario.id}/senha`)
-      .send({ senha: 'nova-senha-456' })
+      .send({ senha: 'Nova-senha-456' })
       .expect(204);
     assert.equal(res.text, '');
 
     const login = (senha) => request(app).post('/api/auth/login').send({ identificador: u.email, senha });
-    await login('nova-senha-456').expect(200);
+    await login('Nova-senha-456').expect(200);
     await login(u.senha).expect(401);
     await u.api('get', '/api/auth/me').expect(401);
     const { rows } = await pool.query(
@@ -314,7 +314,7 @@ describe('usuários', () => {
     const u = await novoUsuario();
     const inativo = await novoUsuario();
     await pool.query('UPDATE usuarios SET ativo = false WHERE id = $1', [inativo.usuario.id]);
-    const put = (id, senha = 'nova-senha-456') =>
+    const put = (id, senha = 'Nova-senha-456') =>
       admin.api('put', `/api/admin/usuarios/${id}/senha`).send({ senha });
 
     const curta = await put(u.usuario.id, 'curta').expect(400);
@@ -406,12 +406,12 @@ describe('usuários', () => {
 
     test('aceita 8 e 72 caracteres ASCII; 7 ou 73 dão 400 e a sessão continua', async () => {
       const u = await novoUsuario();
-      const SENHA_72 = 'x'.repeat(72);
-      await put(u.usuario.id, { senha: 'x'.repeat(7) }).expect(400);
+      const SENHA_72 = 'Ab1!' + 'x'.repeat(68);
+      await put(u.usuario.id, { senha: 'Abcde1!' }).expect(400);
       const longa = await put(u.usuario.id, { senha: SENHA_72 + 'x' }).expect(400);
-      assert.match(JSON.stringify(longa.body), /longa demais/);
+      assert.match(JSON.stringify(longa.body), /Senha muito longa/);
       await u.api('get', '/api/auth/me').expect(200);
-      for (const senha of ['x'.repeat(8), SENHA_72]) {
+      for (const senha of ['Abcdef1!', SENHA_72]) {
         await put(u.usuario.id, { senha }).expect(204);
         await login(u.email, senha).expect(200);
       }
@@ -420,9 +420,9 @@ describe('usuários', () => {
     test('limite é de 72 bytes: acento conta 2 e o 73º byte dá 400', async () => {
       // bcrypt ignora o que passa do 72º byte: sem esse limite, X+"A" e X+"B" seriam a mesma senha.
       const u = await novoUsuario();
-      const SENHA_72_BYTES = 'é'.repeat(36); // 36 caracteres, 72 bytes
+      const SENHA_72_BYTES = 'Ab1!' + 'é'.repeat(34); // 38 caracteres, 72 bytes
       const res = await put(u.usuario.id, { senha: SENHA_72_BYTES + 'A' }).expect(400);
-      assert.match(JSON.stringify(res.body), /longa demais/);
+      assert.match(JSON.stringify(res.body), /Senha muito longa/);
       await u.api('get', '/api/auth/me').expect(200);
       await login(u.email, u.senha).expect(200);
 
@@ -431,9 +431,22 @@ describe('usuários', () => {
       await login(u.email, SENHA_72_BYTES.slice(0, -1)).expect(401);
     });
 
+    test('sem maiúscula ou com emoji dá 400 com a mensagem no campo senha e nada muda', async () => {
+      const u = await novoUsuario();
+      for (const [senha, mensagem] of [
+        ['nova-senha-456', 'A senha precisa de uma letra maiúscula'],
+        ['Nova-senha-456🇧🇷', 'A senha não pode ter emoji nem caracteres invisíveis'],
+      ]) {
+        const res = await put(u.usuario.id, { senha }).expect(400);
+        assert.deepEqual(res.body.erro.detalhes, [{ campo: 'senha', mensagem }], senha);
+      }
+      await u.api('get', '/api/auth/me').expect(200);
+      await login(u.email, u.senha).expect(200);
+    });
+
     test('aceita aspas, aspas simples e barra invertida, e o login com ela funciona', async () => {
       const u = await novoUsuario();
-      const senha = `"'\\'; DROP TABLE usuarios; --`;
+      const senha = `Ab1"'\\'; DROP TABLE usuarios; --`;
       await put(u.usuario.id, { senha }).expect(204);
       await login(u.email, senha).expect(200);
       await login(u.email, u.senha).expect(401);
@@ -475,7 +488,7 @@ describe('usuários', () => {
     test('campos extras no corpo são ignorados (não muda papel, ativo nem e-mail)', async () => {
       const u = await novoUsuario();
       await put(u.usuario.id, {
-        senha: 'nova-senha-456',
+        senha: 'Nova-senha-456',
         papel: 'admin',
         ativo: false,
         email: 'x@y.com',
@@ -490,10 +503,10 @@ describe('usuários', () => {
       const a = await novoAdmin();
       await a
         .api('put', `/api/admin/usuarios/${a.usuario.id}/senha`)
-        .send({ senha: 'nova-senha-456' })
+        .send({ senha: 'Nova-senha-456' })
         .expect(204);
       await a.api('get', '/api/auth/me').expect(401);
-      const sessao = (await login(a.email, 'nova-senha-456').expect(200)).body;
+      const sessao = (await login(a.email, 'Nova-senha-456').expect(200)).body;
       assert.equal(sessao.usuario.papel, 'admin');
       await autenticado(sessao.token)('get', '/api/admin/usuarios').expect(200);
     });
@@ -502,10 +515,10 @@ describe('usuários', () => {
   test('uuid em maiúsculas de outro usuário: senha e papel funcionam e o id volta minúsculo', async () => {
     const u = await novoUsuario();
     const ID = u.usuario.id.toUpperCase();
-    await admin.api('put', `/api/admin/usuarios/${ID}/senha`).send({ senha: 'nova-senha-456' }).expect(204);
+    await admin.api('put', `/api/admin/usuarios/${ID}/senha`).send({ senha: 'Nova-senha-456' }).expect(204);
     await request(app)
       .post('/api/auth/login')
-      .send({ identificador: u.email, senha: 'nova-senha-456' })
+      .send({ identificador: u.email, senha: 'Nova-senha-456' })
       .expect(200);
     const res = await admin.api('patch', `/api/admin/usuarios/${ID}`).send({ admin: true }).expect(200);
     assert.equal(res.body.id, u.usuario.id);
@@ -557,7 +570,7 @@ describe('usuários', () => {
         .expect(400);
       await admin
         .api('put', `/api/admin/usuarios/${UUID_INEXISTENTE}/senha`)
-        .send({ senha: 'nova-senha-456' })
+        .send({ senha: 'Nova-senha-456' })
         .expect(404);
       await admin.api('patch', `/api/admin/usuarios/${admin.usuario.id}`).send({ admin: false }).expect(409);
       await admin.api('patch', `/api/admin/usuarios/${UUID_INEXISTENTE}`).send({ admin: true }).expect(404);

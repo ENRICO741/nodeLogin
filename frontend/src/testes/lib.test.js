@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { api, definirAoSessaoExpirar, ErroApi, tokenSalvo } from '../lib/api';
+import { MINIMO_SENHA, REQUISITOS_SENHA, senhaLongaDemais, temCaractereInvalido } from '../lib/senha';
 import { servidorFalso, erroApi } from './utils';
 
 describe('tokenSalvo', () => {
@@ -48,6 +49,111 @@ describe('ErroApi', () => {
       },
     });
     expect(e.errosPorCampo).toEqual({ email: 'E-mail inválido', senha: 'Curta' });
+  });
+
+  it('errosPorCampo fica com a primeira mensagem de cada campo', () => {
+    const e = new ErroApi(400, {
+      erro: {
+        codigo: 'VALIDACAO',
+        mensagem: 'Dados inválidos',
+        detalhes: [
+          { campo: 'senha', mensagem: 'A senha precisa de pelo menos 8 caracteres' },
+          { campo: 'email', mensagem: 'E-mail inválido' },
+          { campo: 'senha', mensagem: 'A senha precisa de uma letra maiúscula' },
+        ],
+      },
+    });
+    expect(e.errosPorCampo).toEqual({
+      senha: 'A senha precisa de pelo menos 8 caracteres',
+      email: 'E-mail inválido',
+    });
+    expect(e.detalhes).toHaveLength(3); // não altera os detalhes originais
+    expect(new ErroApi(400, null).errosPorCampo).toEqual({});
+  });
+});
+
+describe('regra de senha', () => {
+  const atendidos = (s) => REQUISITOS_SENHA.filter((r) => r.atende(s)).map((r) => r.texto);
+  const [tamanho, maiuscula, minuscula, numero, especial] = REQUISITOS_SENHA.map((r) => r.texto);
+
+  it('cinco requisitos; vazio não atende nenhum e senha forte atende todos', () => {
+    expect(MINIMO_SENHA).toBe(8);
+    expect(REQUISITOS_SENHA).toHaveLength(5);
+    expect(atendidos('')).toEqual([]);
+    expect(atendidos('Senha-forte1')).toHaveLength(5);
+  });
+
+  it('cada requisito reconhece só o seu tipo', () => {
+    expect(atendidos('A')).toEqual([maiuscula]);
+    expect(atendidos('a')).toEqual([minuscula]);
+    expect(atendidos('1')).toEqual([numero]);
+    expect(atendidos('!')).toEqual([especial]);
+  });
+
+  it('tamanho mínimo: 7 não basta, 8 basta; espaço conta como caractere', () => {
+    expect(atendidos('aaaaaaa')).not.toContain(tamanho);
+    expect(atendidos('aaaaaaaa')).toContain(tamanho);
+    expect(atendidos('       a')).toContain(tamanho);
+  });
+
+  it('acentos contam como letra (não como especial)', () => {
+    expect(atendidos('É')).toEqual([maiuscula]);
+    expect(atendidos('ç')).toEqual([minuscula]);
+    expect(atendidos('ã')).toEqual([minuscula]);
+  });
+
+  it('aspas, aspas simples e barra invertida contam como especial e são aceitas', () => {
+    for (const c of ['"', "'", '\\', '/', '`', '_', '-', '€']) {
+      expect(atendidos(c), c).toEqual([especial]);
+      expect(temCaractereInvalido(`Senha1${c}x`), c).toBe(false);
+    }
+  });
+
+  it('espaço não é especial, mas é aceito', () => {
+    expect(atendidos(' ')).toEqual([]);
+    expect(temCaractereInvalido('Minha senha 1!')).toBe(false);
+  });
+
+  it('dígitos de outros alfabetos não contam como número', () => {
+    expect(atendidos('٣')).not.toContain(numero);
+  });
+
+  it('recusa emoji, bandeira, tom de pele, ❤️, NUL, tab e caracteres invisíveis', () => {
+    const invalidos = {
+      emoji: 'Senha1!😀',
+      cadeado: '🔒Senha1!',
+      bandeira: 'Senha1!🇧🇷',
+      'tom de pele': 'Senha1!🏽',
+      coração: 'Senha1!❤️',
+      'seletor de variação sozinho': 'Senha1!\uFE0F',
+      NUL: 'Senha1!\0x',
+      tab: 'Senha1!\tx',
+      'quebra de linha': 'Senha1!\nx',
+      'espaço de largura zero': 'Senha1!\u200Bx',
+      'separador de linha': 'Senha1!\u2028x',
+      'separador de parágrafo': 'Senha1!\u2029x',
+    };
+    for (const [nome, valor] of Object.entries(invalidos))
+      expect(temCaractereInvalido(valor), nome).toBe(true);
+  });
+
+  it('aceita símbolos de teclado que o Unicode também lista como emoji de texto (© ® ™ ❤ sem seletor)', () => {
+    for (const c of ['©', '®', '™', '❤', '§', '°', '€', '£', '¬'])
+      expect(temCaractereInvalido(`Senha1${c}x`), c).toBe(false);
+  });
+
+  it('senhaLongaDemais conta bytes, não caracteres: limite exato de 72', () => {
+    expect(senhaLongaDemais('Ab1!' + 'x'.repeat(68))).toBe(false);
+    expect(senhaLongaDemais('Ab1!' + 'x'.repeat(69))).toBe(true);
+    expect(senhaLongaDemais('Ab1!' + 'é'.repeat(34))).toBe(false);
+    // 39 caracteres, mas 74 bytes.
+    expect(senhaLongaDemais('Ab1!' + 'é'.repeat(35))).toBe(true);
+    expect(senhaLongaDemais('')).toBe(false);
+  });
+
+  it('aceita a senha vazia e texto comum com acento', () => {
+    expect(temCaractereInvalido('')).toBe(false);
+    expect(temCaractereInvalido('Coração#2024')).toBe(false);
   });
 });
 

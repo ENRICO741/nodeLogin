@@ -34,7 +34,7 @@ async function novoUsuario(extra = {}) {
     nome: 'Pessoa Teste',
     apelido: `pessoa${sufixo}`,
     email: `pessoa${sufixo}@exemplo.com`,
-    senha: 'senha-forte-123',
+    senha: 'Senha-forte-123',
     ...extra,
   };
   const res = await request(app).post('/api/auth/cadastro').send(dados).expect(201);

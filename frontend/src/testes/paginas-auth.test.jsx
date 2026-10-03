@@ -59,11 +59,11 @@ describe('Entrar', () => {
 });
 
 describe('Cadastro', () => {
-  const preencher = async (confirmacao = 'senha-forte-123') => {
+  const preencher = async (confirmacao = 'Senha-forte-123', senha = 'Senha-forte-123') => {
     await userEvent.type(await screen.findByLabelText('Nome'), 'Maria Silva');
     await userEvent.type(screen.getByLabelText('Apelido'), 'maria');
     await userEvent.type(screen.getByLabelText('E-mail'), 'maria@empresa.com');
-    await userEvent.type(screen.getByLabelText('Senha'), 'senha-forte-123');
+    await userEvent.type(screen.getByLabelText('Senha'), senha);
     await userEvent.type(screen.getByLabelText('Confirme a senha'), confirmacao);
     await userEvent.click(screen.getByRole('button', { name: 'Criar conta' }));
   };
@@ -98,7 +98,7 @@ describe('Cadastro', () => {
       nome: 'Maria Silva',
       apelido: 'maria',
       email: 'maria@empresa.com',
-      senha: 'senha-forte-123',
+      senha: 'Senha-forte-123',
       consentiu_pesquisa: false,
     });
   });
@@ -124,11 +124,33 @@ describe('Cadastro', () => {
         ]),
       },
     });
-    await preencher();
+    await preencher('Curta-1', 'Curta-1');
     expect(await screen.findByText('Use de 3 a 30 letras')).toBeInTheDocument();
+    expect(screen.getByText('A senha precisa de pelo menos 8 caracteres')).toBeInTheDocument();
     expect(screen.getByLabelText('Senha')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByLabelText('Nome')).not.toHaveAttribute('aria-invalid');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('mostra os requisitos da senha e marca os atendidos enquanto digita', async () => {
+    await renderizarApp('/cadastro', { usuario: null });
+    const senha = await screen.findByLabelText('Senha');
+    expect(senha).toHaveAccessibleDescription(/Pelo menos 8 caracteres: pendente/);
+    expect(screen.getAllByText(': pendente')).toHaveLength(5);
+    await userEvent.type(senha, 'Senha-forte-123');
+    expect(screen.getAllByText(': atendido')).toHaveLength(5);
+    expect(screen.queryByText(/Não use emoji/)).not.toBeInTheDocument();
+  });
+
+  it('emoji na senha mostra aviso no campo, que some ao apagar', async () => {
+    const { servidor } = await renderizarApp('/cadastro', { usuario: null });
+    await userEvent.type(await screen.findByLabelText('Senha'), 'Senha-forte-1😀');
+    expect(screen.getByText(/Não use emoji/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Senha')).toHaveAttribute('aria-invalid', 'true');
+    await userEvent.clear(screen.getByLabelText('Senha'));
+    expect(screen.queryByText(/Não use emoji/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Senha')).not.toHaveAttribute('aria-invalid');
+    expect(servidor.enviados('POST /auth/cadastro')).toEqual([]);
   });
 
   it('e-mail já cadastrado mostra aviso geral', async () => {
@@ -200,17 +222,17 @@ describe('Redefinir senha', () => {
 
   it('com token válido troca a senha e oferece entrar', async () => {
     const { servidor } = await abrir('?token=abc123', { 'POST /auth/redefinir-senha': { status: 204 } });
-    await preencher('nova-senha-1', 'nova-senha-1');
+    await preencher('Nova-senha-1', 'Nova-senha-1');
     expect(await screen.findByText('Senha alterada. Entre com a nova senha.')).toBeInTheDocument();
     expect(servidor.enviados('POST /auth/redefinir-senha')).toEqual([
-      { token: 'abc123', senha: 'nova-senha-1' },
+      { token: 'abc123', senha: 'Nova-senha-1' },
     ]);
     expect(screen.getByRole('link', { name: 'Entrar' })).toHaveAttribute('href', '/entrar');
   });
 
   it('senhas diferentes não chamam a API', async () => {
     const { servidor } = await abrir('?token=abc123', {});
-    await preencher('nova-senha-1', 'outra-coisa');
+    await preencher('Nova-senha-1', 'outra-coisa');
     expect(await screen.findByText('As senhas não conferem')).toBeInTheDocument();
     expect(servidor.enviados('POST /auth/redefinir-senha')).toEqual([]);
   });
@@ -225,7 +247,7 @@ describe('Redefinir senha', () => {
     await abrir('?token=velho', {
       'POST /auth/redefinir-senha': erroApi(400, 'TOKEN_INVALIDO', 'Link inválido ou expirado. Peça um novo'),
     });
-    await preencher('nova-senha-1', 'nova-senha-1');
+    await preencher('Nova-senha-1', 'Nova-senha-1');
     expect(await screen.findByRole('alert')).toHaveTextContent('Link inválido ou expirado');
   });
 
@@ -242,6 +264,19 @@ describe('Redefinir senha', () => {
         'true',
       ),
     );
+    expect(screen.getByText('Curta')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('mostra os requisitos da nova senha; emoji gera aviso, aspas e barra não', async () => {
+    await abrir('?token=abc', {});
+    const senha = await screen.findByLabelText('Nova senha', { selector: 'input' });
+    expect(screen.getAllByText(': pendente')).toHaveLength(5);
+    await userEvent.type(senha, 'Ab1"/x');
+    expect(screen.getAllByText(': atendido')).toHaveLength(4);
+    expect(screen.queryByText(/Não use emoji/)).not.toBeInTheDocument();
+    await userEvent.type(senha, '🇧🇷');
+    expect(screen.getByText(/Não use emoji/)).toBeInTheDocument();
   });
 
   it('funciona mesmo com alguém logado (link aberto em outro aparelho)', async () => {

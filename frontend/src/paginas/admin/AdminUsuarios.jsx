@@ -4,11 +4,10 @@ import { useApi } from '../../hooks/useApi';
 import { useAuth } from '../../contexto/Auth';
 import { Avatar } from '../../componentes/Avatar';
 import { Campo } from '../../componentes/Campo';
+import { CampoSenhaNova } from '../../componentes/CampoSenhaNova';
 import { Aviso, Carregando, ErroCarregamento, Vazio } from '../../componentes/Estado';
 import { VoltarAdmin } from './Admin';
 import styles from './Admin.module.css';
-
-const MINIMO_SENHA = 8;
 
 const FILTROS = [
   ['todos', 'Todos'],
@@ -52,17 +51,7 @@ function FormSenha({ usuario, aoCancelar, aoSalvar }) {
       aria-label={`Nova senha de ${usuario.nome}`}
     >
       <Aviso tipo="erro">{erro && !erro.detalhes.length ? erro.message : null}</Aviso>
-      <Campo
-        label="Nova senha"
-        name="senha"
-        type="password"
-        autoComplete="new-password"
-        autoFocus
-        minLength={MINIMO_SENHA}
-        required
-        ajuda={`Pelo menos ${MINIMO_SENHA} caracteres.`}
-        erro={erro?.errosPorCampo.senha}
-      />
+      <CampoSenhaNova label="Nova senha" name="senha" autoFocus erro={erro?.errosPorCampo.senha} />
       <Campo
         label="Confirme a nova senha"
         name="confirmacao"

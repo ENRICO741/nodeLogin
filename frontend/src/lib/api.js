@@ -33,9 +33,9 @@ export class ErroApi extends Error {
     this.detalhes = corpo?.erro?.detalhes ?? [];
   }
 
-  // { campo: mensagem } para mostrar o erro junto de cada campo do formulário.
+  // { campo: mensagem } para mostrar o erro junto de cada campo do formulário (o primeiro de cada campo).
   get errosPorCampo() {
-    return Object.fromEntries(this.detalhes.map((d) => [d.campo, d.mensagem]));
+    return Object.fromEntries([...this.detalhes].reverse().map((d) => [d.campo, d.mensagem]));
   }
 }
 

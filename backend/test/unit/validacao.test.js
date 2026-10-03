@@ -164,32 +164,110 @@ describe('idDaRota', () => {
 });
 
 describe('senha', () => {
+  const SENHA_72 = 'Ab1!' + 'x'.repeat(68);
+  const SENHA_72_BYTES = 'Ab1!' + 'é'.repeat(34); // 38 caracteres, 72 bytes
+  const mensagens = (s) => {
+    const r = senha.safeParse(s);
+    return r.success ? [] : r.error.issues.map((i) => i.message);
+  };
+  const INVALIDO = 'A senha não pode ter emoji nem caracteres invisíveis';
+  const ESPECIAL = 'A senha precisa de um caractere especial';
+
   test('aceita 8 e 72 caracteres ASCII (limites exatos)', () => {
-    assert.equal(senha.parse('12345678'), '12345678');
-    assert.equal(senha.parse('x'.repeat(72)), 'x'.repeat(72));
+    assert.equal(senha.parse('Abcdef1!'), 'Abcdef1!');
+    assert.equal(senha.parse(SENHA_72), SENHA_72);
   });
   test('recusa 7 caracteres com mensagem clara', () => {
-    const r = senha.safeParse('1234567');
-    assert.equal(r.success, false);
-    assert.deepEqual(
-      r.error.issues.map((i) => i.message),
-      ['A senha precisa de pelo menos 8 caracteres'],
-    );
+    assert.deepEqual(mensagens('Abcde1!'), ['A senha precisa de pelo menos 8 caracteres']);
   });
   test('recusa 73 caracteres ASCII', () => {
-    assert.throws(() => senha.parse('x'.repeat(73)));
+    assert.deepEqual(mensagens(SENHA_72 + 'x'), ['Senha muito longa, considere diminuí-la um pouco']);
+  });
+  test('cada requisito faltando dá só a sua mensagem', () => {
+    assert.deepEqual(mensagens('abcdef1!'), ['A senha precisa de uma letra maiúscula']);
+    assert.deepEqual(mensagens('ABCDEF1!'), ['A senha precisa de uma letra minúscula']);
+    assert.deepEqual(mensagens('Abcdefg!'), ['A senha precisa de um número']);
+    assert.deepEqual(mensagens('Abcdefg1'), [ESPECIAL]);
+  });
+  test('vazia lista todos os requisitos, na ordem da tela', () => {
+    assert.deepEqual(mensagens(''), [
+      'A senha precisa de pelo menos 8 caracteres',
+      'A senha precisa de uma letra maiúscula',
+      'A senha precisa de uma letra minúscula',
+      'A senha precisa de um número',
+      ESPECIAL,
+    ]);
+  });
+  test('emoji é apontado junto com os requisitos que faltam', () => {
+    assert.deepEqual(mensagens('abcdefg🔒'), [
+      'A senha precisa de uma letra maiúscula',
+      'A senha precisa de um número',
+      ESPECIAL,
+      INVALIDO,
+    ]);
+  });
+  test('letra acentuada conta como maiúscula e minúscula', () => {
+    assert.equal(senha.parse('Ábcdef1!'), 'Ábcdef1!');
+    assert.equal(senha.parse('éBCDEF1!'), 'éBCDEF1!');
+    assert.equal(senha.parse('ÇÃO-ção1'), 'ÇÃO-ção1');
+  });
+  test('aspas, aspas simples e barra invertida são aceitas e contam como especial', () => {
+    for (const c of ['"', "'", '\\']) assert.equal(senha.parse(`Abcdef1${c}`), `Abcdef1${c}`, c);
+    const sql = `Ab1"'\\'; DROP TABLE usuarios; --`;
+    assert.equal(senha.parse(sql), sql);
+  });
+  test('espaço é aceito mas não conta como especial', () => {
+    assert.deepEqual(mensagens('Abcdef 1'), [ESPECIAL]);
+    assert.equal(senha.parse('Abc def 1!'), 'Abc def 1!');
+  });
+  test('símbolos do teclado (ABNT2 inclusive) contam como especial', () => {
+    for (const c of '!@#$%^&*()-_=+[]{}<>?/|;:,.~`´¨§¬¢£°€') {
+      assert.equal(senha.parse(`Abcdef1${c}`), `Abcdef1${c}`, c);
+    }
+  });
+  test('ª º ¹ ² ³ são aceitos mas não contam como especial (Unicode os trata como letra/número)', () => {
+    for (const c of 'ªº¹²³') assert.deepEqual(mensagens(`Abcdef1${c}`), [ESPECIAL], c);
+    // ² não conta como número: \d é só 0-9.
+    assert.deepEqual(mensagens('Abcdefg²!'), ['A senha precisa de um número']);
+  });
+  test('recusa emoji: simples, com tom de pele, bandeira e com seletor de variação', () => {
+    for (const e of ['🔒', '👍🏽', '🇧🇷', '❤️', '😀'])
+      assert.deepEqual(mensagens(`Abcdef1!${e}`), [INVALIDO], e);
+  });
+  test('aceita símbolos de teclado que o Unicode também lista como emoji de texto (© ® ™ ❤ sem seletor)', () => {
+    for (const c of '©®™❤✓★') assert.equal(senha.parse(`Abcdef1${c}`), `Abcdef1${c}`, c);
+  });
+  test('recusa NUL, controle e invisíveis', () => {
+    for (const c of [
+      '\u0000',
+      '\t',
+      '\n',
+      '\r',
+      '\u200B',
+      '\u200D',
+      '\u00AD',
+      '\uFEFF',
+      '\u202E',
+      '\uD800',
+      '\u2028',
+      '\u2029',
+    ]) {
+      assert.deepEqual(mensagens(`Abcdef1!${c}`), [INVALIDO], JSON.stringify(c));
+    }
+  });
+  test('espaços Unicode (NBSP, U+3000) passam', () => {
+    for (const c of ['\u00A0', '\u3000']) {
+      assert.equal(senha.parse(`Abcdef1!${c}`), `Abcdef1!${c}`, JSON.stringify(c));
+    }
   });
   test('preserva espaços nas pontas e unicode (sem trim)', () => {
-    assert.equal(senha.parse('  abcdefgh  '), '  abcdefgh  ');
-    assert.equal(senha.parse('  🔒senha çã  '), '  🔒senha çã  ');
+    assert.equal(senha.parse('  Abcdef1!  '), '  Abcdef1!  ');
+    assert.equal(senha.parse('  Sénha çã-1  '), '  Sénha çã-1  ');
   });
   test('limite é de 72 bytes, não de 72 caracteres (o bcrypt corta em 72 bytes)', () => {
-    assert.equal(Buffer.byteLength('é'.repeat(36)), 72);
-    assert.equal(senha.parse('é'.repeat(36)), 'é'.repeat(36));
-    const r = senha.safeParse('é'.repeat(36) + 'A'); // 37 caracteres, 73 bytes
-    assert.equal(r.success, false);
-    assert.match(r.error.issues[0].message, /longa demais/);
-    assert.throws(() => senha.parse('🔒'.repeat(19))); // 38 unidades, 76 bytes
+    assert.equal(Buffer.byteLength(SENHA_72_BYTES), 72);
+    assert.equal(senha.parse(SENHA_72_BYTES), SENHA_72_BYTES);
+    assert.deepEqual(mensagens(SENHA_72_BYTES + 'A'), ['Senha muito longa, considere diminuí-la um pouco']);
   });
   test('recusa tipos que não são string', () => {
     for (const valor of [12345678, null, undefined, [], {}]) {

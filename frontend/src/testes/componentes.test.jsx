@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { Campo } from '../componentes/Campo';
+import { CampoSenhaNova } from '../componentes/CampoSenhaNova';
 import { Aviso, Carregando, ErroCarregamento, Vazio } from '../componentes/Estado';
 import { Avatar } from '../componentes/Avatar';
 import { CardResultado } from '../componentes/CardResultado';
@@ -45,6 +46,138 @@ describe('Campo', () => {
     );
     expect(screen.getByLabelText('Texto').tagName).toBe('TEXTAREA');
     expect(screen.getByLabelText('Opção')).toHaveValue('b');
+  });
+});
+
+describe('CampoSenhaNova', () => {
+  const AVISO = /Não use emoji nem caracteres invisíveis/;
+  const renderizar = (props) => {
+    render(<CampoSenhaNova label="Senha" name="senha" {...props} />);
+    return screen.getByLabelText('Senha');
+  };
+  // Estado de cada requisito pelo texto sr-only, na ordem da lista.
+  const estados = () => screen.getAllByRole('listitem').map((li) => li.textContent.split(': ').at(-1));
+  const item = (texto) => screen.getByText(texto, { exact: false, selector: 'li' });
+
+  it('começa com os 5 requisitos pendentes, sem aviso, e a lista descreve o input', () => {
+    const input = renderizar();
+    expect(input).toHaveAttribute('type', 'password');
+    expect(input).toHaveAttribute('autocomplete', 'new-password');
+    expect(input).toBeRequired();
+    expect(estados()).toEqual(['pendente', 'pendente', 'pendente', 'pendente', 'pendente']);
+    expect(
+      screen.getAllByRole('listitem').filter((li) => li.classList.contains('requisitos-senha__ok')),
+    ).toEqual([]);
+    expect(input).not.toHaveAttribute('aria-invalid');
+    const lista = screen.getByRole('list');
+    expect(input.getAttribute('aria-describedby').split(' ')).toContain(lista.parentElement.id);
+    expect(input).toHaveAccessibleDescription(/Pelo menos 8 caracteres: pendente/);
+  });
+
+  it('cada tipo digitado marca o requisito como atendido', async () => {
+    const input = renderizar();
+    await userEvent.type(input, 'a');
+    expect(item('Uma letra minúscula')).toHaveTextContent('Uma letra minúscula: atendido');
+    expect(item('Uma letra minúscula')).toHaveClass('requisitos-senha__ok');
+    expect(item('Uma letra maiúscula')).toHaveTextContent(': pendente');
+    await userEvent.type(input, 'B');
+    expect(item('Uma letra maiúscula')).toHaveTextContent(': atendido');
+    await userEvent.type(input, '3');
+    expect(item('Um número')).toHaveTextContent(': atendido');
+    await userEvent.type(input, '#');
+    expect(item('Um caractere especial')).toHaveTextContent(': atendido');
+    expect(item('Pelo menos 8 caracteres')).toHaveTextContent(': pendente');
+    await userEvent.type(input, 'xyzw');
+    expect(estados()).toEqual(['atendido', 'atendido', 'atendido', 'atendido', 'atendido']);
+    expect(input).toHaveAccessibleDescription(/Um número: atendido/);
+  });
+
+  it('apagar volta o requisito para pendente', async () => {
+    const input = renderizar();
+    await userEvent.type(input, 'A');
+    expect(item('Uma letra maiúscula')).toHaveTextContent(': atendido');
+    await userEvent.type(input, '{Backspace}');
+    expect(estados()).toEqual(['pendente', 'pendente', 'pendente', 'pendente', 'pendente']);
+  });
+
+  it('aviso aparece só com emoji e some ao apagar', async () => {
+    const input = renderizar();
+    await userEvent.type(input, 'Senha1!');
+    expect(screen.queryByText(AVISO)).not.toBeInTheDocument();
+    await userEvent.type(input, '😀');
+    expect(screen.getByText(AVISO)).toBeInTheDocument();
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(input).toHaveAccessibleDescription(AVISO);
+    await userEvent.clear(input);
+    expect(screen.queryByText(AVISO)).not.toBeInTheDocument();
+    expect(input).not.toHaveAttribute('aria-invalid');
+  });
+
+  it('caractere invisível (espaço de largura zero) também mostra o aviso', async () => {
+    const input = renderizar();
+    await userEvent.type(input, `Senha1!${String.fromCharCode(0x200b)}`);
+    expect(screen.getByText(AVISO)).toBeInTheDocument();
+  });
+
+  it('aspas, aspas simples, barra invertida e espaço não mostram aviso', async () => {
+    const input = renderizar();
+    const valor = 'Se"nh\'a 1\\';
+    await userEvent.type(input, valor);
+    expect(input).toHaveValue(valor);
+    expect(screen.queryByText(AVISO)).not.toBeInTheDocument();
+    expect(input).not.toHaveAttribute('aria-invalid');
+    expect(item('Um caractere especial')).toHaveTextContent(': atendido');
+  });
+
+  it('mostra o erro da API quando não há caractere inválido; o aviso de emoji tem prioridade', async () => {
+    const input = renderizar({ erro: 'A senha precisa de uma letra maiúscula' });
+    expect(screen.getByText('A senha precisa de uma letra maiúscula')).toBeInTheDocument();
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    await userEvent.type(input, 'a😀');
+    expect(screen.getByText(AVISO)).toBeInTheDocument();
+    expect(screen.queryByText('A senha precisa de uma letra maiúscula')).not.toBeInTheDocument();
+    await userEvent.type(input, '{Backspace}{Backspace}');
+    expect(screen.getByText('A senha precisa de uma letra maiúscula')).toBeInTheDocument();
+  });
+
+  it('erro da API some quando a senha passa a atender todos os requisitos', async () => {
+    const input = renderizar({ erro: 'A senha precisa de uma letra maiúscula' });
+    await userEvent.type(input, 'senha-forte-1');
+    expect(screen.getByText('A senha precisa de uma letra maiúscula')).toBeInTheDocument();
+    await userEvent.type(input, 'A');
+    expect(screen.queryByText('A senha precisa de uma letra maiúscula')).not.toBeInTheDocument();
+    expect(input).not.toHaveAttribute('aria-invalid');
+  });
+
+  it('senha acima de 72 bytes mostra o aviso de tamanho; emoji tem prioridade', async () => {
+    const LONGA = 'Senha muito longa, considere diminuí-la um pouco';
+    const input = renderizar();
+    await userEvent.click(input);
+    await userEvent.paste('Ab1!' + 'é'.repeat(34));
+    expect(screen.queryByText(LONGA)).not.toBeInTheDocument();
+    await userEvent.paste('é');
+    expect(screen.getByText(LONGA)).toBeInTheDocument();
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    await userEvent.paste('😀');
+    expect(screen.getByText(AVISO)).toBeInTheDocument();
+    expect(screen.queryByText(LONGA)).not.toBeInTheDocument();
+  });
+
+  it('o aviso fica numa região viva para o leitor de tela anunciar enquanto digita', async () => {
+    const input = renderizar();
+    const regiao = document.querySelector('.campo__erro');
+    expect(regiao).toHaveAttribute('aria-live', 'polite');
+    expect(regiao).toBeEmptyDOMElement();
+    await userEvent.type(input, '😀');
+    expect(regiao).toHaveTextContent(AVISO);
+  });
+
+  it('repassa props ao input (name, autoFocus) e mantém o botão de mostrar senha', async () => {
+    const input = renderizar({ autoFocus: true });
+    expect(input).toHaveAttribute('name', 'senha');
+    expect(input).toHaveFocus();
+    await userEvent.click(screen.getByRole('button', { name: 'Mostrar senha' }));
+    expect(input).toHaveAttribute('type', 'text');
   });
 });
 

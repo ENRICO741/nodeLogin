@@ -683,7 +683,7 @@ describe('Usuários (admin)', () => {
   it('redefinir senha: senhas diferentes mostram erro sem chamar a API', async () => {
     const confirmar = vi.spyOn(window, 'confirm');
     const { servidor } = await abrirSenha();
-    await preencherSenha('senha-nova-1', 'senha-nova-2');
+    await preencherSenha('Senha-nova-1', 'Senha-nova-2');
     expect(screen.getByText('As senhas não conferem')).toBeInTheDocument();
     expect(confirmar).not.toHaveBeenCalled();
     expect(servidor.enviados('PUT /admin/usuarios/u1/senha')).toHaveLength(0);
@@ -692,7 +692,7 @@ describe('Usuários (admin)', () => {
   it('redefinir senha: cancelar a confirmação não chama a API', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(false);
     const { servidor } = await abrirSenha();
-    await preencherSenha('senha-nova-1');
+    await preencherSenha('Senha-nova-1');
     expect(servidor.enviados('PUT /admin/usuarios/u1/senha')).toHaveLength(0);
     expect(screen.getByLabelText('Nova senha')).toBeInTheDocument();
   });
@@ -712,7 +712,7 @@ describe('Usuários (admin)', () => {
 
     await userEvent.clear(screen.getByLabelText('Nova senha'));
     await userEvent.clear(screen.getByLabelText('Confirme a nova senha'));
-    await preencherSenha('senha-nova-1');
+    await preencherSenha('Senha-nova-1');
     expect(confirmar).toHaveBeenLastCalledWith(
       'Definir uma nova senha para Maria Silva? A pessoa será desconectada de todos os aparelhos.',
     );
@@ -722,25 +722,39 @@ describe('Usuários (admin)', () => {
     expect(screen.queryByLabelText('Nova senha')).not.toBeInTheDocument();
     expect(servidor.enviados('PUT /admin/usuarios/u1/senha')).toEqual([
       { senha: 'curta' },
-      { senha: 'senha-nova-1' },
+      { senha: 'Senha-nova-1' },
     ]);
+  });
+
+  it('redefinir senha: mostra os requisitos marcados e avisa sobre emoji', async () => {
+    await abrirSenha();
+    const form = formSenha('Maria Silva');
+    const senha = within(form).getByLabelText('Nova senha');
+    expect(senha).toHaveAccessibleDescription(/Uma letra maiúscula: pendente/);
+    expect(within(form).getAllByText(': pendente')).toHaveLength(5);
+    await userEvent.type(senha, 'Senha-nova-1');
+    expect(within(form).getAllByText(': atendido')).toHaveLength(5);
+    expect(within(form).queryByText(/Não use emoji/)).not.toBeInTheDocument();
+    await userEvent.type(senha, '❤️');
+    expect(within(form).getByText(/Não use emoji/)).toBeInTheDocument();
+    expect(senha).toHaveAttribute('aria-invalid', 'true');
   });
 
   it('redefinir senha: corrigir a confirmação apaga o erro e envia uma vez', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     const put = pendente();
     const { servidor } = await abrirSenha({ 'PUT /admin/usuarios/u1/senha': put.rota });
-    await preencherSenha('senha-nova-1', 'senha-nova-2');
+    await preencherSenha('Senha-nova-1', 'Senha-nova-2');
     expect(screen.getByText('As senhas não conferem')).toBeInTheDocument();
 
     await userEvent.clear(screen.getByLabelText('Confirme a nova senha'));
-    await userEvent.type(screen.getByLabelText('Confirme a nova senha'), 'senha-nova-1');
+    await userEvent.type(screen.getByLabelText('Confirme a nova senha'), 'Senha-nova-1');
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }));
     // o form segue aberto enquanto o PUT não volta: o erro sumiu de fato, não por desmontar
     expect(screen.getByRole('button', { name: 'Salvando…' })).toBeInTheDocument();
     expect(screen.queryByText('As senhas não conferem')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Confirme a nova senha')).not.toHaveAttribute('aria-invalid');
-    expect(servidor.enviados('PUT /admin/usuarios/u1/senha')).toEqual([{ senha: 'senha-nova-1' }]);
+    expect(servidor.enviados('PUT /admin/usuarios/u1/senha')).toEqual([{ senha: 'Senha-nova-1' }]);
     await put.liberar({ status: 204 });
   });
 
@@ -748,7 +762,7 @@ describe('Usuários (admin)', () => {
     const confirmar = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const put = pendente();
     const { servidor } = await abrirSenha({ 'PUT /admin/usuarios/u1/senha': put.rota });
-    await preencherSenha('senha-nova-1');
+    await preencherSenha('Senha-nova-1');
     expect(screen.getByRole('button', { name: 'Salvando…' })).toBeDisabled();
 
     await userEvent.type(screen.getByLabelText('Confirme a nova senha'), '{Enter}');
@@ -764,7 +778,7 @@ describe('Usuários (admin)', () => {
     await abrirSenha({
       'PUT /admin/usuarios/u1/senha': erroApi(404, 'NAO_ENCONTRADO', 'Usuário não encontrado'),
     });
-    await preencherSenha('senha-nova-1');
+    await preencherSenha('Senha-nova-1');
     const form = formSenha('Maria Silva');
     expect(await within(form).findByRole('alert')).toHaveTextContent('Usuário não encontrado');
     expect(screen.getByLabelText('Nova senha')).not.toHaveAttribute('aria-invalid');
@@ -778,8 +792,8 @@ describe('Usuários (admin)', () => {
     const botao = botaoSenha('Maria Silva');
     expect(botao).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByLabelText('Nova senha')).toHaveFocus();
-    await userEvent.type(screen.getByLabelText('Nova senha'), 'senha-nova-1');
-    await userEvent.type(screen.getByLabelText('Confirme a nova senha'), 'senha-nova-1');
+    await userEvent.type(screen.getByLabelText('Nova senha'), 'Senha-nova-1');
+    await userEvent.type(screen.getByLabelText('Confirme a nova senha'), 'Senha-nova-1');
 
     await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
     expect(formSenha('Maria Silva')).not.toBeInTheDocument();
@@ -809,7 +823,7 @@ describe('Usuários (admin)', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     const put = pendente();
     await abrirSenha({ 'PUT /admin/usuarios/u1/senha': put.rota });
-    await preencherSenha('senha-nova-1');
+    await preencherSenha('Senha-nova-1');
     await userEvent.click(botaoSenha('Bruno Lima'));
     const campoBruno = within(formSenha('Bruno Lima')).getByLabelText('Nova senha');
     await userEvent.type(campoBruno, 'abc');
@@ -825,7 +839,7 @@ describe('Usuários (admin)', () => {
   it('abrir outro formulário de senha apaga o aviso anterior', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     await abrirSenha({ 'PUT /admin/usuarios/u1/senha': { status: 204 } });
-    await preencherSenha('senha-nova-1');
+    await preencherSenha('Senha-nova-1');
     expect(await screen.findByRole('status')).toHaveTextContent('Senha de Maria Silva redefinida');
     await userEvent.click(botaoSenha('Bruno Lima'));
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
@@ -838,7 +852,7 @@ describe('Usuários (admin)', () => {
       'PUT /admin/usuarios/a1/senha': { status: 204 },
     });
     await userEvent.click(await screen.findByRole('button', { name: 'Redefinir senha de Ana Admin' }));
-    await preencherSenha('senha-nova-1');
+    await preencherSenha('Senha-nova-1');
     expect(await screen.findByRole('heading', { name: 'Entrar' })).toBeInTheDocument();
   });
 
