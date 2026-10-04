@@ -76,12 +76,15 @@ export function Entrar() {
 export function Cadastro() {
   const { cadastrar } = useAuth();
   const [erroConfirmacao, setErroConfirmacao] = useState(null);
+  const [erroConsentimento, setErroConsentimento] = useState(null);
   // Checkbox marcado chega como "on" no FormData; a API espera booleano.
   const { enviando, erro, porCampo, enviar } = useEnvio(
     async ({ consentiu_pesquisa, confirmacao, ...dados }) => {
+      const consentiu = consentiu_pesquisa === 'on';
       setErroConfirmacao(dados.senha === confirmacao ? null : 'As senhas não conferem');
-      if (dados.senha !== confirmacao) return;
-      await cadastrar({ ...dados, consentiu_pesquisa: consentiu_pesquisa === 'on' });
+      setErroConsentimento(consentiu ? null : 'É preciso aceitar para criar a conta');
+      if (dados.senha !== confirmacao || !consentiu) return;
+      await cadastrar({ ...dados, consentiu_pesquisa: true });
     },
   );
 
@@ -116,12 +119,21 @@ export function Cadastro() {
           erro={erroConfirmacao}
         />
         <label className="campo-check">
-          <input type="checkbox" name="consentiu_pesquisa" />
+          <input
+            type="checkbox"
+            name="consentiu_pesquisa"
+            required
+            aria-invalid={erroConsentimento || porCampo.consentiu_pesquisa ? true : undefined}
+            aria-describedby="consentimento-erro"
+          />
           <span>
-            Autorizo o uso anônimo dos meus dados de uso do app na pesquisa acadêmica do TCC. Opcional: você
-            pode mudar isso depois no seu perfil.
+            Concordo que meus dados de uso do app sejam coletados para telemetria e métricas da pesquisa
+            acadêmica do TCC, sempre de forma anônima. Obrigatório para criar a conta.
           </span>
         </label>
+        <span id="consentimento-erro" className="campo__erro" aria-live="polite">
+          {erroConsentimento || porCampo.consentiu_pesquisa}
+        </span>
         <button type="submit" className="botao botao--bloco" disabled={enviando}>
           {enviando ? 'Criando conta…' : 'Criar conta'}
         </button>

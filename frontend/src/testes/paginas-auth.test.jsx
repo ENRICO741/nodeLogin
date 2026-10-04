@@ -59,12 +59,13 @@ describe('Entrar', () => {
 });
 
 describe('Cadastro', () => {
-  const preencher = async (confirmacao = 'Senha-forte-123', senha = 'Senha-forte-123') => {
+  const preencher = async (confirmacao = 'Senha-forte-123', senha = 'Senha-forte-123', consentir = true) => {
     await userEvent.type(await screen.findByLabelText('Nome'), 'Maria Silva');
     await userEvent.type(screen.getByLabelText('Apelido'), 'maria');
     await userEvent.type(screen.getByLabelText('E-mail'), 'maria@empresa.com');
     await userEvent.type(screen.getByLabelText('Senha'), senha);
     await userEvent.type(screen.getByLabelText('Confirme a senha'), confirmacao);
+    if (consentir) await userEvent.click(screen.getByRole('checkbox', { name: /Concordo/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Criar conta' }));
   };
 
@@ -99,19 +100,29 @@ describe('Cadastro', () => {
       apelido: 'maria',
       email: 'maria@empresa.com',
       senha: 'Senha-forte-123',
-      consentiu_pesquisa: false,
+      consentiu_pesquisa: true,
     });
   });
 
-  it('checkbox de consentimento marcado envia consentiu_pesquisa: true', async () => {
-    const { servidor } = await renderizarApp('/cadastro', {
+  it('sem aceitar o uso dos dados não chama a API', async () => {
+    const { servidor } = await renderizarApp('/cadastro', { usuario: null, rotas: {} });
+    await preencher(undefined, undefined, false);
+    expect(await screen.findByText('É preciso aceitar para criar a conta')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /Concordo/ })).toHaveAttribute('aria-invalid', 'true');
+    expect(servidor.enviados('POST /auth/cadastro')).toEqual([]);
+  });
+
+  it('erro de consentimento vindo da API aparece junto do checkbox', async () => {
+    await renderizarApp('/cadastro', {
       usuario: null,
-      rotas: { 'POST /auth/cadastro': { status: 201, corpo: SESSAO }, ...rotasLogado },
+      rotas: {
+        'POST /auth/cadastro': erroApi(400, 'VALIDACAO', 'Dados inválidos', [
+          { campo: 'consentiu_pesquisa', mensagem: 'É preciso aceitar o uso anônimo' },
+        ]),
+      },
     });
-    await userEvent.click(await screen.findByRole('checkbox', { name: /Autorizo o uso anônimo/ }));
     await preencher();
-    await screen.findByRole('heading', { name: 'Aulas' });
-    expect(servidor.enviados('POST /auth/cadastro')[0].consentiu_pesquisa).toBe(true);
+    expect(await screen.findByText('É preciso aceitar o uso anônimo')).toBeInTheDocument();
   });
 
   it('erros de validação aparecem junto de cada campo, sem aviso geral', async () => {

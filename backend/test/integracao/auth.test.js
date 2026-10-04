@@ -15,6 +15,7 @@ const cadastro = (extra) =>
     apelido: `ok_${Math.random().toString(36).slice(2, 10)}`,
     email: `ok_${Math.random().toString(36).slice(2, 10)}@exemplo.com`,
     senha: 'Senha-forte-123',
+    consentiu_pesquisa: true,
     ...extra,
   });
 const camposComErro = (res) => res.body.erro.detalhes.map((d) => d.campo);

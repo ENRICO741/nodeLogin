@@ -17,13 +17,13 @@ function sessao({ senha_alterada_em, ...usuario }) {
   return { token: emitirToken(usuario.id, senha_alterada_em), usuario };
 }
 
-async function cadastrar({ nome, apelido, email, senha, consentiu_pesquisa }) {
+async function cadastrar({ nome, apelido, email, senha }) {
   const senhaHash = await bcrypt.hash(senha, config.BCRYPT_CUSTO);
   const { rows } = await query(
     `INSERT INTO usuarios (nome, apelido, email, senha_hash, consentiu_pesquisa_em)
-     VALUES ($1, $2, $3, $4, CASE WHEN $5 THEN now() END)
+     VALUES ($1, $2, $3, $4, now())
      RETURNING ${CAMPOS_USUARIO}, senha_alterada_em`,
-    [nome, apelido, email, senhaHash, consentiu_pesquisa],
+    [nome, apelido, email, senhaHash],
   );
   return sessao(rows[0]);
 }

@@ -15,8 +15,8 @@ const esquemaCadastro = z.object({
     .regex(/^[\w.-]{3,30}$/, 'Use de 3 a 30 letras, números, ponto, hífen ou sublinhado'),
   email,
   senha,
-  // Consentimento opcional para uso anônimo dos dados de uso na pesquisa (LGPD).
-  consentiu_pesquisa: z.boolean().default(false),
+  // Consentimento obrigatório para uso anônimo dos dados de uso (telemetria e pesquisa, LGPD).
+  consentiu_pesquisa: z.literal(true, 'É preciso aceitar o uso anônimo dos dados para criar a conta'),
 });
 const esquemaLogin = z.object({ identificador: texto(1, 254), senha: z.string().min(1).max(72) });
 const esquemaRedefinicao = z.object({ token: z.string().min(20).max(100), senha });

@@ -77,7 +77,7 @@ As aulas são arquivos HTML em [`conteudo/aulas/`](conteudo/), uma pasta por aul
   - `app_instalado`.
 - **No banco, com data e hora:** respostas, conclusões, badges e o **histórico de pontos** (`pontuacao_historico`).
 
-**Consentimento:** é opcional, pedido no cadastro e alterável no perfil. Só quem consentiu entra na pesquisa.
+**Consentimento:** obrigatório no cadastro (sem aceitar o uso anônimo dos dados para telemetria e métricas, a conta não é criada). Pode ser retirado depois no perfil; só quem mantém o consentimento entra na pesquisa.
 
 **Exportação:** Admin → Estatísticas → **Dados da pesquisa** gera CSVs das visões `pesquisa_*` (migration `002`):
 
