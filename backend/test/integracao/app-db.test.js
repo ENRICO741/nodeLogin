@@ -9,6 +9,16 @@ const mailer = require('../../src/lib/mailer');
 before(prepararBanco);
 after(() => pool.end());
 
+describe('pool', () => {
+  test('abre até 20 conexões; as consultas seguintes esperam na fila e terminam', async () => {
+    const consultas = Array.from({ length: 22 }, () => pool.query('SELECT pg_sleep(0.3)'));
+    await new Promise((resolver) => setTimeout(resolver, 100));
+    assert.equal(pool.totalCount, 20);
+    assert.equal(pool.waitingCount, 2);
+    assert.equal((await Promise.all(consultas)).length, 22);
+  });
+});
+
 describe('app', () => {
   test('GET /api/saude responde sem login; sem SMTP fica "degradado" (200)', async () => {
     const res = await request(app).get('/api/saude').expect(200);

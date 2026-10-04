@@ -188,7 +188,7 @@ describe('rate limit (desligado em teste, ligado aqui com NODE_ENV=development)'
     );
   const resultado = (saida) => JSON.parse(saida.match(/RESULTADO (.*)/)[1]);
 
-  test('login bloqueia a 11ª tentativa em 15 minutos, com mensagem padrão', async () => {
+  test('login bloqueia a 11ª tentativa na mesma conta em 15 minutos, com mensagem padrão', async () => {
     const { saida } = await rodarComLimite(`
       const r = [];
       for (let i = 0; i < 11; i++) {
@@ -201,6 +201,40 @@ describe('rate limit (desligado em teste, ligado aqui com NODE_ENV=development)'
     const r = resultado(saida);
     assert.deepEqual(r.slice(0, 10), Array(10).fill(401));
     assert.deepEqual(r.slice(10), [429, 'MUITAS_REQUISICOES']);
+  });
+
+  test('login: outra conta no mesmo IP (turma atrás do NAT) e a mesma conta em outro IP seguem liberadas', async () => {
+    const { saida } = await rodarComLimite(`
+      const login = (identificador, ip = '10.0.3.1') =>
+        request(app).post('/api/auth/login').set('X-Forwarded-For', ip).send({ identificador, senha: 'y' });
+      for (let i = 0; i < 10; i++) await login('conta');
+      const r = {
+        mesmaConta: (await login('conta')).status,
+        maiusculas: (await login('CONTA')).status,
+        outraConta: (await login('outra')).status,
+        outroIp: (await login('conta', '10.0.3.2')).status,
+      };
+      console.log('RESULTADO', JSON.stringify(r));
+    `);
+    assert.deepEqual(resultado(saida), { mesmaConta: 429, maiusculas: 429, outraConta: 401, outroIp: 401 });
+  });
+
+  test('teto de 100 por IP soma cadastro, login e redefinição; outro IP segue liberado', async () => {
+    const { saida } = await rodarComLimite(`
+      const post = (rota, corpo, ip = '10.0.4.1') =>
+        request(app).post('/api/auth/' + rota).set('X-Forwarded-For', ip).send(corpo);
+      const antes = new Set();
+      for (let i = 0; i < 50; i++) antes.add((await post('cadastro', {})).status);
+      for (let i = 0; i < 50; i++) antes.add((await post('login', { identificador: 'c' + i })).status);
+      const r = {
+        antes: [...antes],
+        redefinir: (await post('redefinir-senha', {})).status,
+        cadastro: (await post('cadastro', {})).status,
+        outroIp: (await post('cadastro', {}, '10.0.4.2')).status,
+      };
+      console.log('RESULTADO', JSON.stringify(r));
+    `);
+    assert.deepEqual(resultado(saida), { antes: [400], redefinir: 429, cadastro: 429, outroIp: 400 });
   });
 
   test('esqueci-senha limita por IP e também por e-mail (mesmo trocando de IP)', async () => {

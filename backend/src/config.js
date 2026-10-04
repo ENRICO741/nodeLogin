@@ -10,7 +10,9 @@ const esquema = z.object({
   DATABASE_URL: z.string().min(1),
   JWT_SECRET: z.string().min(32, 'JWT_SECRET precisa de pelo menos 32 caracteres'),
   JWT_EXPIRA_EM: z.string().default('7d'),
-  BCRYPT_CUSTO: z.coerce.number().int().min(4).max(15).default(12),
+  // 11: metade da CPU do 12 por cadastro/login (o gargalo no teste de carga), acima do mínimo do OWASP (10).
+  // Hashes antigos continuam valendo: o custo fica gravado no próprio hash.
+  BCRYPT_CUSTO: z.coerce.number().int().min(4).max(15).default(11),
   APP_URL: z.url().default('http://localhost:5173'),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().default(587),

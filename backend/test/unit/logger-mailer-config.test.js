@@ -183,7 +183,7 @@ describe('config', () => {
     const config = JSON.parse(saida);
     assert.equal(config.NODE_ENV, 'development');
     assert.equal(config.PORT, 4000);
-    assert.equal(config.BCRYPT_CUSTO, 12);
+    assert.equal(config.BCRYPT_CUSTO, 11);
     assert.equal(config.JWT_EXPIRA_EM, '7d');
     assert.equal(config.SMTP_HOST, undefined);
   });

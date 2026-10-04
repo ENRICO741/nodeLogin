@@ -161,6 +161,16 @@ describe('POST /api/auth/login', () => {
     await post('/api/auth/login', { identificador: 'x' }).expect(400);
   });
 
+  test('hash gravado com outro custo do bcrypt continua entrando (baixar BCRYPT_CUSTO não invalida senhas)', async () => {
+    const u = await novoUsuario();
+    await pool.query('UPDATE usuarios SET senha_hash = $2 WHERE id = $1', [
+      u.usuario.id,
+      await bcrypt.hash(u.senha, 6),
+    ]);
+    await post('/api/auth/login', { identificador: u.email, senha: u.senha }).expect(200);
+    await post('/api/auth/login', { identificador: u.email, senha: 'Outra-senha-123' }).expect(401);
+  });
+
   test('tentativa de injeção SQL no identificador só falha o login', async () => {
     await post('/api/auth/login', { identificador: "' OR '1'='1", senha: "' OR '1'='1" }).expect(401);
   });
