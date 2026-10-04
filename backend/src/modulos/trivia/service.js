@@ -1,6 +1,6 @@
 const { transacao } = require('../../db/pool');
-const { naoEncontrado, conflito } = require('../../lib/erros');
-const { creditarPontos, pontuacaoAtual, concederBadges } = require('../pontuacao');
+const { HttpError, naoEncontrado, conflito } = require('../../lib/erros');
+const { ehAdmin, creditarPontos, pontuacaoAtual, concederBadges } = require('../pontuacao');
 
 async function obterRodada(c, rodadaId, usuarioId) {
   const { rows } = await c.query(
@@ -24,8 +24,22 @@ async function obterRodada(c, rodadaId, usuarioId) {
   return rows[0];
 }
 
+// A trivia só abre depois da trilha inteira de aulas (admin já entra liberado).
+async function triviaLiberada(c, usuarioId) {
+  const { rows } = await c.query(
+    `SELECT ${ehAdmin('$1')} OR NOT EXISTS (
+       SELECT 1 FROM aulas a WHERE a.ativo AND NOT EXISTS (
+         SELECT 1 FROM aula_visitas v WHERE v.aula_id = a.id AND v.usuario_id = $1 AND v.concluida)) AS liberada`,
+    [usuarioId],
+  );
+  return rows[0].liberada;
+}
+
 async function criarRodada(usuarioId, { dificuldade, limite }) {
   return transacao(async (c) => {
+    if (!(await triviaLiberada(c, usuarioId))) {
+      throw new HttpError(403, 'TRIVIA_BLOQUEADA', 'Conclua todas as aulas para liberar a trivia');
+    }
     const {
       rows: [rodada],
     } = await c.query('INSERT INTO trivia_rodadas (usuario_id, dificuldade) VALUES ($1, $2) RETURNING id', [
@@ -71,7 +85,7 @@ async function responder(rodadaId, usuarioId, { questao_id, alternativa }) {
     const { rows: respostas } = await c.query(
       `INSERT INTO trivia_respostas (rodada_id, questao_id, usuario_id, correta, pontuou)
        VALUES ($1, $2, $3, $4, $4 AND NOT EXISTS (
-         SELECT 1 FROM trivia_respostas WHERE usuario_id = $3 AND questao_id = $2 AND pontuou))
+         SELECT 1 FROM trivia_respostas WHERE usuario_id = $3 AND questao_id = $2 AND pontuou) AND NOT ${ehAdmin('$3')})
        ON CONFLICT (rodada_id, questao_id) DO NOTHING
        RETURNING pontuou`,
       [rodadaId, questao_id, usuarioId, correta],
@@ -117,4 +131,4 @@ async function finalizar(rodadaId, usuarioId) {
   });
 }
 
-module.exports = { obterRodada, criarRodada, responder, finalizar };
+module.exports = { obterRodada, criarRodada, responder, finalizar, triviaLiberada };

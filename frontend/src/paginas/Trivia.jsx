@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { ArrowLeft, Gauge, Signal, SignalLow, SignalMedium } from 'lucide-react';
+import { ArrowLeft, Gauge, Lock, Signal, SignalLow, SignalMedium } from 'lucide-react';
 import { api } from '../lib/api';
 import { registrarEvento } from '../lib/telemetria';
 import { useApi } from '../hooks/useApi';
@@ -24,8 +24,29 @@ const DIFICULDADES = [
 
 export function Trivia() {
   const navigate = useNavigate();
+  const { usuario } = useAuth();
+  const aulas = useApi('/aulas');
   const [iniciando, setIniciando] = useState(null);
   const [erro, setErro] = useState(null);
+
+  if (aulas.carregando) return <Carregando />;
+  if (aulas.erro) return <ErroCarregamento erro={aulas.erro} onTentarDeNovo={aulas.recarregar} />;
+  // O backend também barra (TRIVIA_BLOQUEADA); aqui só evita mostrar botões que não funcionam.
+  // Admin entra liberado para conferir as perguntas (sem pontuar).
+  if (usuario?.papel !== 'admin' && !aulas.dados.every((a) => a.concluida)) {
+    return (
+      <div className="pagina">
+        <header className="cabecalho-pagina">
+          <h1>Trivia</h1>
+        </header>
+        <Vazio icone={Lock} titulo="Conclua todas as aulas para liberar a trivia">
+          <Link to="/aulas" className="botao">
+            Ir para as aulas
+          </Link>
+        </Vazio>
+      </div>
+    );
+  }
 
   async function iniciar(dificuldade) {
     setIniciando(dificuldade);

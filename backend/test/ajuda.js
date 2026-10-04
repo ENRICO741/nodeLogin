@@ -9,6 +9,7 @@ const { migrar } = require('../src/db/migrar');
 const { semear } = require('../src/db/seed');
 const { importarConteudo } = require('../src/scripts/importar-aulas');
 const mailer = require('../src/lib/mailer');
+const { concederBadges } = require('../src/modulos/pontuacao');
 
 const RAIZ_BACKEND = path.join(__dirname, '..');
 
@@ -35,6 +36,7 @@ async function novoUsuario(extra = {}) {
     apelido: `pessoa${sufixo}`,
     email: `pessoa${sufixo}@exemplo.com`,
     senha: 'Senha-forte-123',
+    consentiu_pesquisa: true,
     ...extra,
   };
   const res = await request(app).post('/api/auth/cadastro').send(dados).expect(201);
@@ -49,6 +51,25 @@ async function novoAdmin() {
   const admin = await novoUsuario();
   await tornarAdmin(admin.email);
   return admin;
+}
+
+// Marca como concluídas, direto no banco, as aulas ativas que faltam (sem pontos): libera a trivia.
+async function concluirAulas(usuarioId) {
+  await pool.query(
+    `INSERT INTO aula_visitas (usuario_id, aula_id, finalizada_em, concluida)
+     SELECT $1, a.id, now(), true FROM aulas a WHERE a.ativo AND NOT EXISTS (
+       SELECT 1 FROM aula_visitas v WHERE v.usuario_id = $1 AND v.aula_id = a.id AND v.concluida)`,
+    [usuarioId],
+  );
+}
+
+// Usuário com a trilha de aulas concluída, pronto para a trivia. Já leva as conquistas das aulas,
+// como no fluxo real, para os testes da trivia verem só as conquistas novas.
+async function novoJogador() {
+  const u = await novoUsuario();
+  await concluirAulas(u.usuario.id);
+  await concederBadges(pool, u.usuario.id);
+  return u;
 }
 
 // Gabarito lido direto do banco (a API nunca o entrega antes da resposta).
@@ -98,6 +119,8 @@ module.exports = {
   prepararBanco,
   novoUsuario,
   novoAdmin,
+  novoJogador,
+  concluirAulas,
   tornarAdmin,
   autenticado,
   gabarito,
