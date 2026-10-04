@@ -1,0 +1,205 @@
+QUESTIONÁRIOS DA PESQUISA - GUARDIÃO IMPACTA (RASCUNHO)
+========================================================
+
+Situação: tradução inicial, ainda NÃO revisada.
+Falta: retrotradução, comparação, piloto com 3 a 5 pessoas.
+
+Códigos: sigla do construto + número. Final _R = item invertido.
+Item invertido: nota = (máximo da escala + 1) - resposta.
+
+Aplicação:
+- Ordem dos itens aleatória.
+- Nunca mostrar o nome do construto ou do tipo ao participante.
+
+
+--------------------------------------------------------
+1. UES-SF - User Engagement Scale, Short Form
+--------------------------------------------------------
+Fonte: O'Brien, H. L.; Cairns, P.; Hall, M. (2018). A practical approach
+to measuring user engagement with the refined user engagement scale (UES)
+and new UES short form. International Journal of Human-Computer Studies,
+112, 28-39. https://doi.org/10.1016/j.ijhcs.2018.01.004
+
+Quando: antes (sobre treinamentos anteriores) e depois (sobre o app).
+
+Escala de 5 pontos:
+  1 = Discordo totalmente
+  2 = Discordo
+  3 = Nem concordo nem discordo
+  4 = Concordo
+  5 = Concordo totalmente
+
+Pontuação:
+- Inverter os itens PU.
+- Nota de cada subescala = média dos seus 3 itens.
+- Nota geral = média dos 12 itens.
+
+Subescalas:
+  FA = atenção focada
+  PU = usabilidade percebida (itens invertidos)
+  AE = apelo estético
+  RW = recompensa
+
+ANTES
+Cabeçalho: "Pense nos treinamentos de segurança da informação que você já fez."
+FA1    Eu perdia a noção do que acontecia ao meu redor.
+FA2    O tempo nesses treinamentos passava voando.
+FA3    Eu ficava absorvido(a) nesses treinamentos.
+PU1_R  Eu me sentia frustrado(a) durante os treinamentos.
+PU2_R  Os treinamentos eram confusos.
+PU3_R  Fazer os treinamentos era cansativo.
+AE1    Os treinamentos eram atraentes.
+AE2    Os treinamentos eram esteticamente agradáveis.
+AE3    Os treinamentos agradavam aos meus sentidos.
+RW1    Fazer os treinamentos valia a pena.
+RW2    A experiência nos treinamentos era recompensadora.
+RW3    Eu me sentia interessado(a) nos treinamentos.
+
+DEPOIS
+Cabeçalho: "Pense no seu uso do Guardião Impacta."
+FA1    Eu perdi a noção do que acontecia ao meu redor.
+FA2    O tempo usando o app passou voando.
+FA3    Eu fiquei absorvido(a) usando o app.
+PU1_R  Eu me senti frustrado(a) usando o app.
+PU2_R  O app foi confuso de usar.
+PU3_R  Usar o app foi cansativo.
+AE1    O app é atraente.
+AE2    O app é esteticamente agradável.
+AE3    O app agradou aos meus sentidos.
+RW1    Usar o app valeu a pena.
+RW2    A experiência com o app foi recompensadora.
+RW3    Eu me senti interessado(a) usando o app.
+
+ORIGINAL EM INGLÊS (para a retrotradução; "Application X" = nome do sistema)
+FA-S.1  I lost myself in this experience.
+FA-S.2  The time I spent using Application X just slipped away.
+FA-S.3  I was absorbed in this experience.
+PU-S.1  I felt frustrated while using this Application X.
+PU-S.2  I found this Application X confusing to use.
+PU-S.3  Using this Application X was taxing.
+AE-S.1  This Application X was attractive.
+AE-S.2  This Application X was aesthetically appealing.
+AE-S.3  This Application X appealed to my senses.
+RW-S.1  Using Application X was worthwhile.
+RW-S.2  My experience was rewarding.
+RW-S.3  I felt interested in this experience.
+Conferir a redação exata no Apêndice B do artigo.
+
+
+--------------------------------------------------------
+2. HEXAD - Tipos de usuário em gamificação
+--------------------------------------------------------
+Fonte: Tondello, G. F. et al. (2016). The Gamification User Types Hexad
+Scale. CHI PLAY '16, 229-243. https://doi.org/10.1145/2967934.2968082
+
+Quando: só no questionário de antes (é traço da pessoa, não do app).
+
+Escala de 7 pontos (o quanto a frase descreve você):
+  1 = Discordo totalmente
+  ...
+  7 = Concordo totalmente
+
+Pontuação: nota de cada tipo = SOMA dos seus 4 itens (de 4 a 28).
+
+Tipos:
+  HXP = Filantropo
+  HXS = Socializador
+  HXF = Espírito livre
+  HXA = Conquistador
+  HXD = Disruptor
+  HXR = Jogador
+
+Antes de traduzir, procurar se existe versão validada em português.
+
+HXP1  Fico feliz quando consigo ajudar os outros.
+      (It makes me happy if I am able to help others.)
+HXP2  Gosto de ajudar outras pessoas a se orientarem em situações novas.
+      (I like helping others to orient themselves in new situations.)
+HXP3  Gosto de compartilhar o que sei.
+      (I like sharing my knowledge.)
+HXP4  O bem-estar dos outros é importante para mim.
+      (The wellbeing of others is important to me.)
+
+HXS1  Interagir com outras pessoas é importante para mim.
+      (Interacting with others is important to me.)
+HXS2  Gosto de fazer parte de uma equipe.
+      (I like being part of a team.)
+HXS3  É importante para mim sentir que faço parte de uma comunidade.
+      (It is important to me to feel like I am part of a community.)
+HXS4  Gosto de atividades em grupo.
+      (I enjoy group activities.)
+
+HXF1  É importante para mim seguir meu próprio caminho.
+      (It is important to me to follow my own path.)
+HXF2  Muitas vezes deixo a curiosidade me guiar.
+      (I often let my curiosity guide me.)
+HXF3  Gosto de experimentar coisas novas.
+      (I like to try new things.)
+HXF4  Ser independente é importante para mim.
+      (Being independent is important to me.)
+
+HXA1  Gosto de superar obstáculos.
+      (I like defeating obstacles.)
+HXA2  É importante para mim sempre concluir minhas tarefas por completo.
+      (It is important to me to always carry out my tasks completely.)
+HXA3  Tenho dificuldade de largar um problema antes de achar a solução.
+      (It is difficult for me to let go of a problem before I have found
+      a solution.)
+HXA4  Gosto de dominar tarefas difíceis.
+      (I like mastering difficult tasks.)
+
+HXD1  Gosto de provocar.
+      (I like to provoke.)
+HXD2  Gosto de questionar o status quo.
+      (I like to question the status quo.)
+HXD3  Eu me vejo como rebelde.
+      (I see myself as a rebel.)
+HXD4  Não gosto de seguir regras.
+      (I dislike following rules.)
+
+HXR1  Gosto de competições em que dá para ganhar um prêmio.
+      (I like competitions where a prize can be won.)
+HXR2  Recompensas são uma ótima forma de me motivar.
+      (Rewards are a great way to motivate me.)
+HXR3  Retorno sobre o investimento é importante para mim.
+      (Return of investment is important to me.)
+HXR4  Se a recompensa for suficiente, eu me esforço.
+      (If the reward is sufficient I will put in the effort.)
+
+
+--------------------------------------------------------
+3. ITENS PRÓPRIOS - Elementos de gamificação
+--------------------------------------------------------
+Não validados. Analisar item a item, sem somar com a UES-SF.
+Validar o conteúdo com 2 ou 3 professores (clareza e relevância).
+
+Quando: só no questionário de depois.
+Escala: a mesma de 5 pontos da UES-SF.
+
+GAM1  Os pontos me motivaram a responder mais perguntas.
+GAM2  O ranking me fez querer voltar ao app.
+GAM3  As conquistas me deram vontade de completar mais aulas.
+GAM4  Prefiro aprender segurança da informação assim do que nos
+      treinamentos que já fiz.
+GAM5  Eu recomendaria o app para colegas.
+
+
+--------------------------------------------------------
+4. PROCESSO DE TRADUÇÃO (versão enxuta de Beaton et al., 2000)
+--------------------------------------------------------
+Referência: Beaton, D. E. et al. (2000). Guidelines for the process of
+cross-cultural adaptation of self-report measures. Spine, 25(24),
+3186-3191.
+
+1. Tradução inicial para o português.
+   Feita: os rascunhos acima.
+2. Retrotradução: outra pessoa, fluente em inglês, traduz o português de
+   volta para o inglês SEM ver o original.
+3. Comparar a retrotradução com o original e ajustar cada item cujo
+   sentido mudou.
+4. Piloto com 3 a 5 pessoas do público-alvo.
+   - Elas respondem e dizem, com as próprias palavras, o que entenderam
+     de cada item.
+   - Ajustar o que gerar dúvida.
+5. No TCC: descrever o processo, citar as escalas como "adaptadas de" e
+   reportar o alfa de Cronbach de cada subescala (meta: 0,7 ou mais).
