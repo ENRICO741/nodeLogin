@@ -84,7 +84,7 @@ As aulas são arquivos HTML em [`conteudo/aulas/`](conteudo/), uma pasta por aul
 - uso diário (DAU);
 - engajamento por participante;
 - retenção por coorte;
-- sessões, eventos, respostas e pontos.
+- sessões (sem fim registrado, o fim é o último evento da sessão e `fim_estimado` marca), eventos, respostas, pontos e conquistas com a data (`pesquisa_badges`, migration `005`).
 
 Os CSVs não trazem nome, e-mail nem apelido. Cada pessoa aparece como um pseudônimo, gerado com `PESQUISA_SEGREDO`. Os horários estão em America/Sao_Paulo.
 

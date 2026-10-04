@@ -21,7 +21,11 @@ const VISOES = {
     titulo: 'Retenção por coorte',
     descricao: 'Participantes ativos por semana desde o cadastro, agrupados pela semana de entrada',
   },
-  sessoes: { visao: 'pesquisa_sessoes', titulo: 'Sessões', descricao: 'Cada abertura do app, com duração' },
+  sessoes: {
+    visao: 'pesquisa_sessoes',
+    titulo: 'Sessões',
+    descricao: 'Cada abertura do app, com duração (estimada pelo último evento quando o fim não chegou)',
+  },
   eventos: {
     visao: 'pesquisa_eventos',
     titulo: 'Eventos',
@@ -36,6 +40,11 @@ const VISOES = {
     visao: 'pesquisa_pontos',
     titulo: 'Pontos',
     descricao: 'Cada crédito de pontos, com o total acumulado',
+  },
+  badges: {
+    visao: 'pesquisa_badges',
+    titulo: 'Conquistas',
+    descricao: 'Cada conquista obtida, com a data',
   },
 };
 
@@ -95,3 +104,5 @@ router.get('/:id.csv', async (req, res) => {
 
 module.exports = router;
 module.exports.paraCsv = paraCsv;
+module.exports.VISOES = VISOES;
+module.exports.lerVisao = lerVisao;
