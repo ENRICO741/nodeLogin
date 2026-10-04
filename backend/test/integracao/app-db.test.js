@@ -97,6 +97,46 @@ describe('banco', () => {
     assert.ok(antes.some((m) => m.nome === '001_schema_inicial.sql'));
   });
 
+  test('migração 004: "Guardião de Dados" vira "Graduado" e quem tinha continua com ela', async () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const sql = fs.readFileSync(
+      path.join(__dirname, '../../src/db/migrations/004_mais_conquistas.sql'),
+      'utf8',
+    );
+    const renomear = sql.match(/UPDATE badges[^;]+;/)[0];
+    const u = await novoUsuario();
+    const c = await pool.connect();
+    try {
+      await c.query('BEGIN');
+      // Volta o banco ao estado de antes da 004 só dentro desta transação (desfeita no fim).
+      await c.query('ALTER TABLE badges DROP CONSTRAINT badges_tipo_criterio_check');
+      await c.query("UPDATE badges SET nome = 'Outro' WHERE nome = 'Graduado'");
+      const {
+        rows: [antigo],
+      } = await c.query(
+        "INSERT INTO badges (nome, descricao, tipo_criterio) VALUES ('Guardião de Dados', 'Concluiu todas as aulas.', 'todas_aulas') RETURNING id",
+      );
+      await c.query('INSERT INTO usuario_badges (usuario_id, badge_id) VALUES ($1, $2)', [
+        u.usuario.id,
+        antigo.id,
+      ]);
+
+      await c.query(renomear);
+
+      const { rows } = await c.query(
+        'SELECT b.id, b.nome, b.tipo_criterio, b.quantidade FROM badges b JOIN usuario_badges ub ON ub.badge_id = b.id WHERE ub.usuario_id = $1',
+        [u.usuario.id],
+      );
+      assert.deepEqual(rows, [
+        { id: antigo.id, nome: 'Graduado', tipo_criterio: 'aulas_concluidas', quantidade: 15 },
+      ]);
+    } finally {
+      await c.query('ROLLBACK');
+      c.release();
+    }
+  });
+
   test('seed não duplica conteúdo se já existe aula', async () => {
     const contar = async () =>
       (
@@ -141,6 +181,10 @@ describe('banco', () => {
       "INSERT INTO questoes_trivia (dificuldade, enunciado, alternativa_a, alternativa_b, alternativa_c, alternativa_d, resposta_correta) VALUES ('extrema','x','a','b','c','d','a')",
       "INSERT INTO badges (nome, descricao, tipo_criterio) VALUES ('x', 'y', 'aula_concluida')",
       "INSERT INTO badges (nome, descricao, tipo_criterio) VALUES ('x', 'y', 'desconhecido')",
+      "INSERT INTO badges (nome, descricao, tipo_criterio) VALUES ('x', 'y', 'todas_aulas')",
+      "INSERT INTO badges (nome, descricao, tipo_criterio) VALUES ('x', 'y', 'pontos')",
+      "INSERT INTO badges (nome, descricao, tipo_criterio, quantidade) VALUES ('x', 'y', 'aulas_concluidas', 0)",
+      "INSERT INTO badges (nome, descricao, tipo_criterio, dificuldade) VALUES ('x', 'y', 'trivia_completa', 'extrema')",
       'UPDATE usuarios SET pontuacao_total = -1',
       "UPDATE usuarios SET papel = 'root'",
     ];

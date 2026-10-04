@@ -1,9 +1,29 @@
-import { Award, BookCheck, GraduationCap, Lock, Zap } from 'lucide-react';
+import {
+  Award,
+  BookCheck,
+  Brain,
+  GraduationCap,
+  Lock,
+  Repeat,
+  Sparkles,
+  Star,
+  Target,
+  Zap,
+} from 'lucide-react';
 import { useApi } from '../hooks/useApi';
 import { Carregando, ErroCarregamento, Vazio } from '../componentes/Estado';
 import styles from './Conquistas.module.css';
 
-const ICONES = { aula_concluida: BookCheck, primeira_trivia: Zap, todas_aulas: GraduationCap };
+const ICONES = {
+  aula_concluida: BookCheck,
+  aulas_concluidas: GraduationCap,
+  aulas_gabaritadas: Target,
+  primeira_trivia: Zap,
+  trivia_rodadas: Repeat,
+  trivia_completa: Brain,
+  rodada_perfeita: Sparkles,
+  pontos: Star,
+};
 const formatarData = (iso) => new Date(iso).toLocaleDateString('pt-BR');
 
 export function Conquistas() {

@@ -15,6 +15,7 @@ Adições da migration `002_aulas_arquivo_e_pesquisa.sql`:
 - **`sessoes_app.standalone` e `sessoes_app.largura_tela`**: contexto da sessão (app instalado ou navegador, e largura da tela).
 - **Tabela `pontuacao_historico`**: `usuario_id`, `origem`, `referencia_id`, `pontos`, `total_apos` e `criado_em`. Cada crédito de pontos gera uma linha.
 - **Visões `pesquisa_*`**: pseudonimizadas e filtradas por consentimento, para exportação.
+- **Migration `005`**: a visão interna `sessoes_app_fim` estima o fim das sessões sem `finalizada_em` (último evento da sessão ou o início), usada por `pesquisa_sessoes` (coluna `fim_estimado`), `pesquisa_uso_diario` e `pesquisa_engajamento_usuario`; `pesquisa_badges` traz cada conquista com a data.
 
 ## Regras garantidas pelo banco
 
@@ -175,6 +176,8 @@ erDiagram
     text imagem_url
     string tipo_criterio
     uuid aula_id FK
+    int quantidade
+    string dificuldade
     boolean ativo
     timestamp criado_em
   }

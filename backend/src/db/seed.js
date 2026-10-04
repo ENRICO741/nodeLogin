@@ -133,33 +133,61 @@ const COLUNAS_QUESTAO = [
 ];
 const valoresQuestao = (q) => COLUNAS_QUESTAO.map((coluna) => q[coluna]);
 
-// Popula trivia e badges só em banco vazio, numa transação. Roda depois da importação das aulas,
+// [nome, descricao, tipo_criterio, quantidade, dificuldade]
+const BADGES = [
+  ['Aprendiz Dedicado', 'Concluiu 5 aulas.', 'aulas_concluidas', 5, null],
+  ['Sentinela', 'Concluiu 10 aulas.', 'aulas_concluidas', 10, null],
+  ['Graduado', 'Concluiu 15 aulas.', 'aulas_concluidas', 15, null],
+  ['Aluno Nota 10', 'Acertou todas as perguntas de todas as aulas.', 'aulas_gabaritadas', null, null],
+  ['Curioso da Trivia', 'Terminou sua primeira rodada de trivia.', 'primeira_trivia', null, null],
+  ['Frequentador da Trivia', 'Terminou 10 rodadas de trivia.', 'trivia_rodadas', 10, null],
+  ['Recruta da Trivia', 'Acertou todas as questões fáceis da trivia.', 'trivia_completa', null, 'facil'],
+  ['Agente da Trivia', 'Acertou todas as questões médias da trivia.', 'trivia_completa', null, 'media'],
+  ['Elite da Trivia', 'Acertou todas as questões difíceis da trivia.', 'trivia_completa', null, 'dificil'],
+  [
+    'Mestre da Trivia',
+    'Acertou todas as questões da trivia, nos três níveis.',
+    'trivia_completa',
+    null,
+    null,
+  ],
+  ['Rodada Perfeita', 'Acertou todas as questões de uma rodada de trivia.', 'rodada_perfeita', null, null],
+  ['Centena', 'Chegou a 100 pontos.', 'pontos', 100, null],
+  ['Pontuação de Elite', 'Chegou a 300 pontos.', 'pontos', 300, null],
+];
+
+// Popula a trivia só em banco vazio, numa transação. Badges: insere a cada subida os que faltam (por nome),
+// assim bancos já semeados também recebem os novos. Roda depois da importação das aulas,
 // para o badge "Primeiros Passos" apontar para a aula de menor ordem.
 async function semear() {
   const { rows } = await pool.query('SELECT EXISTS (SELECT 1 FROM questoes_trivia) AS tem_conteudo');
-  if (rows[0].tem_conteudo) return;
 
   await transacao(async (c) => {
-    for (const questao of TRIVIA_QUESTOES) {
-      await c.query(
-        `INSERT INTO questoes_trivia (dificuldade, ${COLUNAS_QUESTAO.join(', ')})
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [questao.dificuldade, ...valoresQuestao(questao)],
-      );
+    if (!rows[0].tem_conteudo) {
+      for (const questao of TRIVIA_QUESTOES) {
+        await c.query(
+          `INSERT INTO questoes_trivia (dificuldade, ${COLUNAS_QUESTAO.join(', ')})
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [questao.dificuldade, ...valoresQuestao(questao)],
+        );
+      }
+      logger.info('seed aplicado', { trivia: TRIVIA_QUESTOES.length });
     }
 
     await c.query(
       `INSERT INTO badges (nome, descricao, tipo_criterio, aula_id)
-       SELECT 'Primeiros Passos', 'Concluiu a primeira aula.', 'aula_concluida', id FROM aulas ORDER BY ordem LIMIT 1`,
+       SELECT 'Primeiros Passos', 'Concluiu a primeira aula.', 'aula_concluida', id FROM aulas
+       WHERE NOT EXISTS (SELECT 1 FROM badges WHERE nome = 'Primeiros Passos')
+       ORDER BY ordem LIMIT 1`,
     );
-    await c.query(
-      `INSERT INTO badges (nome, descricao, tipo_criterio) VALUES
-        ('Curioso da Trivia', 'Terminou sua primeira rodada de trivia.', 'primeira_trivia'),
-        ('Guardião de Dados', 'Concluiu todas as aulas.', 'todas_aulas')`,
-    );
+    for (const badge of BADGES) {
+      await c.query(
+        `INSERT INTO badges (nome, descricao, tipo_criterio, quantidade, dificuldade)
+         SELECT $1::varchar, $2::text, $3::varchar, $4::int, $5::varchar WHERE NOT EXISTS (SELECT 1 FROM badges WHERE nome = $1)`,
+        badge,
+      );
+    }
   });
-
-  logger.info('seed aplicado', { trivia: TRIVIA_QUESTOES.length });
 }
 
 module.exports = { semear };

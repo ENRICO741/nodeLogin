@@ -1,6 +1,16 @@
 const { describe, test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const { pool, prepararBanco, novoUsuario, novoAdmin, request, app } = require('../ajuda');
+const {
+  pool,
+  prepararBanco,
+  novoUsuario,
+  novoJogador,
+  concluirAulas,
+  novoAdmin,
+  request,
+  app,
+} = require('../ajuda');
+const { semear } = require('../../src/db/seed');
 
 before(prepararBanco);
 after(() => pool.end());
@@ -14,8 +24,9 @@ describe('GET /api/badges', () => {
     const u = await novoUsuario();
     const outro = await novoUsuario();
     const antes = (await u.api('get', '/api/badges').expect(200)).body;
-    assert.equal(antes.length, 3);
+    assert.equal(antes.length, 14);
     assert.ok(antes.every((b) => b.obtida_em === null));
+    await concluirAulas(u.usuario.id);
 
     const rodada = (await u.api('post', '/api/trivia/rodadas').send({ dificuldade: 'facil' })).body;
     await u.api('post', `/api/trivia/rodadas/${rodada.id}/finalizar`);
@@ -25,16 +36,51 @@ describe('GET /api/badges', () => {
   });
 
   test('badge desativado some da lista e deixa de ser concedido', async () => {
-    const u = await novoUsuario();
+    const u = await novoJogador();
     await pool.query("UPDATE badges SET ativo = false WHERE tipo_criterio = 'primeira_trivia'");
     try {
-      assert.equal((await u.api('get', '/api/badges')).body.length, 2);
+      assert.equal((await u.api('get', '/api/badges')).body.length, 13);
       const rodada = (await u.api('post', '/api/trivia/rodadas').send({ dificuldade: 'facil' })).body;
       const fim = (await u.api('post', `/api/trivia/rodadas/${rodada.id}/finalizar`)).body;
       assert.deepEqual(fim.novos_badges, []);
     } finally {
       await pool.query("UPDATE badges SET ativo = true WHERE tipo_criterio = 'primeira_trivia'");
     }
+  });
+
+  test('ordem fixa: aulas em escada, depois trivia por nível, depois pontos', async () => {
+    const u = await novoUsuario();
+    assert.deepEqual(
+      (await u.api('get', '/api/badges')).body.map((b) => b.nome),
+      [
+        'Primeiros Passos',
+        'Aprendiz Dedicado',
+        'Sentinela',
+        'Graduado',
+        'Aluno Nota 10',
+        'Curioso da Trivia',
+        'Frequentador da Trivia',
+        'Recruta da Trivia',
+        'Agente da Trivia',
+        'Elite da Trivia',
+        'Mestre da Trivia',
+        'Rodada Perfeita',
+        'Centena',
+        'Pontuação de Elite',
+      ],
+    );
+  });
+
+  test('seed recria só o badge que falta, sem mexer nos existentes', async () => {
+    const { rows: antes } = await pool.query("SELECT id FROM badges WHERE nome <> 'Centena' ORDER BY id");
+    await pool.query("DELETE FROM badges WHERE nome = 'Centena'");
+    await semear();
+    const { rows } = await pool.query("SELECT quantidade FROM badges WHERE nome = 'Centena'");
+    assert.deepEqual(rows, [{ quantidade: 100 }]);
+    assert.deepEqual(
+      (await pool.query("SELECT id FROM badges WHERE nome <> 'Centena' ORDER BY id")).rows,
+      antes,
+    );
   });
 
   test('exige login', async () => {
