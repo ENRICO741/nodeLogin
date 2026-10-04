@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { erroApi, renderizarApp, sequencia } from './utils';
+import { erroApi, renderizarApp, sequencia, USUARIO } from './utils';
 
 const questao = (id, extra = {}) => ({
   id,
@@ -14,10 +14,22 @@ const questao = (id, extra = {}) => ({
   alternativa_d: `${id}-D`,
   ...extra,
 });
+const aula = (id, ordem, titulo, extra = {}) => ({
+  id,
+  titulo,
+  ordem,
+  pontos_conclusao: 20,
+  total_questoes: 1,
+  concluida: false,
+  bloqueada: false,
+  ...extra,
+});
 const AULAS = [
-  { id: 'a1', titulo: 'Phishing', ordem: 1, pontos_conclusao: 20, total_questoes: 2, concluida: true },
-  { id: 'a2', titulo: 'Senhas fortes', ordem: 2, pontos_conclusao: 20, total_questoes: 1, concluida: false },
+  aula('a1', 1, 'Phishing', { total_questoes: 2, concluida: true }),
+  aula('a2', 2, 'Senhas fortes'),
+  aula('a3', 3, 'Celular', { bloqueada: true }),
 ];
+const AULAS_CONCLUIDAS = AULAS.map((a) => ({ ...a, concluida: true, bloqueada: false }));
 const AULA = {
   id: 'a1',
   titulo: 'Phishing',
@@ -41,7 +53,7 @@ const alternativa = (texto) => screen.getByRole('button', { name: new RegExp(`^$
 describe('Aulas', () => {
   it('lista as aulas com progresso, status e link', async () => {
     await renderizarApp('/aulas', { rotas: { 'GET /aulas': AULAS } });
-    expect(await screen.findByText('1 de 2 concluídas')).toBeInTheDocument();
+    expect(await screen.findByText('1 de 3 concluídas')).toBeInTheDocument();
     expect(screen.getByRole('progressbar', { name: 'Aulas concluídas' })).toHaveAttribute(
       'aria-valuenow',
       '1',
@@ -51,6 +63,14 @@ describe('Aulas', () => {
     expect(within(itens[1]).getByText(/1 pergunta ·/)).toBeInTheDocument();
     expect(within(itens[0]).getByText(/2 perguntas ·/)).toBeInTheDocument();
     expect(within(itens[1]).getByRole('link')).toHaveAttribute('href', '/aulas/a2');
+  });
+
+  it('aula bloqueada não tem link e diz qual concluir antes', async () => {
+    await renderizarApp('/aulas', { rotas: { 'GET /aulas': AULAS } });
+    const bloqueada = (await screen.findAllByRole('listitem'))[2];
+    expect(within(bloqueada).getByText('Conclua a aula 2 para continuar')).toBeInTheDocument();
+    expect(within(bloqueada).getByLabelText('Bloqueada')).toBeInTheDocument();
+    expect(within(bloqueada).queryByRole('link')).toBeNull();
   });
 
   it('sem aulas mostra estado vazio', async () => {
@@ -124,6 +144,8 @@ describe('Aula', () => {
     expect(screen.getByText('+30')).toBeInTheDocument();
     expect(screen.getByText('Primeiros Passos')).toBeInTheDocument();
     expect(screen.getByLabelText('70 pontos')).toBeInTheDocument();
+    // Trivia só abre ao fim da trilha: sem trivia_liberada, sem atalho para ela.
+    expect(screen.queryByRole('link', { name: 'Testar na trivia' })).toBeNull();
     expect(servidor.enviados('POST /visitas/v1/respostas')).toEqual([
       { questao_id: 'q1', alternativa: 'b' },
       { questao_id: 'q2', alternativa: 'a' },
@@ -173,6 +195,28 @@ describe('Aula', () => {
     expect(await screen.findByText('Resposta correta!')).toBeInTheDocument();
   });
 
+  it('ao concluir a última aula da trilha, o resultado oferece a trivia', async () => {
+    await renderizarApp('/aulas/a1', {
+      rotas: rotasAula({
+        'GET /aulas/a1': { ...AULA, questoes: [questao('q1')] },
+        'POST /visitas/v1/respostas': feedback(true),
+        'POST /visitas/v1/finalizar': {
+          acertos: 1,
+          total_questoes: 1,
+          pontos_questoes: 10,
+          bonus_conclusao: 20,
+          pontuacao_total: 80,
+          novos_badges: [],
+          trivia_liberada: true,
+        },
+      }),
+    });
+    await userEvent.click(await screen.findByRole('button', { name: 'Responder 1 pergunta' }));
+    await userEvent.click(alternativa('q1-B'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Concluir aula' }));
+    expect(await screen.findByRole('link', { name: 'Testar na trivia' })).toHaveAttribute('href', '/trivia');
+  });
+
   it('falha ao concluir mostra erro e mantém a última pergunta', async () => {
     await renderizarApp('/aulas/a1', {
       rotas: rotasAula({
@@ -186,6 +230,15 @@ describe('Aula', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Concluir aula' }));
     expect(await screen.findByText('Responda todas as questões')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Concluir aula' })).toBeInTheDocument();
+  });
+
+  it('aula bloqueada (403) mostra o aviso e o caminho de volta', async () => {
+    await renderizarApp('/aulas/a3', {
+      rotas: { 'GET /aulas/a3': erroApi(403, 'AULA_BLOQUEADA', 'Conclua a aula 2 para continuar') },
+    });
+    expect(await screen.findByText('Conclua a aula 2 para continuar')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Tentar de novo' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Ver aulas' })).toHaveAttribute('href', '/aulas');
   });
 
   it('aula inexistente mostra o erro', async () => {
@@ -207,7 +260,11 @@ const RODADA = {
 describe('Trivia', () => {
   it('escolher a dificuldade cria a rodada e abre as perguntas', async () => {
     const { servidor } = await renderizarApp('/trivia', {
-      rotas: { 'POST /trivia/rodadas': { status: 201, corpo: RODADA }, 'GET /trivia/rodadas/r1': RODADA },
+      rotas: {
+        'GET /aulas': AULAS_CONCLUIDAS,
+        'POST /trivia/rodadas': { status: 201, corpo: RODADA },
+        'GET /trivia/rodadas/r1': RODADA,
+      },
     });
     await userEvent.click(await screen.findByRole('button', { name: /Média/ }));
     expect(await screen.findByText('Pergunta t1?')).toBeInTheDocument();
@@ -218,12 +275,39 @@ describe('Trivia', () => {
   it('sem questões na dificuldade mostra o erro e reabilita as opções', async () => {
     await renderizarApp('/trivia', {
       rotas: {
+        'GET /aulas': AULAS_CONCLUIDAS,
         'POST /trivia/rodadas': erroApi(409, 'SEM_QUESTOES', 'Ainda não há questões para esta dificuldade'),
       },
     });
     await userEvent.click(await screen.findByRole('button', { name: /Difícil/ }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Ainda não há questões');
     expect(screen.getByRole('button', { name: /Difícil/ })).toBeEnabled();
+  });
+
+  it('sem concluir todas as aulas, não mostra as dificuldades e manda para as aulas', async () => {
+    const { servidor } = await renderizarApp('/trivia', { rotas: { 'GET /aulas': AULAS } });
+    expect(await screen.findByText('Conclua todas as aulas para liberar a trivia')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Fácil/ })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Ir para as aulas' })).toHaveAttribute('href', '/aulas');
+    expect(servidor.enviados('POST /trivia/rodadas')).toEqual([]);
+  });
+
+  it('admin vê as dificuldades mesmo sem concluir as aulas', async () => {
+    await renderizarApp('/trivia', {
+      usuario: { ...USUARIO, papel: 'admin' },
+      rotas: { 'GET /aulas': AULAS },
+    });
+    expect(await screen.findByRole('button', { name: /Fácil/ })).toBeInTheDocument();
+    expect(screen.queryByText('Conclua todas as aulas para liberar a trivia')).toBeNull();
+  });
+
+  it('erro ao checar as aulas permite tentar de novo', async () => {
+    await renderizarApp('/trivia', {
+      rotas: { 'GET /aulas': sequencia(erroApi(500, 'ERRO_INTERNO', 'Erro interno'), AULAS_CONCLUIDAS) },
+    });
+    expect(await screen.findByRole('alert')).toHaveTextContent('Erro interno');
+    await userEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
+    expect(await screen.findByRole('button', { name: /Fácil/ })).toBeInTheDocument();
   });
 });
 

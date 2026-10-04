@@ -38,11 +38,11 @@
   transition: border-color var(--transicao);
 }
 @media (hover: hover) {
-  .item:hover {
+  .item:not(.bloqueada):hover {
     border-color: var(--cor-primaria);
   }
-  .item:hover .seta,
-  .item:hover .titulo {
+  .item:not(.bloqueada):hover .seta,
+  .item:not(.bloqueada):hover .titulo {
     color: var(--cor-primaria);
   }
 }
@@ -87,6 +87,14 @@
   background: transparent;
   border: 1px solid currentColor;
   color: var(--cor-sucesso);
+}
+/* Aula ainda fechada: card apagado, cadeado no lugar da seta (o hover acima ignora este card). */
+.bloqueada,
+.bloqueada .numero {
+  color: var(--cor-texto-suave);
+}
+.bloqueada .titulo {
+  color: inherit;
 }
 .seta {
   flex-shrink: 0;

@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { BookOpen, CheckCircle2, ChevronRight } from 'lucide-react';
+import { BookOpen, CheckCircle2, ChevronRight, Lock } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
 import { Carregando, ErroCarregamento, Vazio } from '../componentes/Estado';
 import styles from './Aulas.module.css';
@@ -43,22 +43,35 @@ export function Aulas() {
           </div>
 
           <ol className={styles.lista}>
-            {aulas.map((aula) => (
+            {aulas.map((aula, i) => (
               <li key={aula.id}>
-                <Link to={`/aulas/${aula.id}`} className={`cartao ${styles.item}`}>
-                  <span className={styles.numero} aria-hidden="true">
-                    {aula.concluida ? <CheckCircle2 size={22} /> : aula.ordem}
-                  </span>
-                  <span className={styles.info}>
-                    <span className={styles.titulo}>{aula.titulo}</span>
-                    <span className={styles.meta}>
-                      {aula.total_questoes} {aula.total_questoes === 1 ? 'pergunta' : 'perguntas'} · bônus de{' '}
-                      {aula.pontos_conclusao} pts
+                {aula.bloqueada ? (
+                  <div className={`cartao ${styles.item} ${styles.bloqueada}`}>
+                    <span className={styles.numero} aria-hidden="true">
+                      {aula.ordem}
                     </span>
-                  </span>
-                  {aula.concluida && <span className="selo selo--sucesso">Concluída</span>}
-                  <ChevronRight aria-hidden="true" size={20} className={styles.seta} />
-                </Link>
+                    <span className={styles.info}>
+                      <span className={styles.titulo}>{aula.titulo}</span>
+                      <span className={styles.meta}>Conclua a aula {aulas[i - 1].ordem} para continuar</span>
+                    </span>
+                    <Lock aria-label="Bloqueada" size={20} className={styles.seta} />
+                  </div>
+                ) : (
+                  <Link to={`/aulas/${aula.id}`} className={`cartao ${styles.item}`}>
+                    <span className={styles.numero} aria-hidden="true">
+                      {aula.concluida ? <CheckCircle2 size={22} /> : aula.ordem}
+                    </span>
+                    <span className={styles.info}>
+                      <span className={styles.titulo}>{aula.titulo}</span>
+                      <span className={styles.meta}>
+                        {aula.total_questoes} {aula.total_questoes === 1 ? 'pergunta' : 'perguntas'} · bônus
+                        de {aula.pontos_conclusao} pts
+                      </span>
+                    </span>
+                    {aula.concluida && <span className="selo selo--sucesso">Concluída</span>}
+                    <ChevronRight aria-hidden="true" size={20} className={styles.seta} />
+                  </Link>
+                )}
               </li>
             ))}
           </ol>

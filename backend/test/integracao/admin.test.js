@@ -6,6 +6,7 @@ const {
   pool,
   prepararBanco,
   novoUsuario,
+  novoJogador,
   novoAdmin,
   tornarAdmin,
   autenticado,
@@ -161,7 +162,7 @@ describe('questões de aula', () => {
     assert.equal(editada.enunciado, q.enunciado);
 
     await admin.api('delete', `/api/admin/questoes-aula/${q.id}`).expect(204);
-    const u = await novoUsuario();
+    const u = await novoJogador();
     assert.deepEqual((await u.api('get', `/api/aulas/${aula.id}`)).body.questoes, []);
     await admin.api('patch', `/api/admin/questoes-aula/${q.id}`).send({ ativo: true }).expect(200);
     assert.equal((await u.api('get', `/api/aulas/${aula.id}`)).body.questoes.length, 1);
@@ -171,7 +172,7 @@ describe('questões de aula', () => {
     const aula = (await novaAula()).body;
     const q = (await admin.api('post', `/api/admin/aulas/${aula.id}/questoes`).send(questao())).body;
     await admin.api('patch', `/api/admin/questoes-aula/${q.id}`).send({ resposta_correta: 'd' });
-    const u = await novoUsuario();
+    const u = await novoJogador();
     const visita = (await u.api('post', `/api/aulas/${aula.id}/visitas`)).body;
     const r = (
       await u.api('post', `/api/visitas/${visita.id}/respostas`).send({ questao_id: q.id, alternativa: 'd' })
@@ -648,7 +649,18 @@ describe('GET /api/admin/estatisticas', () => {
     await u.api('post', `/api/visitas/${visita.id}/finalizar`);
     await u.api('post', `/api/aulas/${aula.id}/visitas`); // tentativa aberta
 
-    const rodada = (await u.api('post', '/api/trivia/rodadas').send({ dificuldade: 'media' })).body;
+    // A trivia exige a trilha inteira. Só a primeira aula fica ativa por um instante,
+    // para liberar a trivia sem criar visitas que mudariam as métricas.
+    const { rows: outras } = await pool.query(
+      'UPDATE aulas SET ativo = false WHERE ativo AND id <> $1 RETURNING id',
+      [aula.id],
+    );
+    let rodada;
+    try {
+      rodada = (await u.api('post', '/api/trivia/rodadas').send({ dificuldade: 'media' }).expect(201)).body;
+    } finally {
+      await pool.query('UPDATE aulas SET ativo = true WHERE id = ANY($1)', [outras.map((a) => a.id)]);
+    }
     await u
       .api('post', `/api/trivia/rodadas/${rodada.id}/respostas`)
       .send({ questao_id: rodada.questoes[0].id, alternativa: 'a' });

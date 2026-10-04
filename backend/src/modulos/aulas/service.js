@@ -1,13 +1,38 @@
 const { query, transacao } = require('../../db/pool');
-const { naoEncontrado, conflito } = require('../../lib/erros');
-const { creditarPontos, pontuacaoAtual, concederBadges } = require('../pontuacao');
+const { HttpError, naoEncontrado, conflito } = require('../../lib/erros');
+const { ehAdmin, creditarPontos, pontuacaoAtual, concederBadges } = require('../pontuacao');
+const { triviaLiberada } = require('../trivia/service');
+
+// Trilha em sequência: a aula só abre depois de concluída a anterior (aula ativa de ordem imediatamente menor).
+// Admin não fica preso à trilha.
+async function exigirLiberada(aulaId, usuarioId) {
+  const { rows } = await query(
+    `SELECT ant.ordem AS ordem_anterior, ant.concluida OR ${ehAdmin('$2')} AS anterior_concluida
+     FROM aulas a
+     LEFT JOIN LATERAL (
+       SELECT p.ordem, EXISTS (
+         SELECT 1 FROM aula_visitas v WHERE v.aula_id = p.id AND v.usuario_id = $2 AND v.concluida) AS concluida
+       FROM aulas p WHERE p.ativo AND p.ordem < a.ordem ORDER BY p.ordem DESC LIMIT 1
+     ) ant ON true
+     WHERE a.id = $1 AND a.ativo`,
+    [aulaId, usuarioId],
+  );
+  if (!rows[0]) throw naoEncontrado('Aula não encontrada');
+  const { ordem_anterior, anterior_concluida } = rows[0];
+  if (ordem_anterior !== null && !anterior_concluida) {
+    throw new HttpError(403, 'AULA_BLOQUEADA', `Conclua a aula ${ordem_anterior} para continuar`);
+  }
+}
 
 async function listar(usuarioId) {
   const { rows } = await query(
-    `SELECT a.id, a.titulo, a.ordem, a.pontos_conclusao,
-       (SELECT count(*)::int FROM questoes_aula q WHERE q.aula_id = a.id AND q.ativo) AS total_questoes,
-       EXISTS (SELECT 1 FROM aula_visitas v WHERE v.aula_id = a.id AND v.usuario_id = $1 AND v.concluida) AS concluida
-     FROM aulas a WHERE a.ativo ORDER BY a.ordem`,
+    `SELECT *, NOT (COALESCE(lag(concluida) OVER (ORDER BY ordem), true) OR ${ehAdmin('$1')}) AS bloqueada
+     FROM (
+       SELECT a.id, a.titulo, a.ordem, a.pontos_conclusao,
+         (SELECT count(*)::int FROM questoes_aula q WHERE q.aula_id = a.id AND q.ativo) AS total_questoes,
+         EXISTS (SELECT 1 FROM aula_visitas v WHERE v.aula_id = a.id AND v.usuario_id = $1 AND v.concluida) AS concluida
+       FROM aulas a WHERE a.ativo
+     ) lista ORDER BY ordem`,
     [usuarioId],
   );
   return rows;
@@ -15,6 +40,7 @@ async function listar(usuarioId) {
 
 // Nunca devolve `resposta_correta` nem `explicacao`: elas só aparecem depois da resposta.
 async function obter(aulaId, usuarioId) {
+  await exigirLiberada(aulaId, usuarioId);
   const { rows } = await query(
     `SELECT a.id, a.titulo, a.ordem, a.conteudo_html, a.pontos_conclusao,
        EXISTS (SELECT 1 FROM aula_visitas v WHERE v.aula_id = a.id AND v.usuario_id = $2 AND v.concluida) AS concluida,
@@ -34,6 +60,7 @@ async function obter(aulaId, usuarioId) {
 }
 
 async function iniciarVisita(aulaId, usuarioId) {
+  await exigirLiberada(aulaId, usuarioId);
   const { rows } = await query(
     `INSERT INTO aula_visitas (usuario_id, aula_id)
      SELECT $2, id FROM aulas WHERE id = $1 AND ativo
@@ -72,7 +99,7 @@ async function responder(visitaId, usuarioId, { questao_id, alternativa }) {
     const { rows: respostas } = await c.query(
       `INSERT INTO aula_respostas (visita_id, questao_id, usuario_id, correta, pontuou)
        VALUES ($1, $2, $3, $4, $4 AND NOT EXISTS (
-         SELECT 1 FROM aula_respostas WHERE usuario_id = $3 AND questao_id = $2 AND pontuou))
+         SELECT 1 FROM aula_respostas WHERE usuario_id = $3 AND questao_id = $2 AND pontuou) AND NOT ${ehAdmin('$3')})
        ON CONFLICT (visita_id, questao_id) DO NOTHING
        RETURNING pontuou`,
       [visitaId, questao_id, usuarioId, correta],
@@ -120,6 +147,7 @@ async function finalizar(visitaId, usuarioId) {
       `UPDATE aula_visitas SET finalizada_em = now(), concluida = true,
          pontos_conclusao_ganhos = NOT EXISTS (
            SELECT 1 FROM aula_visitas WHERE usuario_id = $2 AND aula_id = $3 AND pontos_conclusao_ganhos)
+           AND NOT ${ehAdmin('$2')}
        WHERE id = $1 RETURNING pontos_conclusao_ganhos`,
       [visitaId, usuarioId, visita.aula_id],
     );
@@ -139,6 +167,7 @@ async function finalizar(visitaId, usuarioId) {
         ? await creditarPontos(c, usuarioId, bonus, 'aula_conclusao', visita.aula_id)
         : await pontuacaoAtual(c, usuarioId),
       novos_badges: await concederBadges(c, usuarioId),
+      trivia_liberada: await triviaLiberada(c, usuarioId),
     };
   });
 }

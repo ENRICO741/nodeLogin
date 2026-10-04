@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import DOMPurify from 'dompurify';
-import { ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Lock } from 'lucide-react';
 import { api } from '../lib/api';
 import { registrarEvento } from '../lib/telemetria';
 import { useApi } from '../hooks/useApi';
 import { useQuiz } from '../hooks/useQuiz';
 import { useLeitura } from '../hooks/useLeitura';
 import { useAuth } from '../contexto/Auth';
-import { Aviso, Carregando, ErroCarregamento } from '../componentes/Estado';
+import { Aviso, Carregando, ErroCarregamento, Vazio } from '../componentes/Estado';
 import { QuestaoCard } from '../componentes/QuestaoCard';
 import { CardResultado } from '../componentes/CardResultado';
 import styles from './Aula.module.css';
@@ -72,6 +72,17 @@ export function Aula() {
   const concluirLeitura = useLeitura(id, Boolean(aula) && etapa === 'conteudo');
 
   if (carregando) return <Carregando texto="Carregando aula…" />;
+  if (erro?.codigo === 'AULA_BLOQUEADA') {
+    return (
+      <div className="pagina">
+        <Vazio icone={Lock} titulo={erro.message}>
+          <Link to="/aulas" className="botao">
+            Ver aulas
+          </Link>
+        </Vazio>
+      </div>
+    );
+  }
   if (erro) return <ErroCarregamento erro={erro} onTentarDeNovo={recarregar} />;
 
   async function iniciar() {
@@ -137,9 +148,11 @@ export function Aula() {
           <Link to="/aulas" className="botao botao--bloco">
             Ver outras aulas
           </Link>
-          <Link to="/trivia" className="botao botao--secundario botao--bloco">
-            Testar na trivia
-          </Link>
+          {resultado.trivia_liberada && (
+            <Link to="/trivia" className="botao botao--secundario botao--bloco">
+              Testar na trivia
+            </Link>
+          )}
         </CardResultado>
       )}
     </div>

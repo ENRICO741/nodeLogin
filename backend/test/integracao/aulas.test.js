@@ -1,6 +1,6 @@
 const { describe, test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const { pool, prepararBanco, novoUsuario, gabarito, errada } = require('../ajuda');
+const { pool, prepararBanco, novoUsuario, novoJogador, novoAdmin, gabarito, errada } = require('../ajuda');
 
 before(prepararBanco);
 after(() => pool.end());
@@ -81,6 +81,101 @@ describe('GET /api/aulas', () => {
   });
 });
 
+describe('trilha em sequência', () => {
+  test('lista marca bloqueada toda aula cuja anterior não foi concluída', async () => {
+    const u = await novoUsuario();
+    let aulas = (await u.api('get', '/api/aulas')).body;
+    assert.deepEqual(
+      aulas.map((a) => a.bloqueada),
+      aulas.map((_, i) => i > 0),
+    );
+    const { visita } = await responderAula(u, aulas[0].id);
+    await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200);
+    aulas = (await u.api('get', '/api/aulas')).body;
+    assert.deepEqual(
+      aulas.map((a) => a.bloqueada),
+      aulas.map((_, i) => i > 1),
+    );
+  });
+
+  test('aula bloqueada não abre nem inicia visita: 403 dizendo qual concluir', async () => {
+    const u = await novoUsuario();
+    const [, segunda, terceira] = (await u.api('get', '/api/aulas')).body;
+    for (const [metodo, url] of [
+      ['get', `/api/aulas/${segunda.id}`],
+      ['post', `/api/aulas/${segunda.id}/visitas`],
+    ]) {
+      const res = await u.api(metodo, url).expect(403);
+      assert.deepEqual(res.body.erro, {
+        codigo: 'AULA_BLOQUEADA',
+        mensagem: 'Conclua a aula 1 para continuar',
+      });
+    }
+    const res = await u.api('get', `/api/aulas/${terceira.id}`).expect(403);
+    assert.equal(res.body.erro.mensagem, 'Conclua a aula 2 para continuar');
+    const { rows } = await pool.query('SELECT count(*)::int AS n FROM aula_visitas WHERE usuario_id = $1', [
+      u.usuario.id,
+    ]);
+    assert.equal(rows[0].n, 0);
+  });
+
+  test('visita aberta sem concluir não libera a próxima; concluir libera', async () => {
+    const u = await novoUsuario();
+    const [primeira, segunda] = (await u.api('get', '/api/aulas')).body;
+    const { visita } = await responderAula(u, primeira.id);
+    await u.api('get', `/api/aulas/${segunda.id}`).expect(403);
+    await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200);
+    await u.api('get', `/api/aulas/${segunda.id}`).expect(200);
+    await u.api('post', `/api/aulas/${segunda.id}/visitas`).expect(201);
+  });
+
+  test('aula desativada sai da trilha: a seguinte passa a depender da anterior a ela', async () => {
+    const u = await novoUsuario();
+    const [primeira, segunda, terceira] = (await u.api('get', '/api/aulas')).body;
+    const { visita } = await responderAula(u, primeira.id);
+    await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200);
+    await pool.query('UPDATE aulas SET ativo = false WHERE id = $1', [segunda.id]);
+    try {
+      await u.api('get', `/api/aulas/${terceira.id}`).expect(200);
+      const aulas = (await u.api('get', '/api/aulas')).body;
+      assert.equal(aulas.find((a) => a.id === terceira.id).bloqueada, false);
+    } finally {
+      await pool.query('UPDATE aulas SET ativo = true WHERE id = $1', [segunda.id]);
+    }
+  });
+});
+
+describe('admin', () => {
+  test('vê a trilha toda liberada: abre e faz qualquer aula', async () => {
+    const admin = await novoAdmin();
+    const aulas = (await admin.api('get', '/api/aulas')).body;
+    assert.ok(aulas.every((a) => !a.bloqueada));
+    const ultima = aulas.at(-1);
+    await admin.api('get', `/api/aulas/${ultima.id}`).expect(200);
+    const visita = (await admin.api('post', `/api/aulas/${ultima.id}/visitas`).expect(201)).body;
+    await admin.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200);
+  });
+
+  test('acertar e concluir não dá pontos, bônus nem histórico', async () => {
+    const admin = await novoAdmin();
+    const aula = await primeiraAula(admin);
+    const { respostas, visita } = await responderAula(admin, aula.id);
+    assert.ok(respostas.every((r) => r.correta && r.pontos_ganhos === 0 && r.pontuacao_total === 0));
+    const fim = (await admin.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200)).body;
+    assert.deepEqual(
+      [fim.pontos_questoes, fim.bonus_conclusao, fim.pontuacao_total, fim.trivia_liberada],
+      [0, 0, 0, true],
+    );
+    const { rows } = await pool.query(
+      `SELECT (SELECT count(*)::int FROM pontuacao_historico WHERE usuario_id = $1) AS historico,
+         (SELECT count(*)::int FROM aula_respostas WHERE usuario_id = $1 AND pontuou) AS pontuadas,
+         (SELECT count(*)::int FROM aula_visitas WHERE usuario_id = $1 AND pontos_conclusao_ganhos) AS bonus`,
+      [admin.usuario.id],
+    );
+    assert.deepEqual(rows[0], { historico: 0, pontuadas: 0, bonus: 0 });
+  });
+});
+
 describe('GET /api/aulas/:id', () => {
   test('traz conteúdo e questões sem gabarito nem explicação', async () => {
     const u = await novoUsuario();
@@ -102,14 +197,17 @@ describe('GET /api/aulas/:id', () => {
   });
 
   test('aula desativada dá 404 e aula sem questões traz lista vazia', async () => {
-    const u = await novoUsuario();
+    const u = await novoJogador(); // as aulas novas vão para o fim da trilha
     const { rows } = await pool.query(
       "INSERT INTO aulas (titulo, ordem, conteudo_html, ativo) VALUES ('Vazia', 900, '<p>x</p>', true), ('Off', 901, '<p>x</p>', false) RETURNING id",
     );
-    const vazia = (await u.api('get', `/api/aulas/${rows[0].id}`).expect(200)).body;
-    assert.deepEqual(vazia.questoes, []);
-    await u.api('get', `/api/aulas/${rows[1].id}`).expect(404);
-    await pool.query('DELETE FROM aulas WHERE id = ANY($1)', [rows.map((r) => r.id)]);
+    try {
+      const vazia = (await u.api('get', `/api/aulas/${rows[0].id}`).expect(200)).body;
+      assert.deepEqual(vazia.questoes, []);
+      await u.api('get', `/api/aulas/${rows[1].id}`).expect(404);
+    } finally {
+      await pool.query('DELETE FROM aulas WHERE id = ANY($1)', [rows.map((r) => r.id)]);
+    }
   });
 });
 
@@ -179,7 +277,7 @@ describe('POST /api/visitas/:id/respostas', () => {
   });
 
   test('questão de outra aula, desativada ou inexistente dá 404', async () => {
-    const u = await novoUsuario();
+    const u = await novoJogador();
     const [a2, a1] = (await u.api('get', '/api/aulas')).body;
     const outra = (await u.api('get', `/api/aulas/${a2.id}`)).body.questoes[0];
     const visita = (await u.api('post', `/api/aulas/${a1.id}/visitas`)).body;
@@ -230,6 +328,7 @@ describe('POST /api/visitas/:id/finalizar', () => {
         bonus_conclusao: aula.pontos_conclusao,
         pontuacao_total: 10 + aula.pontos_conclusao,
         novos_badges: ['aula_concluida'],
+        trivia_liberada: false,
       },
     );
   });
@@ -255,15 +354,18 @@ describe('POST /api/visitas/:id/finalizar', () => {
   });
 
   test('aula sem questões pode ser concluída direto', async () => {
-    const u = await novoUsuario();
+    const u = await novoJogador();
     const { rows } = await pool.query(
       "INSERT INTO aulas (titulo, ordem, conteudo_html, pontos_conclusao) VALUES ('Só leitura', 950, '<p>x</p>', 5) RETURNING id",
     );
-    const visita = (await u.api('post', `/api/aulas/${rows[0].id}/visitas`)).body;
-    const fim = (await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200)).body;
-    assert.equal(fim.total_questoes, 0);
-    assert.equal(fim.bonus_conclusao, 5);
-    await pool.query('DELETE FROM aulas WHERE id = $1', [rows[0].id]);
+    try {
+      const visita = (await u.api('post', `/api/aulas/${rows[0].id}/visitas`)).body;
+      const fim = (await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200)).body;
+      assert.equal(fim.total_questoes, 0);
+      assert.equal(fim.bonus_conclusao, 5);
+    } finally {
+      await pool.query('DELETE FROM aulas WHERE id = $1', [rows[0].id]);
+    }
   });
 
   test('finalizar duas vezes dá 409 e responder depois de finalizar também', async () => {
@@ -303,14 +405,102 @@ describe('POST /api/visitas/:id/finalizar', () => {
     assert.equal(me.pontuacao_total, 20 + aula.pontos_conclusao);
   });
 
-  test('concluir todas as aulas concede o badge de especialista', async () => {
+  test('conquistas por quantidade de aulas: 5, 10 e Graduado em 15', async () => {
     const u = await novoUsuario();
     const aulas = (await u.api('get', '/api/aulas')).body;
-    let ultimos;
+    assert.equal(aulas.length, 15);
+    const ganhas = {};
+    for (const [i, aula] of aulas.entries()) {
+      // Concluir de novo a mesma aula não conta como outra.
+      if (i === 1) {
+        const { visita } = await responderAula(u, aulas[0].id);
+        await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200);
+      }
+      const { visita } = await responderAula(u, aula.id, () => false);
+      const fim = (await u.api('post', `/api/visitas/${visita.id}/finalizar`)).body;
+      for (const b of fim.novos_badges) ganhas[b.nome] = i + 1;
+      assert.equal(
+        fim.trivia_liberada,
+        i === aulas.length - 1,
+        `trivia liberada só na última (aula ${i + 1})`,
+      );
+    }
+    assert.deepEqual(
+      [ganhas['Primeiros Passos'], ganhas['Aprendiz Dedicado'], ganhas.Sentinela, ganhas.Graduado],
+      [1, 5, 10, 15],
+    );
+    assert.ok(!('Guardião de Dados' in ganhas));
+  });
+
+  test('aula desativada não conta para as conquistas por quantidade', async () => {
+    const u = await novoUsuario();
+    const aulas = (await u.api('get', '/api/aulas')).body.slice(0, 5);
     for (const aula of aulas) {
       const { visita } = await responderAula(u, aula.id);
-      ultimos = (await u.api('post', `/api/visitas/${visita.id}/finalizar`)).body.novos_badges;
+      await u.api('post', `/api/visitas/${visita.id}/finalizar`);
     }
-    assert.ok(ultimos.some((b) => b.tipo_criterio === 'todas_aulas'));
+    await pool.query('DELETE FROM usuario_badges WHERE usuario_id = $1', [u.usuario.id]);
+    await pool.query('UPDATE aulas SET ativo = false WHERE id = $1', [aulas[4].id]);
+    try {
+      const { visita } = await responderAula(u, aulas[0].id);
+      const fim = (await u.api('post', `/api/visitas/${visita.id}/finalizar`)).body;
+      assert.ok(!fim.novos_badges.some((b) => b.nome === 'Aprendiz Dedicado'));
+    } finally {
+      await pool.query('UPDATE aulas SET ativo = true WHERE id = $1', [aulas[4].id]);
+    }
+  });
+
+  test('visita aberta sem concluir não conta para as conquistas por quantidade', async () => {
+    const u = await novoUsuario();
+    const aulas = (await u.api('get', '/api/aulas')).body.slice(0, 5);
+    for (const aula of aulas.slice(0, 4)) {
+      const { visita } = await responderAula(u, aula.id);
+      await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200);
+    }
+    const aberta = (await responderAula(u, aulas[4].id)).visita;
+    const { visita } = await responderAula(u, aulas[0].id);
+    let fim = (await u.api('post', `/api/visitas/${visita.id}/finalizar`)).body;
+    assert.ok(!fim.novos_badges.some((b) => b.nome === 'Aprendiz Dedicado'));
+    fim = (await u.api('post', `/api/visitas/${aberta.id}/finalizar`)).body;
+    assert.deepEqual(
+      fim.novos_badges.map((b) => b.nome),
+      ['Aprendiz Dedicado'],
+    );
+  });
+
+  test('Aluno Nota 10: acertar todas as perguntas de todas as aulas, mesmo em outra visita', async () => {
+    const u = await novoUsuario();
+    const aula = await primeiraAula(u);
+    let { visita } = await responderAula(u, aula.id, (i) => i === 0);
+    let fim = (await u.api('post', `/api/visitas/${visita.id}/finalizar`)).body;
+    assert.ok(!fim.novos_badges.some((b) => b.tipo_criterio === 'aulas_gabaritadas'));
+
+    ({ visita } = await responderAula(u, aula.id, (i) => i === 1));
+    fim = (await u.api('post', `/api/visitas/${visita.id}/finalizar`)).body;
+    assert.deepEqual(
+      fim.novos_badges.map((b) => b.nome),
+      ['Aluno Nota 10'],
+    );
+  });
+
+  test('Aluno Nota 10 exige as perguntas das outras aulas também', async () => {
+    const u = await novoUsuario();
+    const outra = (await u.api('get', '/api/aulas')).body[1];
+    const { rows } = await pool.query(
+      "INSERT INTO questoes_aula (aula_id, enunciado, alternativa_a, alternativa_b, alternativa_c, alternativa_d, resposta_correta) VALUES ($1, 'Extra', 'a', 'b', 'c', 'd', 'a') RETURNING id",
+      [outra.id],
+    );
+    try {
+      let { visita } = await responderAula(u, (await primeiraAula(u)).id);
+      let fim = (await u.api('post', `/api/visitas/${visita.id}/finalizar`)).body;
+      assert.ok(!fim.novos_badges.some((b) => b.nome === 'Aluno Nota 10'));
+      // Questão desativada (remoção do admin) deixa de contar.
+      await pool.query('UPDATE questoes_aula SET ativo = false WHERE id = $1', [rows[0].id]);
+      ({ visita } = await responderAula(u, (await primeiraAula(u)).id));
+      fim = (await u.api('post', `/api/visitas/${visita.id}/finalizar`)).body;
+      assert.ok(fim.novos_badges.some((b) => b.nome === 'Aluno Nota 10'));
+    } finally {
+      await pool.query('DELETE FROM questoes_aula WHERE id = $1', [rows[0].id]);
+    }
   });
 });

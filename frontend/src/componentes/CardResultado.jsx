@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useLocation } from 'react-router';
 import { Award, PartyPopper } from 'lucide-react';
 import { registrarEvento } from '../lib/telemetria';
+import { useAuth } from '../contexto/Auth';
 import styles from './CardResultado.module.css';
 
 export function CardResultado({
@@ -14,6 +15,7 @@ export function CardResultado({
   children,
 }) {
   const { pathname } = useLocation();
+  const usuario = useAuth()?.usuario;
 
   // Exposição ao reforço da gamificação (pontos e conquistas mostrados ao terminar).
   useEffect(() => {
@@ -44,7 +46,11 @@ export function CardResultado({
         </div>
       </div>
       {pontosGanhos === 0 && (
-        <p className={styles.nota}>Cada questão e cada bônus de conclusão pontuam só na primeira vez.</p>
+        <p className={styles.nota}>
+          {usuario?.papel === 'admin'
+            ? 'Admin não pontua: a conta serve só para conferir o conteúdo.'
+            : 'Cada questão e cada bônus de conclusão pontuam só na primeira vez.'}
+        </p>
       )}
       {novosBadges.length > 0 && (
         <div className={styles.badges}>
