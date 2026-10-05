@@ -158,11 +158,14 @@ async function finalizar(visitaId, usuarioId) {
          count(*)::int AS total_questoes,
          count(r.id)::int AS respondidas,
          count(*) FILTER (WHERE r.correta)::int AS acertos,
-         COALESCE(sum(q.pontos) FILTER (WHERE r.pontuou), 0)::int AS pontos_questoes
+         -- O que de fato entrou no total nesta tentativa (histórico), não o valor atual da questão.
+         (SELECT COALESCE(sum(h.pontos), 0)::int FROM pontuacao_historico h
+          WHERE h.usuario_id = $3 AND h.origem = 'aula_questao' AND h.referencia_id IN (
+            SELECT questao_id FROM aula_respostas WHERE visita_id = $2 AND pontuou)) AS pontos_questoes
        FROM questoes_aula q
        LEFT JOIN aula_respostas r ON r.questao_id = q.id AND r.visita_id = $2
        WHERE q.aula_id = $1 AND q.ativo`,
-      [visita.aula_id, visitaId],
+      [visita.aula_id, visitaId, usuarioId],
     );
     if (!reenvio && resumo.respondidas < resumo.total_questoes) {
       throw conflito('QUESTOES_PENDENTES', 'Responda todas as questões antes de concluir a aula');
@@ -182,10 +185,17 @@ async function finalizar(visitaId, usuarioId) {
       ganhouBonus = rows[0].pontos_conclusao_ganhos;
     }
 
+    // Primeira conclusão: o bônus da aula, creditado logo abaixo. Reenvio: o que o histórico registrou.
     let bonus = 0;
     if (ganhouBonus) {
-      const { rows } = await c.query('SELECT pontos_conclusao FROM aulas WHERE id = $1', [visita.aula_id]);
-      bonus = rows[0].pontos_conclusao;
+      const { rows } = reenvio
+        ? await c.query(
+            `SELECT COALESCE(sum(pontos), 0)::int AS pontos FROM pontuacao_historico
+             WHERE usuario_id = $1 AND origem = 'aula_conclusao' AND referencia_id = $2`,
+            [usuarioId, visita.aula_id],
+          )
+        : await c.query('SELECT pontos_conclusao AS pontos FROM aulas WHERE id = $1', [visita.aula_id]);
+      bonus = rows[0].pontos;
     }
 
     return {

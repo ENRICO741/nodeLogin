@@ -544,6 +544,42 @@ describe('POST /api/visitas/:id/finalizar', () => {
     );
   });
 
+  test('resumo mostra o que foi creditado: editar os pontos entre responder e finalizar não muda nada', async () => {
+    const u = await novoUsuario();
+    const aula = await primeiraAula(u);
+    const { visita, respostas } = await responderAula(u, aula.id, (i) => i === 0);
+    assert.equal(respostas[0].pontos_ganhos, 10);
+    const ids = (await u.api('get', `/api/aulas/${aula.id}`)).body.questoes.map((q) => q.id);
+    await pool.query('UPDATE questoes_aula SET pontos = 99 WHERE id = ANY($1)', [ids]);
+    try {
+      const fim = (await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200)).body;
+      assert.deepEqual(
+        [fim.pontos_questoes, fim.bonus_conclusao, fim.pontuacao_total],
+        [10, aula.pontos_conclusao, 10 + aula.pontos_conclusao],
+      );
+      // Reenvio (retorno perdido) com o bônus da aula editado: continua o que foi creditado.
+      await pool.query('UPDATE aulas SET pontos_conclusao = 77 WHERE id = $1', [aula.id]);
+      const reenvio = (await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200)).body;
+      assert.deepEqual([reenvio.pontos_questoes, reenvio.bonus_conclusao], [10, aula.pontos_conclusao]);
+    } finally {
+      await pool.query('UPDATE questoes_aula SET pontos = 10 WHERE id = ANY($1)', [ids]);
+      await pool.query('UPDATE aulas SET pontos_conclusao = $2 WHERE id = $1', [
+        aula.id,
+        aula.pontos_conclusao,
+      ]);
+    }
+  });
+
+  test('refazer uma aula já pontuada mostra 0 no resumo (acertos contam, pontos não)', async () => {
+    const u = await novoUsuario();
+    const aula = await primeiraAula(u);
+    let { visita } = await responderAula(u, aula.id);
+    await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200);
+    ({ visita } = await responderAula(u, aula.id));
+    const fim = (await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200)).body;
+    assert.deepEqual([fim.acertos, fim.pontos_questoes, fim.bonus_conclusao], [2, 0, 0]);
+  });
+
   test('refazer a aula não paga bônus de novo', async () => {
     const u = await novoUsuario();
     const aula = await primeiraAula(u);
