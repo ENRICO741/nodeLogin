@@ -99,4 +99,25 @@ async function concederBadges(c, usuarioId) {
   return rows;
 }
 
-module.exports = { ehAdmin, travarUsuario, creditarPontos, pontosCreditados, pontuacaoAtual, concederBadges };
+// Conquistas gravadas no instante dado (fragmento SQL que usa $2 = `param`). O reenvio de uma finalização
+// devolve as da original: concederBadges as grava com o now() da mesma transação que marcou o fim.
+// A comparação fica no SQL: o Date do JS perderia os microssegundos.
+async function badgesObtidosEm(c, usuarioId, instante, param) {
+  const { rows } = await c.query(
+    `SELECT b.id, b.nome, b.descricao, b.imagem_url, b.tipo_criterio
+     FROM usuario_badges ub JOIN badges b ON b.id = ub.badge_id
+     WHERE ub.usuario_id = $1 AND ub.obtida_em = (${instante})`,
+    [usuarioId, param],
+  );
+  return rows;
+}
+
+module.exports = {
+  ehAdmin,
+  travarUsuario,
+  creditarPontos,
+  pontosCreditados,
+  pontuacaoAtual,
+  concederBadges,
+  badgesObtidosEm,
+};

@@ -609,6 +609,8 @@ describe('POST /api/visitas/:id/finalizar', () => {
     assert.equal(segunda.pontos_questoes, 0);
     assert.equal(segunda.pontuacao_total, primeira.pontuacao_total);
     assert.deepEqual(segunda.novos_badges, []);
+    // Reenvio de uma finalização que não deu conquista continua sem nenhuma.
+    assert.deepEqual((await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200)).body, segunda);
   });
 
   test('com questões pendentes dá 409', async () => {
@@ -650,7 +652,9 @@ describe('POST /api/visitas/:id/finalizar', () => {
     ]);
     const nHistorico = await historico();
     const segunda = (await u.api('post', url).expect(200)).body;
-    assert.deepEqual(segunda, { ...primeira, novos_badges: [] });
+    // Mesmas conquistas: se o retorno se perdeu, o aluno ainda vê "Nova conquista!".
+    assert.deepEqual(segunda, primeira);
+    assert.ok(primeira.novos_badges.length > 0);
     assert.equal(segunda.bonus_conclusao, aula.pontos_conclusao);
     assert.equal(segunda.pontuacao_total, 20 + aula.pontos_conclusao);
     assert.equal(await historico(), nHistorico);
@@ -705,7 +709,17 @@ describe('POST /api/visitas/:id/finalizar', () => {
       [200, 200, 200],
     );
     for (const x of r) assert.equal(x.body.pontuacao_total, 20 + aula.pontos_conclusao);
-    assert.equal(r.filter((x) => x.body.novos_badges.length > 0).length, 1, 'badges novos só na primeira');
+    // Todas trazem as conquistas da finalização que pagou; cada uma gravada uma vez só.
+    assert.ok(r[0].body.novos_badges.length > 0);
+    for (const x of r) assert.deepEqual(x.body.novos_badges, r[0].body.novos_badges);
+    const { rows } = await pool.query(
+      'SELECT count(*)::int AS linhas, count(DISTINCT badge_id)::int AS badges FROM usuario_badges WHERE usuario_id = $1',
+      [u.usuario.id],
+    );
+    assert.deepEqual(rows[0], {
+      linhas: r[0].body.novos_badges.length,
+      badges: r[0].body.novos_badges.length,
+    });
     const me = (await u.api('get', '/api/auth/me')).body;
     assert.equal(me.pontuacao_total, 20 + aula.pontos_conclusao);
   });

@@ -444,10 +444,10 @@ describe('POST /api/trivia/rodadas/:id/finalizar', () => {
       ['primeira_trivia'],
     );
 
-    // Reenvio da finalização (retorno perdido): mesmo resumo, sem badge repetido nem data nova.
+    // Reenvio da finalização (retorno perdido): mesmo resumo e mesmas conquistas, sem data nova.
     const { finalizada_em } = (await u.api('get', `/api/trivia/rodadas/${rodada.id}`)).body;
     const de_novo = (await u.api('post', `/api/trivia/rodadas/${rodada.id}/finalizar`).expect(200)).body;
-    assert.deepEqual(de_novo, { ...fim, novos_badges: [] });
+    assert.deepEqual(de_novo, fim);
     // Trocar a resposta de uma questão depois do fim: 409.
     const q1 = rodada.questoes[1];
     const trocada = await responder(u, rodada.id, q1.id, certas[q1.id]).expect(409);
@@ -494,7 +494,7 @@ describe('POST /api/trivia/rodadas/:id/finalizar', () => {
     assert.deepEqual(f2.novos_badges, []);
   });
 
-  test('finalizações paralelas: as duas recebem o resumo, o badge vem uma vez', async () => {
+  test('finalizações paralelas: as duas recebem o resumo e o badge, gravado uma vez', async () => {
     const u = await novoJogador();
     const rodada = (await novaRodada(u)).body;
     await completarRodada(u, rodada);
@@ -505,7 +505,16 @@ describe('POST /api/trivia/rodadas/:id/finalizar', () => {
       r.map((x) => x.status),
       [200, 200],
     );
-    assert.equal(r.flatMap((x) => x.body.novos_badges).length, 1);
+    assert.deepEqual(
+      r.map((x) => x.body.novos_badges.map((b) => b.tipo_criterio)),
+      [['primeira_trivia'], ['primeira_trivia']],
+    );
+    const { rows } = await pool.query(
+      `SELECT count(*)::int AS n FROM usuario_badges ub JOIN badges b ON b.id = ub.badge_id
+       WHERE ub.usuario_id = $1 AND b.tipo_criterio = 'primeira_trivia'`,
+      [u.usuario.id],
+    );
+    assert.equal(rows[0].n, 1);
   });
 
   test('rodada inexistente dá 404', async () => {
