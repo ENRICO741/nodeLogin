@@ -36,8 +36,10 @@ async function concederBadges(c, usuarioId) {
        WHERE b.ativo AND (
          (b.tipo_criterio = 'aula_concluida' AND EXISTS (
            SELECT 1 FROM aula_visitas v WHERE v.usuario_id = $1 AND v.aula_id = b.aula_id AND v.concluida))
+         -- Rodadas jogadas: finalizadas com pelo menos uma resposta (a API deixa finalizar uma rodada vazia).
          OR (b.tipo_criterio = 'primeira_trivia' AND EXISTS (
-           SELECT 1 FROM trivia_rodadas r WHERE r.usuario_id = $1 AND r.finalizada_em IS NOT NULL))
+           SELECT 1 FROM trivia_rodadas r WHERE r.usuario_id = $1 AND r.finalizada_em IS NOT NULL
+             AND EXISTS (SELECT 1 FROM trivia_respostas tr WHERE tr.rodada_id = r.id)))
          OR (b.tipo_criterio = 'aulas_concluidas' AND b.quantidade <= (
            SELECT count(DISTINCT v.aula_id) FROM aula_visitas v JOIN aulas a ON a.id = v.aula_id
            WHERE v.usuario_id = $1 AND v.concluida AND a.ativo))
@@ -49,7 +51,8 @@ async function concederBadges(c, usuarioId) {
              WHERE q.ativo AND a.ativo AND NOT EXISTS (
                SELECT 1 FROM aula_respostas r WHERE r.usuario_id = $1 AND r.questao_id = q.id AND r.correta)))
          OR (b.tipo_criterio = 'trivia_rodadas' AND b.quantidade <= (
-           SELECT count(*) FROM trivia_rodadas r WHERE r.usuario_id = $1 AND r.finalizada_em IS NOT NULL))
+           SELECT count(*) FROM trivia_rodadas r WHERE r.usuario_id = $1 AND r.finalizada_em IS NOT NULL
+             AND EXISTS (SELECT 1 FROM trivia_respostas tr WHERE tr.rodada_id = r.id)))
          -- Acertou, em alguma rodada, cada questão ativa do nível; sem nível, de todos.
          OR (b.tipo_criterio = 'trivia_completa'
            AND EXISTS (SELECT 1 FROM questoes_trivia q

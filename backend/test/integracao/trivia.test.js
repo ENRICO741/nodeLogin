@@ -307,20 +307,31 @@ describe('POST /api/trivia/rodadas/:id/finalizar', () => {
     assert.equal((await u.api('get', '/api/auth/me')).body.pontuacao_total, 5);
   });
 
-  test('pode finalizar sem responder nada; badge só vem uma vez', async () => {
+  test('pode finalizar sem responder nada, mas rodada vazia não dá conquista; badge só vem uma vez', async () => {
     const u = await novoJogador();
     const r1 = (await novaRodada(u)).body;
     const f1 = (await u.api('post', `/api/trivia/rodadas/${r1.id}/finalizar`).expect(200)).body;
     assert.equal(f1.acertos, 0);
-    assert.equal(f1.novos_badges.length, 1);
+    assert.deepEqual(f1.novos_badges, []);
+    // Uma resposta (mesmo errada) já conta como rodada jogada.
     const r2 = (await novaRodada(u)).body;
+    const certas = await gabarito('questoes_trivia', [r2.questoes[0].id]);
+    await responder(u, r2.id, r2.questoes[0].id, errada(certas[r2.questoes[0].id])).expect(200);
     const f2 = (await u.api('post', `/api/trivia/rodadas/${r2.id}/finalizar`).expect(200)).body;
-    assert.deepEqual(f2.novos_badges, []);
+    assert.deepEqual(
+      f2.novos_badges.map((b) => b.nome),
+      ['Curioso da Trivia'],
+    );
+    const r3 = (await novaRodada(u)).body;
+    await responder(u, r3.id, r3.questoes[0].id, 'a').expect(200);
+    const f3 = (await u.api('post', `/api/trivia/rodadas/${r3.id}/finalizar`).expect(200)).body;
+    assert.deepEqual(f3.novos_badges, []);
   });
 
   test('finalizações paralelas: as duas recebem o resumo, o badge vem uma vez', async () => {
     const u = await novoJogador();
     const rodada = (await novaRodada(u)).body;
+    await responder(u, rodada.id, rodada.questoes[0].id, 'a').expect(200);
     const r = await Promise.all(
       [1, 2].map(() => u.api('post', `/api/trivia/rodadas/${rodada.id}/finalizar`)),
     );
@@ -454,17 +465,39 @@ describe('conquistas da trivia', () => {
     }
   });
 
-  test('10 rodadas terminadas dão o Frequentador da Trivia', async () => {
+  test('10 rodadas terminadas (com resposta) dão o Frequentador da Trivia', async () => {
     const u = await novoJogador();
     let nomes = [];
     for (let i = 0; i < 10; i++) {
       assert.ok(!nomes.includes('Frequentador da Trivia'), `antes da rodada ${i + 1}`);
       const rodada = (await novaRodada(u)).body;
+      await responder(u, rodada.id, rodada.questoes[0].id, 'a').expect(200);
       nomes = (await u.api('post', `/api/trivia/rodadas/${rodada.id}/finalizar`)).body.novos_badges.map(
         (b) => b.nome,
       );
     }
     assert.ok(nomes.includes('Frequentador da Trivia'));
+  });
+
+  test('10 rodadas vazias (finalizadas sem responder) não dão Curioso nem Frequentador', async () => {
+    const u = await novoJogador();
+    for (let i = 0; i < 10; i++) {
+      const rodada = (await novaRodada(u)).body;
+      const fim = (await u.api('post', `/api/trivia/rodadas/${rodada.id}/finalizar`).expect(200)).body;
+      assert.deepEqual(fim.novos_badges, [], `rodada ${i + 1}`);
+    }
+    const { rows } = await pool.query(
+      `SELECT b.nome FROM usuario_badges ub JOIN badges b ON b.id = ub.badge_id
+       WHERE ub.usuario_id = $1 AND b.tipo_criterio IN ('primeira_trivia', 'trivia_rodadas')`,
+      [u.usuario.id],
+    );
+    assert.deepEqual(rows, []);
+    // A 11ª, jogada de verdade, dá só o Curioso: as vazias não contam para o Frequentador.
+    const rodada = (await novaRodada(u)).body;
+    await responder(u, rodada.id, rodada.questoes[0].id, 'a').expect(200);
+    const fim = (await u.api('post', `/api/trivia/rodadas/${rodada.id}/finalizar`)).body;
+    assert.ok(fim.novos_badges.some((b) => b.nome === 'Curioso da Trivia'));
+    assert.ok(!fim.novos_badges.some((b) => b.nome === 'Frequentador da Trivia'));
   });
 
   test('pontos acumulados dão Centena e Pontuação de Elite', async () => {
