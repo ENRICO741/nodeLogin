@@ -159,10 +159,14 @@ const BADGES = [
 // Popula a trivia só em banco vazio, numa transação. Badges: insere a cada subida os que faltam (por nome),
 // assim bancos já semeados também recebem os novos. Roda depois da importação das aulas,
 // para o badge "Primeiros Passos" apontar para a aula de menor ordem.
-async function semear() {
-  const { rows } = await pool.query('SELECT EXISTS (SELECT 1 FROM questoes_trivia) AS tem_conteudo');
+// Chave do lock: duas execuções ao mesmo tempo (npm run seed durante a subida da API) rodam uma depois da
+// outra, e a segunda já vê a trivia populada.
+const LOCK_SEED = 4_242_001;
 
+async function semear() {
   await transacao(async (c) => {
+    await c.query('SELECT pg_advisory_xact_lock($1)', [LOCK_SEED]);
+    const { rows } = await c.query('SELECT EXISTS (SELECT 1 FROM questoes_trivia) AS tem_conteudo');
     if (!rows[0].tem_conteudo) {
       for (const questao of TRIVIA_QUESTOES) {
         await c.query(
@@ -174,16 +178,17 @@ async function semear() {
       logger.info('seed aplicado', { trivia: TRIVIA_QUESTOES.length });
     }
 
+    // Nome único (badges_nome_uk, migration 007): a conquista que já existe fica como está.
     await c.query(
       `INSERT INTO badges (nome, descricao, tipo_criterio, aula_id)
        SELECT 'Primeiros Passos', 'Concluiu a primeira aula.', 'aula_concluida', id FROM aulas
-       WHERE NOT EXISTS (SELECT 1 FROM badges WHERE nome = 'Primeiros Passos')
-       ORDER BY ordem LIMIT 1`,
+       ORDER BY ordem LIMIT 1
+       ON CONFLICT (nome) DO NOTHING`,
     );
     for (const badge of BADGES) {
       await c.query(
         `INSERT INTO badges (nome, descricao, tipo_criterio, quantidade, dificuldade)
-         SELECT $1::varchar, $2::text, $3::varchar, $4::int, $5::varchar WHERE NOT EXISTS (SELECT 1 FROM badges WHERE nome = $1)`,
+         VALUES ($1, $2, $3, $4, $5) ON CONFLICT (nome) DO NOTHING`,
         badge,
       );
     }

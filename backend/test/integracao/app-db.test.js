@@ -190,6 +190,75 @@ describe('banco', () => {
     }
   });
 
+  test('dois seeds ao mesmo tempo em banco sem trivia não duplicam questões nem conquistas', async () => {
+    await pool.query('DELETE FROM questoes_trivia');
+    await pool.query("DELETE FROM badges WHERE nome IN ('Centena', 'Primeiros Passos')");
+    await Promise.all([semear(), semear(), semear()]);
+    const { rows } = await pool.query(
+      `SELECT (SELECT count(*)::int FROM questoes_trivia) AS trivia,
+              (SELECT count(*)::int FROM badges) AS badges,
+              (SELECT count(DISTINCT nome)::int FROM badges) AS nomes`,
+    );
+    assert.deepEqual(rows[0], { trivia: 10, badges: 14, nomes: 14 });
+  });
+
+  test('banco recusa conquista com nome repetido (badges_nome_uk)', async () => {
+    await assert.rejects(
+      pool.query(
+        "INSERT INTO badges (nome, descricao, tipo_criterio, quantidade) VALUES ('Centena', 'x', 'pontos', 1)",
+      ),
+      (erro) => erro.code === '23505' && erro.constraint === 'badges_nome_uk',
+    );
+  });
+
+  test('migration 007 com duplicatas já gravadas: fica a mais antiga e quem tinha a cópia não perde a conquista', async () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const sql = fs.readFileSync(
+      path.join(__dirname, '../../src/db/migrations/007_badges_nome_unico.sql'),
+      'utf8',
+    );
+    const [u1, u2] = [await novoUsuario(), await novoUsuario()];
+    const c = await pool.connect();
+    try {
+      await c.query('BEGIN');
+      // Volta ao estado de antes da 007 só dentro desta transação (desfeita no fim).
+      await c.query('DROP INDEX badges_nome_uk');
+      const {
+        rows: [original],
+      } = await c.query("SELECT id FROM badges WHERE nome = 'Centena'");
+      const {
+        rows: [copia],
+      } = await c.query(
+        "INSERT INTO badges (nome, descricao, tipo_criterio, quantidade, criado_em) VALUES ('Centena', 'Chegou a 100 pontos.', 'pontos', 100, now() + interval '1 hour') RETURNING id",
+      );
+      // u1 tem só a cópia; u2 tem as duas.
+      await c.query('INSERT INTO usuario_badges (usuario_id, badge_id) VALUES ($1, $3), ($2, $3), ($2, $4)', [
+        u1.usuario.id,
+        u2.usuario.id,
+        copia.id,
+        original.id,
+      ]);
+
+      await c.query(sql);
+
+      const { rows } = await c.query(
+        `SELECT ub.usuario_id, b.id FROM usuario_badges ub JOIN badges b ON b.id = ub.badge_id
+         WHERE b.nome = 'Centena' ORDER BY ub.usuario_id = $1 DESC`,
+        [u1.usuario.id],
+      );
+      assert.deepEqual(rows, [
+        { usuario_id: u1.usuario.id, id: original.id },
+        { usuario_id: u2.usuario.id, id: original.id },
+      ]);
+      const { rows: n } = await c.query("SELECT count(*)::int AS n FROM badges WHERE nome = 'Centena'");
+      assert.equal(n[0].n, 1);
+    } finally {
+      await c.query('ROLLBACK');
+      c.release();
+    }
+  });
+
   test('seed não duplica conteúdo se já existe aula', async () => {
     const contar = async () =>
       (
