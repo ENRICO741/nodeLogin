@@ -11,6 +11,7 @@ const {
   errada,
   completarRodada,
 } = require('../ajuda');
+const { concederBadges } = require('../../src/modulos/pontuacao');
 
 before(prepararBanco);
 after(() => pool.end());
@@ -663,24 +664,27 @@ describe('conquistas da trivia', () => {
     assert.ok(nomes.includes('Frequentador da Trivia'));
   });
 
-  test('10 rodadas abandonadas (finalizar vazia dá 409) não dão Curioso nem Frequentador', async () => {
+  test('rodadas finalizadas sem resposta não dão Curioso nem Frequentador', async () => {
     const u = await novoJogador();
-    for (let i = 0; i < 10; i++) {
-      const rodada = (await novaRodada(u)).body;
-      await u.api('post', `/api/trivia/rodadas/${rodada.id}/finalizar`).expect(409);
-    }
-    const { rows } = await pool.query(
-      `SELECT b.nome FROM usuario_badges ub JOIN badges b ON b.id = ub.badge_id
-       WHERE ub.usuario_id = $1 AND b.tipo_criterio IN ('primeira_trivia', 'trivia_rodadas')`,
-      [u.usuario.id],
-    );
-    assert.deepEqual(rows, []);
-    // A 11ª, jogada até o fim, dá só o Curioso: as abandonadas não contam para o Frequentador.
+    // A API já não finaliza rodada vazia (409): o critério dos badges é que tem de recusá-la.
+    const vazia = () =>
+      pool.query(
+        "INSERT INTO trivia_rodadas (usuario_id, dificuldade, finalizada_em) VALUES ($1, 'facil', now())",
+        [u.usuario.id],
+      );
+    const conceder = async () => (await concederBadges(pool, u.usuario.id)).map((b) => b.nome);
+    await vazia();
+    assert.deepEqual(await conceder(), [], 'uma vazia não dá o Curioso');
+    for (let i = 1; i < 10; i++) await vazia();
+    assert.deepEqual(await conceder(), [], 'dez vazias não dão o Frequentador');
+    // A 11ª, jogada até o fim, conta como a primeira: dá só o Curioso.
     const rodada = (await novaRodada(u)).body;
     await completarRodada(u, rodada);
-    const fim = (await u.api('post', `/api/trivia/rodadas/${rodada.id}/finalizar`)).body;
-    assert.ok(fim.novos_badges.some((b) => b.nome === 'Curioso da Trivia'));
-    assert.ok(!fim.novos_badges.some((b) => b.nome === 'Frequentador da Trivia'));
+    const fim = (await u.api('post', `/api/trivia/rodadas/${rodada.id}/finalizar`).expect(200)).body;
+    assert.deepEqual(
+      fim.novos_badges.map((b) => b.nome),
+      ['Curioso da Trivia'],
+    );
   });
 
   test('pontos acumulados dão Centena e Pontuação de Elite', async () => {
