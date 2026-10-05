@@ -7,7 +7,7 @@ const {
   pontosCreditados,
   pontuacaoAtual,
   concederBadges,
-  badgesObtidosEm,
+  badgesDaFinalizacao,
 } = require('../pontuacao');
 const { triviaLiberada } = require('../trivia/service');
 
@@ -223,14 +223,7 @@ async function finalizar(visitaId, usuarioId) {
       // Reenvio: também as conquistas da finalização original, cujo retorno pode ter se perdido.
       // Sempre depois de creditar, para o critério de pontos ver o total novo.
       novos_badges: [
-        ...(reenvio
-          ? await badgesObtidosEm(
-              c,
-              usuarioId,
-              'SELECT finalizada_em FROM aula_visitas WHERE id = $2',
-              visitaId,
-            )
-          : []),
+        ...(reenvio ? await badgesDaFinalizacao(c, usuarioId, 'aula', visitaId) : []),
         ...(await concederBadges(c, usuarioId)),
       ],
       trivia_liberada: await triviaLiberada(c, usuarioId),

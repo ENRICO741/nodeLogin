@@ -53,7 +53,7 @@ async function concederBadges(c, usuarioId) {
        WHERE b.ativo AND (
          (b.tipo_criterio = 'aula_concluida' AND EXISTS (
            SELECT 1 FROM aula_visitas v WHERE v.usuario_id = $1 AND v.aula_id = b.aula_id AND v.concluida))
-         -- Rodadas jogadas: finalizadas com pelo menos uma resposta (a API deixa finalizar uma rodada vazia).
+         -- Rodadas jogadas: finalizadas com pelo menos uma resposta (defesa: a API já não finaliza rodada vazia).
          OR (b.tipo_criterio = 'primeira_trivia' AND EXISTS (
            SELECT 1 FROM trivia_rodadas r WHERE r.usuario_id = $1 AND r.finalizada_em IS NOT NULL
              AND EXISTS (SELECT 1 FROM trivia_respostas tr WHERE tr.rodada_id = r.id)))
@@ -93,21 +93,27 @@ async function concederBadges(c, usuarioId) {
        ON CONFLICT (usuario_id, badge_id) DO NOTHING
        RETURNING badge_id
      )
-     SELECT b.id, b.nome, b.descricao, b.imagem_url, b.tipo_criterio FROM badges b JOIN novos n ON n.badge_id = b.id`,
+     SELECT b.id, b.nome, b.descricao, b.imagem_url, b.tipo_criterio FROM badges b JOIN novos n ON n.badge_id = b.id
+     ORDER BY b.id`,
     [usuarioId],
   );
   return rows;
 }
 
-// Conquistas gravadas no instante dado (fragmento SQL que usa $2 = `param`). O reenvio de uma finalização
-// devolve as da original: concederBadges as grava com o now() da mesma transação que marcou o fim.
-// A comparação fica no SQL: o Date do JS perderia os microssegundos.
-async function badgesObtidosEm(c, usuarioId, instante, param) {
+const FINALIZADA_EM = {
+  aula: 'SELECT finalizada_em FROM aula_visitas WHERE id = $2',
+  trivia: 'SELECT finalizada_em FROM trivia_rodadas WHERE id = $2',
+};
+
+// Conquistas da finalização original de uma visita ou rodada, para o reenvio: concederBadges as grava com
+// o now() da mesma transação que marcou o fim. A comparação fica no SQL: o Date do JS perderia os microssegundos.
+async function badgesDaFinalizacao(c, usuarioId, tipo, id) {
   const { rows } = await c.query(
     `SELECT b.id, b.nome, b.descricao, b.imagem_url, b.tipo_criterio
      FROM usuario_badges ub JOIN badges b ON b.id = ub.badge_id
-     WHERE ub.usuario_id = $1 AND ub.obtida_em = (${instante})`,
-    [usuarioId, param],
+     WHERE ub.usuario_id = $1 AND ub.obtida_em = (${FINALIZADA_EM[tipo]})
+     ORDER BY b.id`,
+    [usuarioId, id],
   );
   return rows;
 }
@@ -119,5 +125,5 @@ module.exports = {
   pontosCreditados,
   pontuacaoAtual,
   concederBadges,
-  badgesObtidosEm,
+  badgesDaFinalizacao,
 };

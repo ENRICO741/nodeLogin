@@ -7,7 +7,7 @@ const {
   pontosCreditados,
   pontuacaoAtual,
   concederBadges,
-  badgesObtidosEm,
+  badgesDaFinalizacao,
 } = require('../pontuacao');
 
 async function obterRodada(c, rodadaId, usuarioId) {
@@ -189,14 +189,7 @@ async function finalizar(rodadaId, usuarioId) {
       pontuacao_total: await pontuacaoAtual(c, usuarioId),
       // Reenvio: também as conquistas da finalização original, cujo retorno pode ter se perdido.
       novos_badges: [
-        ...(rodada.finalizada_em
-          ? await badgesObtidosEm(
-              c,
-              usuarioId,
-              'SELECT finalizada_em FROM trivia_rodadas WHERE id = $2',
-              rodadaId,
-            )
-          : []),
+        ...(rodada.finalizada_em ? await badgesDaFinalizacao(c, usuarioId, 'trivia', rodadaId) : []),
         ...(await concederBadges(c, usuarioId)),
       ],
     };
