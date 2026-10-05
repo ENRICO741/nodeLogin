@@ -45,12 +45,19 @@ export function CardResultado({
           <span className={styles.rotulo}>pontuação total</span>
         </div>
       </div>
-      {pontosGanhos === 0 && (
+      {usuario?.papel === 'admin' ? (
         <p className={styles.nota}>
-          {usuario?.papel === 'admin'
-            ? 'Admin não pontua: a conta serve só para conferir o conteúdo.'
-            : 'Cada questão e cada bônus de conclusão pontuam só na primeira vez.'}
+          Conta de admin: os pontos não contam e as conquistas aparecem só para conferência.
         </p>
+      ) : (
+        pontosGanhos === 0 && (
+          <p className={styles.nota}>
+            {/* Bônus de conclusão só existe nas aulas, não na trivia. */}
+            {pathname.startsWith('/aulas')
+              ? 'Cada pergunta pontua só no primeiro acerto, e o bônus de conclusão só na primeira vez.'
+              : 'Cada pergunta pontua só no primeiro acerto.'}
+          </p>
+        )
       )}
       {novosBadges.length > 0 && (
         <div className={styles.badges}>

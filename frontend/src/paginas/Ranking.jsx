@@ -17,7 +17,7 @@ export function Ranking() {
     <div className="pagina">
       <header className="cabecalho-pagina">
         <h1>Ranking</h1>
-        <p>Quem mais aprendeu. Só o apelido aparece aqui.</p>
+        <p>Os 20 alunos com mais pontos. Acerte perguntas nas aulas e na trivia para subir.</p>
       </header>
 
       {minhaPosicao && (

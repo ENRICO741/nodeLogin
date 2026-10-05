@@ -28,6 +28,9 @@ describe('Ranking', () => {
       },
     });
     expect(await screen.findByText('3º', { selector: 'span[class*=minhaPosicao]' })).toBeInTheDocument();
+    expect(
+      screen.getByText('Os 20 alunos com mais pontos. Acerte perguntas nas aulas e na trivia para subir.'),
+    ).toBeInTheDocument();
     const linhas = screen.getAllByRole('listitem');
     expect(linhas).toHaveLength(4);
     expect(within(linhas[2]).getByText('você')).toBeInTheDocument();

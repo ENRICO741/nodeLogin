@@ -11,6 +11,8 @@ import { CardResultado } from '../componentes/CardResultado';
 import { ErrorBoundary } from '../componentes/ErrorBoundary';
 import { AvisoAtualizacao } from '../componentes/AvisoAtualizacao';
 import { QuestaoCard } from '../componentes/QuestaoCard';
+import { AuthProvider } from '../contexto/Auth';
+import { ADMIN, servidorFalso } from './utils';
 
 describe('Campo', () => {
   it('input com label associado', () => {
@@ -255,19 +257,51 @@ describe('CardResultado', () => {
     expect(screen.getByRole('heading', { name: 'Fim!' })).toBeInTheDocument();
     expect(screen.getByText(/Você acertou/)).toHaveTextContent('Você acertou 2 de 3');
     expect(screen.getByText('+25')).toBeInTheDocument();
-    expect(screen.queryByText(/pontuam só na primeira vez/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/primeiro acerto/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'continuar' })).toBeInTheDocument();
   });
 
-  it('zero pontos explica a regra; badges novos aparecem', () => {
+  it('zero pontos na aula: primeiro acerto e bônus de conclusão; badges novos aparecem', () => {
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={['/aulas/a1']}>
         <CardResultado {...base} pontosGanhos={0} novosBadges={[{ id: 'b1', nome: 'Primeiros Passos' }]} />
       </MemoryRouter>,
     );
-    expect(screen.getByText(/pontuam só na primeira vez/)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Cada pergunta pontua só no primeiro acerto, e o bônus de conclusão só na primeira vez.',
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByText('Nova conquista!')).toBeInTheDocument();
     expect(screen.getByText('Primeiros Passos')).toBeInTheDocument();
+  });
+
+  it('zero pontos na trivia: só o primeiro acerto, sem falar em bônus', () => {
+    render(
+      <MemoryRouter initialEntries={['/trivia/r1']}>
+        <CardResultado {...base} pontosGanhos={0} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('Cada pergunta pontua só no primeiro acerto.')).toBeInTheDocument();
+    expect(screen.queryByText(/bônus/)).not.toBeInTheDocument();
+  });
+
+  it('admin vê o aviso de conta de admin (e nunca a regra de pontos)', async () => {
+    localStorage.setItem('guardiao.token', 'token-teste');
+    servidorFalso({ 'GET /auth/me': ADMIN });
+    render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={['/aulas/a1']}>
+          <CardResultado {...base} pontosGanhos={0} />
+        </MemoryRouter>
+      </AuthProvider>,
+    );
+    expect(
+      await screen.findByText(
+        'Conta de admin: os pontos não contam e as conquistas aparecem só para conferência.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/primeiro acerto/)).not.toBeInTheDocument();
   });
 });
 
