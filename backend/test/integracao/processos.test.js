@@ -281,14 +281,17 @@ describe('rate limit (desligado em teste, ligado aqui com NODE_ENV=development)'
 
   test('esqueci-senha: estourado o limite do e-mail, responde o mesmo 200 sem enviar (terceiro não trava a vítima)', async () => {
     const u = await novoUsuario();
+    const misturada = [...u.email].map((c, i) => (i % 2 ? c.toUpperCase() : c)).join('');
     const { saida } = await rodarComLimite(`
       const mailer = require('./src/lib/mailer');
       let enviados = 0;
       mailer.enviarEmail = async () => { enviados++; };
       const respostas = [];
+      // Grafias diferentes do mesmo e-mail somam no mesmo contador.
+      const grafias = ['${u.email}', '${u.email.toUpperCase()}', '${misturada}', '${u.email}'];
       for (let i = 0; i < 4; i++) {
         const res = await request(app).post('/api/auth/esqueci-senha')
-          .set('X-Forwarded-For', '10.0.0.' + (i + 10)).send({ email: '${u.email.toUpperCase()}' });
+          .set('X-Forwarded-For', '10.0.0.' + (i + 10)).send({ email: grafias[i] });
         respostas.push([res.status, res.body.mensagem]);
       }
       // Espaços nas pontas não abrem cota nova: o zod recusa (400), e nada é enviado.
@@ -306,11 +309,13 @@ describe('rate limit (desligado em teste, ligado aqui com NODE_ENV=development)'
     );
     assert.equal(new Set(respostas.map(([, mensagem]) => mensagem)).size, 1, 'mesma mensagem genérica');
     assert.equal(enviados, 3);
+    // Total de tokens, não só os válidos: cada pedido invalida o anterior, então um 4º token (sem
+    // e-mail) também deixaria só 1 válido, mas mataria o último link enviado.
     const { rows } = await pool.query(
-      'SELECT count(*)::int AS n FROM tokens_recuperacao_senha WHERE usuario_id = $1 AND NOT usado',
+      'SELECT count(*)::int AS n FROM tokens_recuperacao_senha WHERE usuario_id = $1',
       [u.usuario.id],
     );
-    assert.equal(rows[0].n, 1, 'o 4º pedido não invalidou o último link enviado');
+    assert.equal(rows[0].n, 3, 'o 4º pedido não gerou token (nem invalidou o último link enviado)');
     assert.equal(comEspaco, 400);
     assert.equal(semEmail, 400, 'corpo sem e-mail passa pelo limite e cai na validação');
   });
