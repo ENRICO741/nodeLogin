@@ -49,7 +49,14 @@ describe('tokenSalvo', () => {
   });
 
   it('com localStorage funcionando, ele é a fonte (memória não ressuscita token limpo em outra aba)', () => {
+    // Uma falha antes deixa o token antigo em memória; o definir com sucesso tem de apagá-lo.
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementationOnce(() => {
+      throw new Error('cota');
+    });
+    tokenSalvo.definir('antigo');
+    setItem.mockRestore();
     tokenSalvo.definir('z');
+    expect(localStorage.getItem('guardiao.token')).toBe('z');
     localStorage.removeItem('guardiao.token');
     expect(tokenSalvo.obter()).toBeNull();
   });
