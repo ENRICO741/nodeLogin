@@ -58,18 +58,19 @@ async function criarRodada(usuarioId, { dificuldade, limite }) {
   });
 }
 
+// Não recusa a rodada finalizada: o reenvio de uma resposta ou da finalização ainda é atendido.
 async function travarRodada(c, rodadaId, usuarioId) {
   const { rows } = await c.query(
     'SELECT id, finalizada_em FROM trivia_rodadas WHERE id = $1 AND usuario_id = $2 FOR UPDATE',
     [rodadaId, usuarioId],
   );
   if (!rows[0]) throw naoEncontrado('Rodada não encontrada');
-  if (rows[0].finalizada_em) throw conflito('RODADA_FINALIZADA', 'Esta rodada já foi finalizada');
+  return rows[0];
 }
 
 async function responder(rodadaId, usuarioId, { questao_id, alternativa }) {
   return transacao(async (c) => {
-    await travarRodada(c, rodadaId, usuarioId);
+    const rodada = await travarRodada(c, rodadaId, usuarioId);
 
     const { rows: questoes } = await c.query(
       `SELECT q.resposta_correta, q.explicacao, q.pontos
@@ -79,48 +80,71 @@ async function responder(rodadaId, usuarioId, { questao_id, alternativa }) {
     );
     const questao = questoes[0];
     if (!questao) throw naoEncontrado('Questão não pertence a esta rodada');
+    const resultado = (correta, pontuou, pontuacao_total) => ({
+      correta,
+      resposta_correta: questao.resposta_correta,
+      explicacao: questao.explicacao,
+      pontos_ganhos: pontuou ? questao.pontos : 0,
+      pontuacao_total,
+    });
+
+    // Reenvio (a resposta foi gravada mas o retorno se perdeu): a mesma alternativa devolve o resultado
+    // gravado, sem pontuar de novo. Outra alternativa não troca a resposta.
+    const {
+      rows: [anterior],
+    } = await c.query(
+      'SELECT alternativa, correta, pontuou FROM trivia_respostas WHERE rodada_id = $1 AND questao_id = $2',
+      [rodadaId, questao_id],
+    );
+    if (anterior) {
+      if (anterior.alternativa !== alternativa) {
+        throw conflito('JA_RESPONDIDA', 'Questão já respondida nesta rodada');
+      }
+      return resultado(anterior.correta, anterior.pontuou, await pontuacaoAtual(c, usuarioId));
+    }
+    if (rodada.finalizada_em) throw conflito('RODADA_FINALIZADA', 'Esta rodada já foi finalizada');
 
     const correta = questao.resposta_correta === alternativa;
     // Anti-farm: cada questão pontua só no primeiro acerto do usuário, em qualquer rodada.
-    const { rows: respostas } = await c.query(
-      `INSERT INTO trivia_respostas (rodada_id, questao_id, usuario_id, correta, pontuou)
-       VALUES ($1, $2, $3, $4, $4 AND NOT EXISTS (
+    const {
+      rows: [{ pontuou }],
+    } = await c.query(
+      `INSERT INTO trivia_respostas (rodada_id, questao_id, usuario_id, alternativa, correta, pontuou)
+       VALUES ($1, $2, $3, $4, $5, $5 AND NOT EXISTS (
          SELECT 1 FROM trivia_respostas WHERE usuario_id = $3 AND questao_id = $2 AND pontuou) AND NOT ${ehAdmin('$3')})
-       ON CONFLICT (rodada_id, questao_id) DO NOTHING
        RETURNING pontuou`,
-      [rodadaId, questao_id, usuarioId, correta],
+      [rodadaId, questao_id, usuarioId, alternativa, correta],
     );
-    if (!respostas[0]) throw conflito('JA_RESPONDIDA', 'Questão já respondida nesta rodada');
-
-    const pontuou = respostas[0].pontuou;
     if (pontuou) {
       await c.query('UPDATE trivia_rodadas SET pontos_ganhos = pontos_ganhos + $2 WHERE id = $1', [
         rodadaId,
         questao.pontos,
       ]);
     }
-    return {
+    return resultado(
       correta,
-      resposta_correta: questao.resposta_correta,
-      explicacao: questao.explicacao,
-      pontos_ganhos: pontuou ? questao.pontos : 0,
-      pontuacao_total: pontuou
+      pontuou,
+      pontuou
         ? await creditarPontos(c, usuarioId, questao.pontos, 'trivia_questao', questao_id)
         : await pontuacaoAtual(c, usuarioId),
-    };
+    );
   });
 }
 
 async function finalizar(rodadaId, usuarioId) {
   return transacao(async (c) => {
-    await travarRodada(c, rodadaId, usuarioId);
+    const rodada = await travarRodada(c, rodadaId, usuarioId);
+    // Reenvio (o retorno da primeira finalização se perdeu): devolve o mesmo resumo, sem mudar a data de fim.
+    if (!rodada.finalizada_em) {
+      await c.query('UPDATE trivia_rodadas SET finalizada_em = now() WHERE id = $1', [rodadaId]);
+    }
     const {
       rows: [resumo],
     } = await c.query(
-      `UPDATE trivia_rodadas r SET finalizada_em = now() WHERE r.id = $1
-       RETURNING r.pontos_ganhos,
+      `SELECT r.pontos_ganhos,
          (SELECT count(*)::int FROM trivia_rodada_questoes WHERE rodada_id = $1) AS total_questoes,
-         (SELECT count(*) FILTER (WHERE correta)::int FROM trivia_respostas WHERE rodada_id = $1) AS acertos`,
+         (SELECT count(*) FILTER (WHERE correta)::int FROM trivia_respostas WHERE rodada_id = $1) AS acertos
+       FROM trivia_rodadas r WHERE r.id = $1`,
       [rodadaId],
     );
     return {

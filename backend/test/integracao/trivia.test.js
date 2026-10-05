@@ -206,12 +206,34 @@ describe('POST /api/trivia/rodadas/:id/respostas', () => {
     await responder(u, rodada.id, UUID_INEXISTENTE, 'a').expect(404);
   });
 
-  test('mesma questão duas vezes na rodada dá 409', async () => {
+  test('mesma questão com outra alternativa dá 409', async () => {
     const u = await novoJogador();
     const rodada = (await novaRodada(u)).body;
     await responder(u, rodada.id, rodada.questoes[0].id, 'a').expect(200);
     const res = await responder(u, rodada.id, rodada.questoes[0].id, 'b').expect(409);
     assert.equal(res.body.erro.codigo, 'JA_RESPONDIDA');
+  });
+
+  test('reenvio da mesma alternativa (retorno perdido) devolve o mesmo resultado sem pontuar de novo', async () => {
+    const u = await novoJogador();
+    const rodada = (await novaRodada(u)).body;
+    const q = rodada.questoes[0];
+    const certas = await gabarito('questoes_trivia', [q.id]);
+    const primeira = (await responder(u, rodada.id, q.id, certas[q.id]).expect(200)).body;
+    assert.equal(primeira.pontos_ganhos, 5);
+    const historico = async () =>
+      (
+        await pool.query('SELECT count(*)::int AS n FROM pontuacao_historico WHERE usuario_id = $1', [
+          u.usuario.id,
+        ])
+      ).rows[0].n;
+    const antes = await historico();
+    const r = await Promise.all([1, 2].map(() => responder(u, rodada.id, q.id, certas[q.id])));
+    for (const x of r) assert.deepEqual([x.status, x.body], [200, primeira]);
+    assert.equal(await historico(), antes);
+    const { rows } = await pool.query('SELECT pontos_ganhos FROM trivia_rodadas WHERE id = $1', [rodada.id]);
+    assert.equal(rows[0].pontos_ganhos, 5);
+    assert.equal((await u.api('get', '/api/auth/me')).body.pontuacao_total, 5);
   });
 
   test('anti-farm: acertar de novo a mesma questão em outra rodada não pontua', async () => {
@@ -270,11 +292,19 @@ describe('POST /api/trivia/rodadas/:id/finalizar', () => {
       ['primeira_trivia'],
     );
 
-    const res = await u.api('post', `/api/trivia/rodadas/${rodada.id}/finalizar`).expect(409);
+    // Reenvio da finalização (retorno perdido): mesmo resumo, sem badge repetido nem data nova.
+    const { finalizada_em } = (await u.api('get', `/api/trivia/rodadas/${rodada.id}`)).body;
+    const de_novo = (await u.api('post', `/api/trivia/rodadas/${rodada.id}/finalizar`).expect(200)).body;
+    assert.deepEqual(de_novo, { ...fim, novos_badges: [] });
+    // Questão não respondida antes do fim continua recusada.
+    const res = await responder(u, rodada.id, rodada.questoes[1].id, 'a').expect(409);
     assert.equal(res.body.erro.codigo, 'RODADA_FINALIZADA');
-    await responder(u, rodada.id, rodada.questoes[1].id, 'a').expect(409);
+    // A já respondida, reenviada igual, devolve o resultado gravado.
+    const q = rodada.questoes[0];
+    assert.equal((await responder(u, rodada.id, q.id, certas[q.id]).expect(200)).body.pontos_ganhos, 5);
     const vista = (await u.api('get', `/api/trivia/rodadas/${rodada.id}`)).body;
-    assert.ok(vista.finalizada_em);
+    assert.equal(vista.finalizada_em, finalizada_em);
+    assert.equal((await u.api('get', '/api/auth/me')).body.pontuacao_total, 5);
   });
 
   test('pode finalizar sem responder nada; badge só vem uma vez', async () => {
@@ -288,13 +318,17 @@ describe('POST /api/trivia/rodadas/:id/finalizar', () => {
     assert.deepEqual(f2.novos_badges, []);
   });
 
-  test('finalizações paralelas: uma vale', async () => {
+  test('finalizações paralelas: as duas recebem o resumo, o badge vem uma vez', async () => {
     const u = await novoJogador();
     const rodada = (await novaRodada(u)).body;
     const r = await Promise.all(
       [1, 2].map(() => u.api('post', `/api/trivia/rodadas/${rodada.id}/finalizar`)),
     );
-    assert.deepEqual(r.map((x) => x.status).sort(), [200, 409]);
+    assert.deepEqual(
+      r.map((x) => x.status),
+      [200, 200],
+    );
+    assert.equal(r.flatMap((x) => x.body.novos_badges).length, 1);
   });
 
   test('rodada inexistente dá 404', async () => {

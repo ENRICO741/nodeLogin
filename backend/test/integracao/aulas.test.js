@@ -255,25 +255,83 @@ describe('POST /api/visitas/:id/respostas', () => {
     assert.equal(respostas[0].pontos_ganhos, 10);
   });
 
-  test('mesma questão duas vezes na visita dá 409', async () => {
+  test('reenvio da mesma alternativa (retorno perdido) devolve o mesmo resultado sem pontuar de novo', async () => {
+    const u = await novoUsuario();
+    const aula = (await u.api('get', `/api/aulas/${(await primeiraAula(u)).id}`)).body;
+    const q = aula.questoes[0];
+    const certas = await gabarito('questoes_aula', [q.id]);
+    const visita = (await u.api('post', `/api/aulas/${aula.id}/visitas`)).body;
+    const corpo = { questao_id: q.id, alternativa: certas[q.id] };
+    const url = `/api/visitas/${visita.id}/respostas`;
+    const primeira = (await u.api('post', url).send(corpo).expect(200)).body;
+    assert.equal(primeira.pontos_ganhos, 10);
+    const historico = async () =>
+      (
+        await pool.query('SELECT count(*)::int AS n FROM pontuacao_historico WHERE usuario_id = $1', [
+          u.usuario.id,
+        ])
+      ).rows[0].n;
+    const antes = await historico();
+    const segunda = (await u.api('post', url).send(corpo).expect(200)).body;
+    assert.deepEqual(segunda, primeira);
+    assert.equal(await historico(), antes);
+    assert.equal((await u.api('get', '/api/auth/me')).body.pontuacao_total, 10);
+    const { rows } = await pool.query('SELECT alternativa FROM aula_respostas WHERE visita_id = $1', [
+      visita.id,
+    ]);
+    assert.deepEqual(rows, [{ alternativa: certas[q.id] }]);
+  });
+
+  test('reenvio de resposta errada devolve o mesmo resultado; trocar a alternativa dá 409', async () => {
+    const u = await novoUsuario();
+    const aula = (await u.api('get', `/api/aulas/${(await primeiraAula(u)).id}`)).body;
+    const q = aula.questoes[0];
+    const certas = await gabarito('questoes_aula', [q.id]);
+    const visita = (await u.api('post', `/api/aulas/${aula.id}/visitas`)).body;
+    const url = `/api/visitas/${visita.id}/respostas`;
+    const corpo = { questao_id: q.id, alternativa: errada(certas[q.id]) };
+    const primeira = (await u.api('post', url).send(corpo).expect(200)).body;
+    assert.equal(primeira.correta, false);
+    assert.deepEqual((await u.api('post', url).send(corpo).expect(200)).body, primeira);
+    // Nem a certa (que pontuaria) nem outra errada trocam a resposta gravada.
+    for (const alternativa of [certas[q.id], errada(errada(certas[q.id]))]) {
+      const res = await u.api('post', url).send({ questao_id: q.id, alternativa }).expect(409);
+      assert.equal(res.body.erro.codigo, 'JA_RESPONDIDA');
+    }
+    assert.equal((await u.api('get', '/api/auth/me')).body.pontuacao_total, 0);
+  });
+
+  test('resposta antiga sem alternativa gravada (antes da migration 006): reenvio continua 409', async () => {
     const u = await novoUsuario();
     const aula = (await u.api('get', `/api/aulas/${(await primeiraAula(u)).id}`)).body;
     const visita = (await u.api('post', `/api/aulas/${aula.id}/visitas`)).body;
     const corpo = { questao_id: aula.questoes[0].id, alternativa: 'a' };
     await u.api('post', `/api/visitas/${visita.id}/respostas`).send(corpo).expect(200);
+    await pool.query('UPDATE aula_respostas SET alternativa = NULL WHERE visita_id = $1', [visita.id]);
     const res = await u.api('post', `/api/visitas/${visita.id}/respostas`).send(corpo).expect(409);
     assert.equal(res.body.erro.codigo, 'JA_RESPONDIDA');
   });
 
-  test('duas respostas iguais em paralelo: uma vale, a outra dá 409', async () => {
+  test('duas respostas iguais em paralelo: as duas recebem o mesmo resultado, gravado uma vez', async () => {
     const u = await novoUsuario();
     const aula = (await u.api('get', `/api/aulas/${(await primeiraAula(u)).id}`)).body;
+    const q = aula.questoes[0];
+    const certas = await gabarito('questoes_aula', [q.id]);
     const visita = (await u.api('post', `/api/aulas/${aula.id}/visitas`)).body;
-    const corpo = { questao_id: aula.questoes[0].id, alternativa: 'b' };
+    const corpo = { questao_id: q.id, alternativa: certas[q.id] };
     const r = await Promise.all(
       [1, 2].map(() => u.api('post', `/api/visitas/${visita.id}/respostas`).send(corpo)),
     );
-    assert.deepEqual(r.map((x) => x.status).sort(), [200, 409]);
+    assert.deepEqual(
+      r.map((x) => x.status),
+      [200, 200],
+    );
+    assert.deepEqual(r[0].body, r[1].body);
+    const { rows } = await pool.query('SELECT count(*)::int AS n FROM aula_respostas WHERE visita_id = $1', [
+      visita.id,
+    ]);
+    assert.equal(rows[0].n, 1);
+    assert.equal((await u.api('get', '/api/auth/me')).body.pontuacao_total, 10);
   });
 
   test('questão de outra aula, desativada ou inexistente dá 404', async () => {
@@ -368,24 +426,79 @@ describe('POST /api/visitas/:id/finalizar', () => {
     }
   });
 
-  test('finalizar duas vezes dá 409 e responder depois de finalizar também', async () => {
+  test('finalizar de novo (retorno perdido) devolve o mesmo resumo sem pagar o bônus de novo', async () => {
     const u = await novoUsuario();
-    const { visita, aula } = await responderAula(u, (await primeiraAula(u)).id);
-    await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200);
-    const res = await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(409);
-    assert.equal(res.body.erro.codigo, 'VISITA_FINALIZADA');
+    const aula = await primeiraAula(u);
+    const { visita, respostas, certas } = await responderAula(u, aula.id);
+    const url = `/api/visitas/${visita.id}/finalizar`;
+    const primeira = (await u.api('post', url).expect(200)).body;
+    const historico = async () =>
+      (
+        await pool.query('SELECT count(*)::int AS n FROM pontuacao_historico WHERE usuario_id = $1', [
+          u.usuario.id,
+        ])
+      ).rows[0].n;
+    const { rows: antes } = await pool.query('SELECT finalizada_em FROM aula_visitas WHERE id = $1', [
+      visita.id,
+    ]);
+    const nHistorico = await historico();
+    const segunda = (await u.api('post', url).expect(200)).body;
+    assert.deepEqual(segunda, { ...primeira, novos_badges: [] });
+    assert.equal(segunda.bonus_conclusao, aula.pontos_conclusao);
+    assert.equal(segunda.pontuacao_total, 20 + aula.pontos_conclusao);
+    assert.equal(await historico(), nHistorico);
+    const { rows: depois } = await pool.query('SELECT finalizada_em FROM aula_visitas WHERE id = $1', [
+      visita.id,
+    ]);
+    assert.deepEqual(depois, antes, 'a data de fim não muda');
+    // Depois de finalizada: reenvio idêntico ainda devolve o resultado; trocar a alternativa, 409.
+    const [q] = (await u.api('get', `/api/aulas/${aula.id}`)).body.questoes;
+    const reenvio = await u
+      .api('post', `/api/visitas/${visita.id}/respostas`)
+      .send({ questao_id: q.id, alternativa: certas[q.id] })
+      .expect(200);
+    assert.deepEqual(reenvio.body, { ...respostas[0], pontuacao_total: 20 + aula.pontos_conclusao });
     await u
       .api('post', `/api/visitas/${visita.id}/respostas`)
-      .send({ questao_id: aula.questoes[0].id, alternativa: 'a' })
+      .send({ questao_id: q.id, alternativa: errada(certas[q.id]) })
       .expect(409);
   });
 
-  test('finalizações paralelas da mesma visita creditam uma única vez', async () => {
+  test('visita finalizada não aceita resposta a questão nova (409 VISITA_FINALIZADA)', async () => {
+    const u = await novoJogador();
+    const { rows } = await pool.query(
+      "INSERT INTO aulas (titulo, ordem, conteudo_html, pontos_conclusao) VALUES ('Sem questões', 951, '<p>x</p>', 0) RETURNING id",
+    );
+    try {
+      const visita = (await u.api('post', `/api/aulas/${rows[0].id}/visitas`)).body;
+      await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200);
+      // O admin adicionou uma questão depois.
+      const { rows: q } = await pool.query(
+        `INSERT INTO questoes_aula (aula_id, enunciado, alternativa_a, alternativa_b, alternativa_c, alternativa_d,
+           resposta_correta, pontos) VALUES ($1, 'Nova?', 'a', 'b', 'c', 'd', 'a', 10) RETURNING id`,
+        [rows[0].id],
+      );
+      const res = await u
+        .api('post', `/api/visitas/${visita.id}/respostas`)
+        .send({ questao_id: q[0].id, alternativa: 'a' })
+        .expect(409);
+      assert.equal(res.body.erro.codigo, 'VISITA_FINALIZADA');
+    } finally {
+      await pool.query('DELETE FROM aulas WHERE id = $1', [rows[0].id]);
+    }
+  });
+
+  test('finalizações paralelas da mesma visita creditam uma única vez e devolvem o mesmo resumo', async () => {
     const u = await novoUsuario();
     const aula = await primeiraAula(u);
     const { visita } = await responderAula(u, aula.id);
     const r = await Promise.all([1, 2, 3].map(() => u.api('post', `/api/visitas/${visita.id}/finalizar`)));
-    assert.deepEqual(r.map((x) => x.status).sort(), [200, 409, 409]);
+    assert.deepEqual(
+      r.map((x) => x.status),
+      [200, 200, 200],
+    );
+    for (const x of r) assert.equal(x.body.pontuacao_total, 20 + aula.pontos_conclusao);
+    assert.equal(r.filter((x) => x.body.novos_badges.length > 0).length, 1, 'badges novos só na primeira');
     const me = (await u.api('get', '/api/auth/me')).body;
     assert.equal(me.pontuacao_total, 20 + aula.pontos_conclusao);
   });

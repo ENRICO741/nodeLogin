@@ -72,15 +72,15 @@ async function iniciarVisita(aulaId, usuarioId) {
 }
 
 // Trava a visita (FOR UPDATE): respostas e finalização da mesma visita não correm em paralelo.
+// Não recusa a visita finalizada: o reenvio de uma resposta ou da finalização ainda é atendido.
 async function travarVisita(c, visitaId, usuarioId) {
   const { rows } = await c.query(
-    'SELECT id, aula_id, finalizada_em FROM aula_visitas WHERE id = $1 AND usuario_id = $2 FOR UPDATE',
+    `SELECT id, aula_id, finalizada_em, pontos_conclusao_ganhos FROM aula_visitas
+     WHERE id = $1 AND usuario_id = $2 FOR UPDATE`,
     [visitaId, usuarioId],
   );
-  const visita = rows[0];
-  if (!visita) throw naoEncontrado('Visita não encontrada');
-  if (visita.finalizada_em) throw conflito('VISITA_FINALIZADA', 'Esta visita já foi finalizada');
-  return visita;
+  if (!rows[0]) throw naoEncontrado('Visita não encontrada');
+  return rows[0];
 }
 
 async function responder(visitaId, usuarioId, { questao_id, alternativa }) {
@@ -93,35 +93,56 @@ async function responder(visitaId, usuarioId, { questao_id, alternativa }) {
     );
     const questao = questoes[0];
     if (!questao) throw naoEncontrado('Questão não encontrada nesta aula');
-
-    const correta = questao.resposta_correta === alternativa;
-    // Pontua só no primeiro acerto do usuário nesta questão (garantido também por índice único parcial).
-    const { rows: respostas } = await c.query(
-      `INSERT INTO aula_respostas (visita_id, questao_id, usuario_id, correta, pontuou)
-       VALUES ($1, $2, $3, $4, $4 AND NOT EXISTS (
-         SELECT 1 FROM aula_respostas WHERE usuario_id = $3 AND questao_id = $2 AND pontuou) AND NOT ${ehAdmin('$3')})
-       ON CONFLICT (visita_id, questao_id) DO NOTHING
-       RETURNING pontuou`,
-      [visitaId, questao_id, usuarioId, correta],
-    );
-    if (!respostas[0]) throw conflito('JA_RESPONDIDA', 'Questão já respondida nesta visita');
-
-    const pontuou = respostas[0].pontuou;
-    return {
+    const resultado = (correta, pontuou, pontuacao_total) => ({
       correta,
       resposta_correta: questao.resposta_correta,
       explicacao: questao.explicacao,
       pontos_ganhos: pontuou ? questao.pontos : 0,
-      pontuacao_total: pontuou
+      pontuacao_total,
+    });
+
+    // Reenvio (a resposta foi gravada mas o retorno se perdeu): a mesma alternativa devolve o resultado
+    // gravado, sem pontuar de novo. Outra alternativa não troca a resposta.
+    const {
+      rows: [anterior],
+    } = await c.query(
+      'SELECT alternativa, correta, pontuou FROM aula_respostas WHERE visita_id = $1 AND questao_id = $2',
+      [visitaId, questao_id],
+    );
+    if (anterior) {
+      if (anterior.alternativa !== alternativa) {
+        throw conflito('JA_RESPONDIDA', 'Questão já respondida nesta visita');
+      }
+      return resultado(anterior.correta, anterior.pontuou, await pontuacaoAtual(c, usuarioId));
+    }
+    if (visita.finalizada_em) throw conflito('VISITA_FINALIZADA', 'Esta visita já foi finalizada');
+
+    const correta = questao.resposta_correta === alternativa;
+    // Pontua só no primeiro acerto do usuário nesta questão (garantido também por índice único parcial).
+    const {
+      rows: [{ pontuou }],
+    } = await c.query(
+      `INSERT INTO aula_respostas (visita_id, questao_id, usuario_id, alternativa, correta, pontuou)
+       VALUES ($1, $2, $3, $4, $5, $5 AND NOT EXISTS (
+         SELECT 1 FROM aula_respostas WHERE usuario_id = $3 AND questao_id = $2 AND pontuou) AND NOT ${ehAdmin('$3')})
+       RETURNING pontuou`,
+      [visitaId, questao_id, usuarioId, alternativa, correta],
+    );
+    return resultado(
+      correta,
+      pontuou,
+      pontuou
         ? await creditarPontos(c, usuarioId, questao.pontos, 'aula_questao', questao_id)
         : await pontuacaoAtual(c, usuarioId),
-    };
+    );
   });
 }
 
 async function finalizar(visitaId, usuarioId) {
   return transacao(async (c) => {
     const visita = await travarVisita(c, visitaId, usuarioId);
+    // Reenvio (o retorno da primeira finalização se perdeu): devolve o mesmo resumo, sem pagar de novo.
+    const reenvio = Boolean(visita.finalizada_em);
 
     const {
       rows: [resumo],
@@ -136,21 +157,23 @@ async function finalizar(visitaId, usuarioId) {
        WHERE q.aula_id = $1 AND q.ativo`,
       [visita.aula_id, visitaId],
     );
-    if (resumo.respondidas < resumo.total_questoes) {
+    if (!reenvio && resumo.respondidas < resumo.total_questoes) {
       throw conflito('QUESTOES_PENDENTES', 'Responda todas as questões antes de concluir a aula');
     }
 
-    // O bônus só é pago na primeira conclusão (índice único parcial aula_visitas_bonus_uk).
-    const {
-      rows: [{ pontos_conclusao_ganhos: ganhouBonus }],
-    } = await c.query(
-      `UPDATE aula_visitas SET finalizada_em = now(), concluida = true,
-         pontos_conclusao_ganhos = NOT EXISTS (
-           SELECT 1 FROM aula_visitas WHERE usuario_id = $2 AND aula_id = $3 AND pontos_conclusao_ganhos)
-           AND NOT ${ehAdmin('$2')}
-       WHERE id = $1 RETURNING pontos_conclusao_ganhos`,
-      [visitaId, usuarioId, visita.aula_id],
-    );
+    let ganhouBonus = visita.pontos_conclusao_ganhos;
+    if (!reenvio) {
+      // O bônus só é pago na primeira conclusão (índice único parcial aula_visitas_bonus_uk).
+      const { rows } = await c.query(
+        `UPDATE aula_visitas SET finalizada_em = now(), concluida = true,
+           pontos_conclusao_ganhos = NOT EXISTS (
+             SELECT 1 FROM aula_visitas WHERE usuario_id = $2 AND aula_id = $3 AND pontos_conclusao_ganhos)
+             AND NOT ${ehAdmin('$2')}
+         WHERE id = $1 RETURNING pontos_conclusao_ganhos`,
+        [visitaId, usuarioId, visita.aula_id],
+      );
+      ganhouBonus = rows[0].pontos_conclusao_ganhos;
+    }
 
     let bonus = 0;
     if (ganhouBonus) {
@@ -163,9 +186,10 @@ async function finalizar(visitaId, usuarioId) {
       total_questoes: resumo.total_questoes,
       pontos_questoes: resumo.pontos_questoes,
       bonus_conclusao: bonus,
-      pontuacao_total: bonus
-        ? await creditarPontos(c, usuarioId, bonus, 'aula_conclusao', visita.aula_id)
-        : await pontuacaoAtual(c, usuarioId),
+      pontuacao_total:
+        bonus && !reenvio
+          ? await creditarPontos(c, usuarioId, bonus, 'aula_conclusao', visita.aula_id)
+          : await pontuacaoAtual(c, usuarioId),
       novos_badges: await concederBadges(c, usuarioId),
       trivia_liberada: await triviaLiberada(c, usuarioId),
     };
