@@ -29,7 +29,8 @@ const esquemaSessao = z
   })
   .default({});
 
-// Sem consentimento (retirado no Perfil) nada é gravado (LGPD art. 8º §5º). 204 para o app não tratar como erro.
+// O cadastro exige o consentimento e o app não o retira; a checagem fica como defesa para conta sem ele
+// (nada é gravado, LGPD). 204 para o app não tratar como erro.
 const semConsentimento = (req) => !req.usuario.consentiu_pesquisa_em;
 
 router.post('/sessoes', limiteEscrita(), async (req, res) => {
