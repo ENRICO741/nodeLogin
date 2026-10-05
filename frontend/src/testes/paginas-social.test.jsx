@@ -189,7 +189,8 @@ describe('Perfil', () => {
   it('foto: redimensiona no navegador, mostra prévia, pode remover', async () => {
     globalThis.createImageBitmap = vi.fn(async () => ({ width: 800, height: 600 }));
     const drawImage = vi.fn();
-    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage });
+    const fillRect = vi.fn();
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage, fillRect });
     vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/webp;base64,AAAA');
     const { servidor } = await renderizarApp('/perfil', {
       rotas: { 'PATCH /perfil': ({ corpo }) => ({ ...USUARIO, ...corpo }) },
@@ -207,6 +208,8 @@ describe('Perfil', () => {
     expect(servidor.enviados('PATCH /perfil')[0].arquivo_foto).toBeUndefined();
     // Com WebP disponível não gera JPEG à toa.
     expect(HTMLCanvasElement.prototype.toDataURL).toHaveBeenCalledTimes(1);
+    // Nem pinta fundo: o WebP mantém a transparência.
+    expect(fillRect).not.toHaveBeenCalled();
 
     await userEvent.click(screen.getByRole('button', { name: /Editar perfil/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Remover foto' }));
@@ -215,7 +218,8 @@ describe('Perfil', () => {
 
   it('foto: navegador sem WebP (Safari no iPhone devolve PNG) envia JPEG', async () => {
     globalThis.createImageBitmap = vi.fn(async () => ({ width: 300, height: 300 }));
-    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage: vi.fn() });
+    const ctx = { drawImage: vi.fn(), fillRect: vi.fn() };
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx);
     const toDataURL = vi
       .spyOn(HTMLCanvasElement.prototype, 'toDataURL')
       .mockImplementation((tipo) =>
@@ -235,6 +239,11 @@ describe('Perfil', () => {
       ['image/webp', 0.85],
       ['image/jpeg', 0.85],
     ]);
+    // JPEG não tem alfa: o fundo branco vai atrás do desenho, antes de gerar o JPEG (senão o PNG transparente sai preto).
+    expect(ctx.fillRect).toHaveBeenCalledWith(0, 0, 256, 256);
+    expect(ctx.fillStyle).toBe('#fff');
+    expect(ctx.globalCompositeOperation).toBe('destination-over');
+    expect(ctx.fillRect.mock.invocationCallOrder[0]).toBeLessThan(toDataURL.mock.invocationCallOrder[1]);
   });
 
   it('foto ilegível mostra erro no campo; cancelar a seleção não muda nada', async () => {

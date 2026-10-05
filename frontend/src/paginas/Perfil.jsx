@@ -18,21 +18,25 @@ async function prepararFoto(arquivo) {
   const canvas = document.createElement('canvas');
   canvas.width = LADO_FOTO;
   canvas.height = LADO_FOTO;
-  canvas
-    .getContext('2d')
-    .drawImage(
-      imagem,
-      (imagem.width - lado) / 2,
-      (imagem.height - lado) / 2,
-      lado,
-      lado,
-      0,
-      0,
-      LADO_FOTO,
-      LADO_FOTO,
-    );
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(
+    imagem,
+    (imagem.width - lado) / 2,
+    (imagem.height - lado) / 2,
+    lado,
+    lado,
+    0,
+    0,
+    LADO_FOTO,
+    LADO_FOTO,
+  );
   const webp = canvas.toDataURL('image/webp', 0.85);
-  return webp.startsWith('data:image/webp') ? webp : canvas.toDataURL('image/jpeg', 0.85);
+  if (webp.startsWith('data:image/webp')) return webp;
+  // JPEG não tem alfa: o transparente sairia preto. Pinta o branco atrás do desenho (o WebP mantém a transparência).
+  ctx.globalCompositeOperation = 'destination-over';
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, LADO_FOTO, LADO_FOTO);
+  return canvas.toDataURL('image/jpeg', 0.85);
 }
 
 function FormPerfil({ usuario, aoSalvar, aoCancelar }) {
