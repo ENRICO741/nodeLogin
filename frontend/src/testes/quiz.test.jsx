@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useQuiz } from '../hooks/useQuiz';
 import { QuestaoCard } from '../componentes/QuestaoCard';
+import { ErroApi } from '../lib/api';
 
 const QUESTOES = [1, 2].map((n) => ({
   id: `q${n}`,
@@ -51,6 +52,79 @@ describe('quiz', () => {
     await userEvent.click(opcao('A'));
     expect(await screen.findByText('Resposta correta!')).toBeInTheDocument();
     expect(screen.getByText('+10 pts')).toBeInTheDocument();
+  });
+
+  describe('resposta gravada sem o retorno chegar', () => {
+    const semConexao = () => new ErroApi(0, { erro: { codigo: 'SEM_CONEXAO', mensagem: 'Sem conexão.' } });
+    const jaRespondida = () =>
+      new ErroApi(409, { erro: { codigo: 'JA_RESPONDIDA', mensagem: 'Você já respondeu esta pergunta' } });
+
+    it('falha de rede e nova tentativa com a mesma alternativa mostra o feedback', async () => {
+      const enviarResposta = vi
+        .fn()
+        .mockRejectedValueOnce(semConexao())
+        .mockResolvedValueOnce({ correta: true, resposta_correta: 'a', pontos_ganhos: 10 });
+      render(<Quiz enviarResposta={enviarResposta} />);
+      await userEvent.click(opcao('A'));
+      expect(await screen.findByRole('alert')).toHaveTextContent('Sem conexão.');
+      await userEvent.click(opcao('A'));
+      expect(await screen.findByText('Resposta correta!')).toBeInTheDocument();
+      expect(enviarResposta.mock.calls).toEqual([
+        ['q1', 'a'],
+        ['q1', 'a'],
+      ]);
+    });
+
+    it('outra alternativa recusada com JA_RESPONDIDA reenvia a anterior e mostra o resultado dela', async () => {
+      const enviarResposta = vi
+        .fn()
+        .mockRejectedValueOnce(semConexao())
+        .mockRejectedValueOnce(jaRespondida())
+        .mockResolvedValueOnce({ correta: false, resposta_correta: 'c', pontos_ganhos: 0 });
+      render(<Quiz enviarResposta={enviarResposta} />);
+      await userEvent.click(opcao('A'));
+      await screen.findByRole('alert');
+      await userEvent.click(opcao('B'));
+      expect(await screen.findByText('Resposta incorreta')).toBeInTheDocument();
+      expect(enviarResposta.mock.calls).toEqual([
+        ['q1', 'a'],
+        ['q1', 'b'],
+        ['q1', 'a'],
+      ]);
+      expect(opcao('A')).toHaveAttribute('aria-pressed', 'true');
+      expect(opcao('B')).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('JA_RESPONDIDA sem nada perdido (ou depois de erro que não é de rede) continua mostrando o erro', async () => {
+      const enviarResposta = vi
+        .fn()
+        .mockRejectedValueOnce(new ErroApi(400, { erro: { codigo: 'VALIDACAO', mensagem: 'Inválida' } }))
+        .mockRejectedValueOnce(jaRespondida());
+      render(<Quiz enviarResposta={enviarResposta} />);
+      await userEvent.click(opcao('A'));
+      expect(await screen.findByRole('alert')).toHaveTextContent('Inválida');
+      await userEvent.click(opcao('B'));
+      expect(await screen.findByRole('alert')).toHaveTextContent('Você já respondeu esta pergunta');
+      expect(enviarResposta).toHaveBeenCalledTimes(2);
+    });
+
+    it('se o reenvio da anterior também falhar, mostra o erro e deixa tentar de novo', async () => {
+      const enviarResposta = vi
+        .fn()
+        .mockRejectedValueOnce(new ErroApi(503, null))
+        .mockRejectedValueOnce(jaRespondida())
+        .mockRejectedValueOnce(semConexao())
+        .mockResolvedValueOnce({ correta: true, resposta_correta: 'a', pontos_ganhos: 10 });
+      render(<Quiz enviarResposta={enviarResposta} />);
+      await userEvent.click(opcao('A'));
+      await screen.findByRole('alert');
+      await userEvent.click(opcao('B'));
+      expect(await screen.findByRole('alert')).toHaveTextContent('Sem conexão.');
+      await userEvent.click(opcao('A'));
+      expect(await screen.findByText('Resposta correta!')).toBeInTheDocument();
+      expect(enviarResposta.mock.calls.map(([, alt]) => alt)).toEqual(['a', 'b', 'a', 'a']);
+    });
   });
 
   it('avança até a última pergunta e chama onFinal', async () => {
