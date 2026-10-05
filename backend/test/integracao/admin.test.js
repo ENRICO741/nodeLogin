@@ -660,6 +660,28 @@ describe('usuários', () => {
 });
 
 describe('GET /api/admin/estatisticas', () => {
+  test('pergunta provisória (confirmacao-leitura) não entra em respostas, acertos nem na lista de questões', async () => {
+    await prepararBanco();
+    admin = await novoAdmin();
+    const u = await novoJogador();
+    const segunda = (await u.api('get', '/api/aulas')).body[1];
+    const detalhe = (await u.api('get', `/api/aulas/${segunda.id}`)).body;
+    const visita = (await u.api('post', `/api/aulas/${segunda.id}/visitas`)).body;
+    await u
+      .api('post', `/api/visitas/${visita.id}/respostas`)
+      .send({ questao_id: detalhe.questoes[0].id, alternativa: 'a' })
+      .expect(200);
+    await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200);
+
+    const s = (await admin.api('get', '/api/admin/estatisticas').expect(200)).body;
+    const porAula = s.aulas.find((x) => x.aula_id === segunda.id);
+    // A visita conta (mais a do novoJogador); a resposta 'Sim' não.
+    assert.deepEqual([porAula.total_concluidas, porAula.total_respostas, porAula.total_acertos], [2, 0, 0]);
+    assert.ok(!s.questoesAula.some((q) => q.questao_id === detalhe.questoes[0].id));
+    const doAluno = s.usuariosAula.find((x) => x.apelido === u.apelido && x.aula_titulo === segunda.titulo);
+    assert.deepEqual([doAluno.total_respostas, doAluno.total_acertos], [0, 0]);
+  });
+
   test('números batem com a atividade real, e usuários aparecem só pelo apelido', async () => {
     await prepararBanco();
     admin = await novoAdmin();
@@ -722,8 +744,8 @@ describe('GET /api/admin/estatisticas', () => {
       [0, 0, null],
     );
 
-    // As duas da aula 01 e a provisória de cada uma das aulas 02 a 15.
-    assert.equal(s.questoesAula.length, 16);
+    // Só as duas da aula 01: a provisória "Terminou?" das aulas 02 a 15 fica fora das estatísticas.
+    assert.equal(s.questoesAula.length, 2);
     assert.equal(s.questoesAula.find((q) => q.questao_id === detalhe.questoes[0].id).total_acertos, 1);
 
     assert.deepEqual(Object.keys(s.usuariosAula[0]).sort(), [

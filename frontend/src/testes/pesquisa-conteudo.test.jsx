@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, renderHook, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import * as telemetria from '../lib/telemetria';
 import { baixarArquivo } from '../lib/api';
+import { useLeitura } from '../hooks/useLeitura';
 import { ADMIN, erroApi, PARTICIPANTE, renderizarApp, sequencia, servidorFalso } from './utils';
 
 let visibilidade = 'visible';
@@ -383,5 +384,62 @@ describe('admin: dados da pesquisa', () => {
     const servidor = servidorFalso({ 'GET /y.csv': 'a,b' });
     await baixarArquivo('/y.csv', 'y.csv');
     expect(servidor.mock.calls[0][1].headers).toEqual({});
+  });
+});
+
+describe('useLeitura: tempo de leitura só com a tela visível', () => {
+  beforeEach(async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(0);
+    localStorage.setItem('guardiao.token', 't');
+    telemetria.definirConsentimento(true);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  const lido = async (servidor) => {
+    await waitFor(() => expect(eventos(servidor, 'aula_conteudo_lido')).toHaveLength(1));
+    return eventos(servidor, 'aula_conteudo_lido')[0];
+  };
+
+  it('pausa em segundo plano e retoma ao voltar (10 s + 60 s fora + 5 s = 15 s)', async () => {
+    const servidor = servidorFalso();
+    await telemetria.iniciarSessao();
+    const { result } = renderHook(() => useLeitura('a1', true));
+    vi.setSystemTime(10_000);
+    mudarVisibilidade('hidden');
+    vi.setSystemTime(70_000);
+    mudarVisibilidade('visible');
+    vi.setSystemTime(75_000);
+    act(() => result.current('iniciou_perguntas'));
+    expect((await lido(servidor)).duracao_ms).toBe(15_000);
+  });
+
+  it('sair com a tela em segundo plano conta só até ela sumir; eventos repetidos não somam', async () => {
+    const servidor = servidorFalso();
+    await telemetria.iniciarSessao();
+    const { unmount } = renderHook(() => useLeitura('a1', true));
+    vi.setSystemTime(8_000);
+    mudarVisibilidade('hidden');
+    mudarVisibilidade('hidden'); // repetido: não muda nada
+    vi.setSystemTime(100_000);
+    unmount();
+    // Em segundo plano a telemetria guarda o evento na fila; ele sai quando o app volta.
+    mudarVisibilidade('visible');
+    const evento = await lido(servidor);
+    expect(evento.duracao_ms).toBe(8_000);
+    expect(evento.metadata.motivo).toBe('saiu');
+  });
+
+  it('aberta já em segundo plano começa a contar só quando aparece', async () => {
+    const servidor = servidorFalso();
+    await telemetria.iniciarSessao();
+    visibilidade = 'hidden';
+    const { result } = renderHook(() => useLeitura('a1', true));
+    vi.setSystemTime(30_000);
+    mudarVisibilidade('visible');
+    mudarVisibilidade('visible'); // repetido: não reinicia a contagem
+    vi.setSystemTime(34_000);
+    act(() => result.current('iniciou_perguntas'));
+    expect((await lido(servidor)).duracao_ms).toBe(4_000);
   });
 });

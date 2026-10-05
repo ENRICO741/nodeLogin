@@ -714,3 +714,45 @@ describe('visão pesquisa_engajamento_usuario (migration 009)', () => {
     assert.deepEqual(await engajamento(u.usuario.id), { rodadas_trivia: 1, respostas_trivia: 4 });
   });
 });
+
+describe('visão pesquisa_respostas (migration 010)', () => {
+  test('traz a chave da questão no fim: a provisória com confirmacao-leitura, trivia com NULL', async () => {
+    const { completarRodada } = require('../ajuda');
+    const u = await novoJogador();
+    const [, segunda] = (await u.api('get', '/api/aulas')).body;
+    const detalhe = (await u.api('get', `/api/aulas/${segunda.id}`)).body;
+    const visita = (await u.api('post', `/api/aulas/${segunda.id}/visitas`)).body;
+    await u
+      .api('post', `/api/visitas/${visita.id}/respostas`)
+      .send({ questao_id: detalhe.questoes[0].id, alternativa: 'a' })
+      .expect(200);
+    const rodada = (await u.api('post', '/api/trivia/rodadas').send({ dificuldade: 'facil' })).body;
+    await completarRodada(u, { ...rodada, questoes: rodada.questoes.slice(0, 1) });
+
+    const c = await pool.connect();
+    try {
+      await c.query('BEGIN');
+      await c.query("SELECT set_config('app.pesquisa_segredo', 'segredo-do-teste', true)");
+      const { fields, rows } = await c.query(
+        `SELECT r.* FROM pesquisa_respostas r
+         JOIN pesquisa_participantes p ON p.participante = r.participante WHERE p.id = $1 ORDER BY r.tipo`,
+        [u.usuario.id],
+      );
+      assert.equal(fields.at(-1).name, 'chave', 'coluna nova no fim');
+      assert.deepEqual(
+        fields.map((f) => f.name),
+        ['participante', 'tipo', 'contexto', 'questao_id', 'correta', 'pontuou', 'respondido_em', 'chave'],
+      );
+      assert.deepEqual(
+        rows.map((r) => [r.tipo, r.chave]),
+        [
+          ['aula', 'confirmacao-leitura'],
+          ['trivia', null],
+        ],
+      );
+    } finally {
+      await c.query('ROLLBACK');
+      c.release();
+    }
+  });
+});

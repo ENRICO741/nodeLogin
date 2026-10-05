@@ -5,6 +5,9 @@ const duracaoMs = (inicio, fim) => `round(avg(extract(epoch FROM ${fim} - ${inic
 const ORDEM_DIFICULDADE = `array_position(ARRAY['facil', 'media', 'dificil']::varchar[], dificuldade)`;
 // Atividade de admins (testes da equipe) fica fora das métricas, como no ranking e na pesquisa.
 const deUsuario = (t) => `${t}.usuario_id IN (SELECT id FROM usuarios WHERE papel = 'usuario')`;
+// Pergunta provisória "Terminou?" das aulas 02 a 15: sempre "Sim", inflaria o % de acerto.
+const naoProvisoria = (q) => `${q}.chave IS DISTINCT FROM 'confirmacao-leitura'`;
+const respostasReais = `aula_respostas r JOIN questoes_aula q ON q.id = r.questao_id AND ${naoProvisoria('q')}`;
 
 const SQL = {
   aulas: `
@@ -14,7 +17,7 @@ const SQL = {
       FROM aula_visitas WHERE ${deUsuario('aula_visitas')} GROUP BY aula_id
     ), r AS (
       SELECT v.aula_id, count(*)::int AS total_respostas, count(*) FILTER (WHERE r.correta)::int AS total_acertos
-      FROM aula_respostas r JOIN aula_visitas v ON v.id = r.visita_id WHERE ${deUsuario('r')} GROUP BY v.aula_id
+      FROM ${respostasReais} JOIN aula_visitas v ON v.id = r.visita_id WHERE ${deUsuario('r')} GROUP BY v.aula_id
     )
     SELECT a.id AS aula_id, a.titulo,
       COALESCE(v.total_tentativas, 0) AS total_tentativas, COALESCE(v.total_concluidas, 0) AS total_concluidas,
@@ -27,6 +30,7 @@ const SQL = {
       count(r.id)::int AS total_respostas, count(*) FILTER (WHERE r.correta)::int AS total_acertos
     FROM questoes_aula q JOIN aulas a ON a.id = q.aula_id
     LEFT JOIN aula_respostas r ON r.questao_id = q.id AND ${deUsuario('r')}
+    WHERE ${naoProvisoria('q')}
     GROUP BY q.id, a.titulo, a.ordem ORDER BY a.ordem, q.criado_em`,
 
   usuariosAula: `
@@ -37,7 +41,7 @@ const SQL = {
     ), r AS (
       SELECT v.usuario_id, v.aula_id, count(*)::int AS total_respostas,
         count(*) FILTER (WHERE r.correta)::int AS total_acertos
-      FROM aula_respostas r JOIN aula_visitas v ON v.id = r.visita_id GROUP BY v.usuario_id, v.aula_id
+      FROM ${respostasReais} JOIN aula_visitas v ON v.id = r.visita_id GROUP BY v.usuario_id, v.aula_id
     )
     SELECT u.apelido, a.titulo AS aula_titulo, v.total_tentativas, v.duracao_media_ms,
       COALESCE(r.total_respostas, 0) AS total_respostas, COALESCE(r.total_acertos, 0) AS total_acertos

@@ -1,7 +1,8 @@
 """Análise das métricas do Guardião Impacta para o TCC.
 
 Entrada (pasta de dados):
-  - CSVs de Admin → Estatísticas → Dados da pesquisa (pesquisa-engajamento-*.csv, -respostas-, -eventos-).
+  - CSVs de Admin → Estatísticas → Dados da pesquisa: pesquisa-engajamento*.csv, pesquisa-respostas*.csv e
+    pesquisa-eventos*.csv (com ou sem a data no nome; havendo mais de um, vale o modificado por último).
   - Opcional: likert-pre.csv e likert-pos.csv com a coluna `codigo` (código do participante) e um item
     por coluna. Item = CONSTRUTO + número (ENG1, ENG2, CONSC1...). Itens invertidos terminam em _R.
 Saída: CSVs em <dados>/saida/.
@@ -10,6 +11,7 @@ Uso: python analise.py <pasta_dados>   |   python analise.py --demo
 """
 
 import json
+import os
 import sys
 import tempfile
 from pathlib import Path
@@ -32,11 +34,15 @@ COMPORTAMENTO = ['dias_ativos', 'sessoes', 'tempo_min', 'aulas_concluidas', 'rod
                  'visitas_ranking', 'visitas_conquistas', 'repeticoes_sem_pontos']
 
 
+PERGUNTA_PROVISORIA = 'confirmacao-leitura'  # "Terminou?" das aulas 02 a 15: sempre "Sim", fica fora do acerto
+
+
 def ler(dados, visao):
-    arquivos = sorted(dados.glob(f'pesquisa-{visao}-*.csv'))
+    # Casa pesquisa-engajamento.csv (baixado pela tela) e pesquisa-engajamento-2026-10-01.csv.
+    arquivos = list(dados.glob(f'pesquisa-{visao}*.csv'))
     if not arquivos:
-        raise FileNotFoundError(f'Falta pesquisa-{visao}-<data>.csv em {dados}')
-    return pd.read_csv(arquivos[-1], encoding='utf-8-sig')
+        raise FileNotFoundError(f'Falta pesquisa-{visao}.csv em {dados}')
+    return pd.read_csv(max(arquivos, key=lambda a: a.stat().st_mtime), encoding='utf-8-sig')
 
 
 def features(dados):
@@ -46,7 +52,6 @@ def features(dados):
               'visitas_ranking', 'visitas_conquistas']:
         f[c] = e[c]
     f['tempo_min'] = e.tempo_total_s / 60
-    f['acerto_aulas'] = e.acertos_aulas / e.respostas_aulas.replace(0, np.nan)
     f['acerto_trivia'] = e.acertos_trivia / e.respostas_trivia.replace(0, np.nan)
     f['periodo_dias'] = (pd.to_datetime(e.ultima_atividade) - pd.to_datetime(e.primeira_atividade)).dt.days + 1
 
@@ -54,6 +59,9 @@ def features(dados):
     r = ler(dados, 'respostas').sort_values('respondido_em')
     acertos_antes = r.groupby(['participante', 'questao_id']).correta.cumsum() - r.correta
     f['repeticoes_sem_pontos'] = (acertos_antes > 0).groupby(r.participante).sum()
+    # Acerto nas aulas sem a pergunta provisória (o engajamento a inclui em acertos_aulas/respostas_aulas).
+    aulas = r[(r.tipo == 'aula') & (r.get('chave') != PERGUNTA_PROVISORIA)]  # CSV antigo: sem a coluna
+    f['acerto_aulas'] = aulas.groupby('participante').correta.mean()
 
     ev = ler(dados, 'eventos')
     leitura = ev[ev.tipo_evento == 'aula_conteudo_lido'].copy()
@@ -61,7 +69,9 @@ def features(dados):
     f['leitura_mediana_s'] = leitura.groupby('participante').duracao_ms.median() / 1000
     f['rolagem_mediana'] = leitura.groupby('participante').rolagem.median()
     quiz = ev[ev.tipo_evento == 'quiz_respondido']
-    f['resposta_mediana_s'] = quiz.groupby('participante').duracao_ms.median() / 1000
+    na_trivia = quiz.tela.fillna('').str.startswith('/trivia')
+    f['resposta_mediana_aula_s'] = quiz[~na_trivia].groupby('participante').duracao_ms.median() / 1000
+    f['resposta_mediana_trivia_s'] = quiz[na_trivia].groupby('participante').duracao_ms.median() / 1000
 
     f[COMPORTAMENTO] = f[COMPORTAMENTO].fillna(0)
     return f
@@ -224,15 +234,20 @@ def demo():
         'primeira_atividade': base,
         'ultima_atividade': base + pd.to_timedelta(rng.integers(0, 30, n), 'D'),
     })
-    eng['acertos_aulas'] = (eng.respostas_aulas * 0.7).astype(int)
+    eng['acertos_aulas'] = eng.respostas_aulas  # inclui a provisória (sempre certa): a análise não usa
     eng['acertos_trivia'] = (eng.respostas_trivia * 0.6).astype(int)
-    resp = pd.DataFrame({'participante': np.repeat(ids, 6), 'questao_id': np.tile([1, 1, 1, 2, 2, 3], n),
-                         'correta': rng.random(6 * n) < 0.7,
-                         'respondido_em': base + pd.to_timedelta(np.tile(range(6), n), 'h')})
-    ev = pd.DataFrame({'participante': np.repeat(ids, 2),
-                       'tipo_evento': np.tile(['aula_conteudo_lido', 'quiz_respondido'], n),
-                       'duracao_ms': rng.integers(5_000, 200_000, 2 * n),
-                       'metadata': np.tile([json.dumps({'rolagem_max': 80}), json.dumps({'correta': True})], n)})
+    # Por participante: 6 respostas de aula reais, 1 da pergunta provisória (sempre certa) e 1 de trivia.
+    resp = pd.DataFrame({'participante': np.repeat(ids, 8), 'questao_id': np.tile([1, 1, 1, 2, 2, 3, 4, 5], n),
+                         'tipo': np.tile(['aula'] * 7 + ['trivia'], n),
+                         'chave': np.tile(['a', 'a', 'a', 'b', 'b', 'c', PERGUNTA_PROVISORIA, None], n),
+                         'correta': np.tile([True, False, True, False, False, True, True, False], n),
+                         'respondido_em': base + pd.to_timedelta(np.tile(range(8), n), 'h')})
+    ev = pd.DataFrame({'participante': np.repeat(ids, 3),
+                       'tipo_evento': np.tile(['aula_conteudo_lido', 'quiz_respondido', 'quiz_respondido'], n),
+                       'tela': np.tile(['/aulas/a1', '/aulas/a1', '/trivia'], n),
+                       'duracao_ms': np.tile([60_000, 8_000, 20_000], n),
+                       'metadata': np.tile([json.dumps({'rolagem_max': 80}), json.dumps({'correta': True}),
+                                            json.dumps({'correta': False})], n)})
     codigos = [i[:8] for i in ids]
 
     def likert(delta):
@@ -242,9 +257,16 @@ def demo():
 
     with tempfile.TemporaryDirectory() as tmp:
         dados = Path(tmp)
-        eng.to_csv(dados / 'pesquisa-engajamento-2026-10-01.csv', index=False)
-        resp.to_csv(dados / 'pesquisa-respostas-2026-10-01.csv', index=False)
+        # Um arquivo velho com data e o novo como a tela baixa (sem data): vale o modificado por último.
+        eng.head(1).to_csv(dados / 'pesquisa-engajamento-2026-09-01.csv', index=False)
+        os.utime(dados / 'pesquisa-engajamento-2026-09-01.csv', (0, 0))
+        eng.to_csv(dados / 'pesquisa-engajamento.csv', index=False)
+        resp.to_csv(dados / 'pesquisa-respostas.csv', index=False)
         ev.to_csv(dados / 'pesquisa-eventos-2026-10-01.csv', index=False)
+        f = features(dados)
+        assert len(f) == n, 'leu o CSV velho em vez do mais recente'
+        assert np.allclose(f.acerto_aulas, 3 / 6), 'acerto_aulas contou a pergunta provisória'
+        assert (f.resposta_mediana_aula_s == 8).all() and (f.resposta_mediana_trivia_s == 20).all()
         likert(0).to_csv(dados / 'likert-pre.csv', index=False)
         likert(np.where(engajado, 1.2, 0.2)).to_csv(dados / 'likert-pos.csv', index=False)
         resultado, clf = main(dados)

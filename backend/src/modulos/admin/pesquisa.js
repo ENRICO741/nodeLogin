@@ -19,7 +19,7 @@ const VISOES = {
   retencao: {
     visao: 'pesquisa_retencao',
     titulo: 'Retenção por coorte',
-    descricao: 'Participantes ativos por semana desde o cadastro, agrupados pela semana de entrada',
+    descricao: 'Participantes ativos, contados em semanas de calendário desde a semana de entrada (coorte)',
   },
   sessoes: {
     visao: 'pesquisa_sessoes',
