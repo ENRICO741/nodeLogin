@@ -79,6 +79,16 @@ describe('POST /api/auth/cadastro', () => {
     await post('/api/auth/login', { identificador: u.apelido.toUpperCase(), senha: u.senha }).expect(200);
   });
 
+  test('"marİa" direto no service.entrar (sem o zod) também não acha a conta', async () => {
+    const service = require('../../src/modulos/auth/service');
+    const u = await novoUsuario({ apelido: `maria${process.pid}` });
+    // O lower() do Postgres transforma "İ" em "i"; o toLowerCase() do JS, não. O service usa só o do JS.
+    await assert.rejects(service.entrar({ identificador: u.apelido.replace('i', 'İ'), senha: u.senha }), {
+      status: 401,
+      codigo: 'CREDENCIAIS_INVALIDAS',
+    });
+  });
+
   test('token do cadastro e do login valem 7 dias (JWT_EXPIRA_EM padrão)', async () => {
     const SETE_DIAS = 7 * 24 * 60 * 60;
     const dados = { apelido: `exp_${Math.random().toString(36).slice(2, 10)}` };
