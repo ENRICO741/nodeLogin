@@ -13,5 +13,5 @@ coverage/
 *.tfstate
 .claude/settings.local.json
 
-# Dados da pesquisa (TCC): nunca versionar
-analise/dados/
+# Modelo de ML e dados da pesquisa: fora do Git
+analise/

@@ -220,7 +220,8 @@ describe('rate limit (desligado em teste, ligado aqui com NODE_ENV=development)'
   });
 
   test('conta bloqueada: variantes "marİa" ou NFD não dão tentativas extras de senha', async () => {
-    const u = await novoUsuario({ apelido: `maria${process.pid}` });
+    // Acento (para a NFD mudar algo) e um "i" (para as variantes com İ e ponto combinante).
+    const u = await novoUsuario({ apelido: `joãomaria${process.pid}` });
     const { saida } = await rodarComLimite(`
       const login = (identificador, senha = 'errada') => request(app).post('/api/auth/login')
         .set('X-Forwarded-For', '10.0.8.1').send({ identificador, senha });
@@ -232,15 +233,20 @@ describe('rate limit (desligado em teste, ligado aqui com NODE_ENV=development)'
         comIPontuado: (await login(apelido.replace('i', String.fromCharCode(0x130)), '${u.senha}')).status,
         comCombinante: (await login(apelido.replace('i', 'i' + pontoAcima), '${u.senha}')).status,
         maiusculas: (await login(apelido.toUpperCase(), '${u.senha}')).status,
+        nfd: (await login(apelido.normalize('NFD'), '${u.senha}')).status,
+        espacos: (await login('  ' + apelido + ' ', '${u.senha}')).status,
       };
       console.log('RESULTADO', JSON.stringify(r));
     `);
-    // As variantes nunca chegam a conferir a senha (400 na validação); a forma normal segue bloqueada.
+    // İ e ponto combinante nunca chegam a conferir a senha (400 na validação); maiúsculas, NFD e
+    // espaços nas pontas caem na mesma chave do limite e seguem bloqueadas.
     assert.deepEqual(resultado(saida), {
       bloqueada: 429,
       comIPontuado: 400,
       comCombinante: 400,
       maiusculas: 429,
+      nfd: 429,
+      espacos: 429,
     });
   });
 
@@ -281,14 +287,17 @@ describe('rate limit (desligado em teste, ligado aqui com NODE_ENV=development)'
 
   test('esqueci-senha: estourado o limite do e-mail, responde o mesmo 200 sem enviar (terceiro não trava a vítima)', async () => {
     const u = await novoUsuario();
+    const misturada = [...u.email].map((c, i) => (i % 2 ? c.toUpperCase() : c)).join('');
     const { saida } = await rodarComLimite(`
       const mailer = require('./src/lib/mailer');
       let enviados = 0;
       mailer.enviarEmail = async () => { enviados++; };
       const respostas = [];
+      // Grafias diferentes do mesmo e-mail somam no mesmo contador.
+      const grafias = ['${u.email}', '${u.email.toUpperCase()}', '${misturada}', '${u.email}'];
       for (let i = 0; i < 4; i++) {
         const res = await request(app).post('/api/auth/esqueci-senha')
-          .set('X-Forwarded-For', '10.0.0.' + (i + 10)).send({ email: '${u.email.toUpperCase()}' });
+          .set('X-Forwarded-For', '10.0.0.' + (i + 10)).send({ email: grafias[i] });
         respostas.push([res.status, res.body.mensagem]);
       }
       // Espaços nas pontas não abrem cota nova: o zod recusa (400), e nada é enviado.
@@ -306,23 +315,27 @@ describe('rate limit (desligado em teste, ligado aqui com NODE_ENV=development)'
     );
     assert.equal(new Set(respostas.map(([, mensagem]) => mensagem)).size, 1, 'mesma mensagem genérica');
     assert.equal(enviados, 3);
+    // Total de tokens, não só os válidos: cada pedido invalida o anterior, então um 4º token (sem
+    // e-mail) também deixaria só 1 válido, mas mataria o último link enviado.
     const { rows } = await pool.query(
-      'SELECT count(*)::int AS n FROM tokens_recuperacao_senha WHERE usuario_id = $1 AND NOT usado',
+      'SELECT count(*)::int AS n FROM tokens_recuperacao_senha WHERE usuario_id = $1',
       [u.usuario.id],
     );
-    assert.equal(rows[0].n, 1, 'o 4º pedido não invalidou o último link enviado');
+    assert.equal(rows[0].n, 3, 'o 4º pedido não gerou token (nem invalidou o último link enviado)');
     assert.equal(comEspaco, 400);
     assert.equal(semEmail, 400, 'corpo sem e-mail passa pelo limite e cai na validação');
   });
 
-  test('sessões e visitas de aula: 60 por minuto por usuário; outro usuário no mesmo IP segue liberado', async () => {
+  test('sessões, eventos, visitas de aula e rodadas: 60 por minuto por usuário; outro usuário no mesmo IP segue liberado', async () => {
     const [a, b] = [await novoUsuario(), await novoUsuario()];
     const { rows } = await pool.query('SELECT id FROM aulas WHERE ativo ORDER BY ordem LIMIT 1');
     const { saida } = await rodarComLimite(`
       const post = (token, url) => request(app).post(url).set('X-Forwarded-For', '10.0.5.1')
         .set('Authorization', 'Bearer ' + token);
       const r = {};
-      for (const url of ['/api/sessoes', '/api/aulas/${rows[0].id}/visitas']) {
+      // Sem corpo: eventos e rodadas caem na validação (400), mas passam pelo limite antes.
+      const urls = ['/api/sessoes', '/api/eventos', '/api/aulas/${rows[0].id}/visitas', '/api/trivia/rodadas'];
+      for (const url of urls) {
         const status = new Set();
         for (let i = 0; i < 60; i++) status.add((await post('${a.token}', url)).status);
         const bloqueada = await post('${a.token}', url);
@@ -335,7 +348,12 @@ describe('rate limit (desligado em teste, ligado aqui com NODE_ENV=development)'
       console.log('RESULTADO', JSON.stringify(r));
     `);
     const esperado = (ok) => ({ antes: [ok], bloqueada: [429, 'MUITAS_REQUISICOES'], outroUsuario: ok });
-    assert.deepEqual(resultado(saida), { sessoes: esperado(201), aulas: esperado(201) });
+    assert.deepEqual(resultado(saida), {
+      sessoes: esperado(201),
+      eventos: esperado(400),
+      aulas: esperado(201),
+      trivia: esperado(400),
+    });
   });
 
   test('rotas autenticadas: 300 por minuto por usuário; a 301ª dá 429 e outro usuário segue liberado', async () => {
@@ -359,7 +377,7 @@ describe('rate limit (desligado em teste, ligado aqui com NODE_ENV=development)'
     });
   });
 
-  test('rotas autenticadas contam por usuário', async () => {
+  test('rotas autenticadas mandam os cabeçalhos RateLimit', async () => {
     const u = await novoUsuario();
     const { saida } = await rodarComLimite(`
       const res = await request(app).get('/api/aulas').set('Authorization', 'Bearer ${u.token}');

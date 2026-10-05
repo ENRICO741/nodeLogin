@@ -426,6 +426,9 @@ describe('exportação da pesquisa', () => {
       res.visoes.map((v) => v.id),
       ['uso-diario', 'engajamento', 'retencao', 'sessoes', 'eventos', 'respostas', 'pontos', 'badges'],
     );
+    // A visão conta semanas de calendário (date_trunc), não blocos de 7 dias desde o cadastro.
+    const retencao = res.visoes.find((v) => v.id === 'retencao');
+    assert.match(retencao.descricao, /semanas de calendário desde a semana de entrada/);
   });
 
   test('só admin exporta', async () => {
@@ -566,7 +569,7 @@ describe('pesquisa: fim estimado das sessões e datas das conquistas', () => {
     // 03:30 UTC de 15/01 = 00:30 em São Paulo; 02:59 UTC de 01/01/2026 = 23:59 de 31/12/2025.
     await ganhar(participante, badges[0], '2026-01-15T03:30:00Z');
     await ganhar(participante, badges[1], '2026-01-01T02:59:00Z');
-    // Admin e quem retirou o consentimento: sessões sem fim e conquistas que não podem aparecer.
+    // Admin e conta sem consentimento: sessões sem fim e conquistas que não podem aparecer.
     for (const u of [admin, naoConsentiu]) {
       await sessao(u, '2026-01-10T15:00:00Z');
       await ganhar(u, badges[0], '2026-01-15T03:30:00Z');
@@ -721,6 +724,8 @@ describe('visão pesquisa_respostas (migration 010)', () => {
     const u = await novoJogador();
     const [, segunda] = (await u.api('get', '/api/aulas')).body;
     const detalhe = (await u.api('get', `/api/aulas/${segunda.id}`)).body;
+    // Antes de abrir a requisição: um erro no meio do encadeamento deixaria o servidor do supertest aberto.
+    assert.ok(detalhe.questoes.length, 'aula 2 sem pergunta');
     const visita = (await u.api('post', `/api/aulas/${segunda.id}/visitas`)).body;
     await u
       .api('post', `/api/visitas/${visita.id}/respostas`)

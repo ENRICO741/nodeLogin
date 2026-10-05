@@ -243,7 +243,7 @@ describe('telemetria', () => {
     await u.api('post', '/api/sessoes/xyz/finalizar').expect(400);
   });
 
-  test('consentimento retirado: sessões e eventos respondem 204 sem gravar; reconsentir volta a gravar', async () => {
+  test('conta sem consentimento não grava telemetria: sessões e eventos respondem 204', async () => {
     const u = await novoUsuario();
     const contar = async () => {
       const { rows } = await pool.query(
@@ -264,6 +264,7 @@ describe('telemetria', () => {
     await u.api('post', '/api/eventos').send({ tipo_evento: 'x', sessao_id: sessao.id }).expect(204);
     assert.deepEqual(await contar(), { sessoes: 1, eventos: 0 });
 
+    // A checagem lê o consentimento a cada requisição: com ele de volta (por SQL), grava de novo.
     await pool.query('UPDATE usuarios SET consentiu_pesquisa_em = now() WHERE id = $1', [u.usuario.id]);
     await u.api('post', '/api/sessoes').expect(201);
     await u.api('post', '/api/eventos').send({ tipo_evento: 'tela_visualizada' }).expect(204);

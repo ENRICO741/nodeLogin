@@ -282,11 +282,18 @@ describe('questões de trivia', () => {
   });
 
   test('exige dificuldade válida; inexistente dá 404', async () => {
-    await admin.api('post', '/api/admin/questoes-trivia').send(questao()).expect(400);
-    await admin
-      .api('post', '/api/admin/questoes-trivia')
-      .send(questao({ dificuldade: 'extrema' }))
-      .expect(400);
+    // Com a aula informada, o 400 só pode vir da dificuldade.
+    const aula_referencia_id = (await primeiraAulaAdmin()).id;
+    for (const extra of [{}, { dificuldade: 'extrema' }]) {
+      const res = await admin
+        .api('post', '/api/admin/questoes-trivia')
+        .send(questao({ aula_referencia_id, ...extra }))
+        .expect(400);
+      assert.deepEqual(
+        res.body.erro.detalhes.map((d) => d.campo),
+        ['dificuldade'],
+      );
+    }
     await admin
       .api('patch', `/api/admin/questoes-trivia/${UUID_INEXISTENTE}`)
       .send({ pontos: 1 })
@@ -666,6 +673,8 @@ describe('GET /api/admin/estatisticas', () => {
     const u = await novoJogador();
     const segunda = (await u.api('get', '/api/aulas')).body[1];
     const detalhe = (await u.api('get', `/api/aulas/${segunda.id}`)).body;
+    // Antes de abrir a requisição: um erro no meio do encadeamento deixaria o servidor do supertest aberto.
+    assert.ok(detalhe.questoes.length, 'aula 2 sem pergunta');
     const visita = (await u.api('post', `/api/aulas/${segunda.id}/visitas`)).body;
     await u
       .api('post', `/api/visitas/${visita.id}/respostas`)
@@ -680,6 +689,32 @@ describe('GET /api/admin/estatisticas', () => {
     assert.ok(!s.questoesAula.some((q) => q.questao_id === detalhe.questoes[0].id));
     const doAluno = s.usuariosAula.find((x) => x.apelido === u.apelido && x.aula_titulo === segunda.titulo);
     assert.deepEqual([doAluno.total_respostas, doAluno.total_acertos], [0, 0]);
+  });
+
+  test('questão criada pelo admin (chave NULL) entra nas questões e nos totais', async () => {
+    const u = await novoJogador();
+    // Aula manual (última da trilha, liberada para o jogador); apagada no fim: as aulas do app são fixas.
+    const aula = (await novaAula().expect(201)).body;
+    try {
+      const q = (await admin.api('post', `/api/admin/aulas/${aula.id}/questoes`).send(questao()).expect(201))
+        .body;
+      assert.equal(q.chave, null);
+      const visita = (await u.api('post', `/api/aulas/${aula.id}/visitas`).expect(201)).body;
+      await u
+        .api('post', `/api/visitas/${visita.id}/respostas`)
+        .send({ questao_id: q.id, alternativa: 'b' })
+        .expect(200);
+
+      const s = (await admin.api('get', '/api/admin/estatisticas').expect(200)).body;
+      const porAula = s.aulas.find((x) => x.aula_id === aula.id);
+      assert.deepEqual([porAula.total_respostas, porAula.total_acertos], [1, 1]);
+      const daQuestao = s.questoesAula.find((x) => x.questao_id === q.id);
+      assert.deepEqual([daQuestao?.total_respostas, daQuestao?.total_acertos], [1, 1]);
+      const doAluno = s.usuariosAula.find((x) => x.apelido === u.apelido && x.aula_titulo === aula.titulo);
+      assert.deepEqual([doAluno.total_respostas, doAluno.total_acertos], [1, 1]);
+    } finally {
+      await pool.query('DELETE FROM aulas WHERE id = $1', [aula.id]);
+    }
   });
 
   test('números batem com a atividade real, e usuários aparecem só pelo apelido', async () => {
