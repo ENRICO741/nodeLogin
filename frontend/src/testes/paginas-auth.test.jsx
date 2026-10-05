@@ -406,7 +406,8 @@ describe('Redefinir senha', () => {
     window.history.pushState({}, '', '/redefinir-senha?token=x');
     render(<App />);
     await waitFor(() => expect(servidor.enviados('GET /auth/me')).toHaveLength(1));
-    await act(() => servidor.mock.results[0].value); // /auth/me respondeu: o usuário está logado
+    const me = servidor.mock.calls.findIndex(([url]) => url === '/api/auth/me');
+    await act(() => servidor.mock.results[me].value); // /auth/me respondeu: o usuário está logado
     expect(screen.getByRole('heading', { name: 'Nova senha' })).toBeInTheDocument();
     expect(window.location.pathname).toBe('/redefinir-senha');
   });
