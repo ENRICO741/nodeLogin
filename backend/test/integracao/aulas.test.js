@@ -593,7 +593,12 @@ describe('POST /api/visitas/:id/finalizar', () => {
     const aula = await primeiraAula(u);
     const v1 = (await responderAula(u, aula.id)).visita;
     const v2 = (await responderAula(u, aula.id)).visita;
-    await Promise.all([v1, v2].map((v) => u.api('post', `/api/visitas/${v.id}/finalizar`)));
+    const r = await Promise.all([v1, v2].map((v) => u.api('post', `/api/visitas/${v.id}/finalizar`)));
+    assert.deepEqual(
+      r.map((x) => x.status),
+      [200, 200],
+    );
+    assert.deepEqual(r.map((x) => x.body.bonus_conclusao).sort(), [0, aula.pontos_conclusao].sort());
     const { rows } = await pool.query(
       'SELECT count(*)::int AS n FROM aula_visitas WHERE usuario_id = $1 AND pontos_conclusao_ganhos',
       [u.usuario.id],
@@ -601,6 +606,34 @@ describe('POST /api/visitas/:id/finalizar', () => {
     assert.equal(rows[0].n, 1);
     const me = (await u.api('get', '/api/auth/me')).body;
     assert.equal(me.pontuacao_total, 20 + aula.pontos_conclusao);
+  });
+
+  test('primeiro acerto em duas visitas ao mesmo tempo: pontua uma vez só', async () => {
+    const u = await novoUsuario();
+    const aula = (await u.api('get', `/api/aulas/${(await primeiraAula(u)).id}`)).body;
+    const q = aula.questoes[0];
+    const certas = await gabarito('questoes_aula', [q.id]);
+    const visitas = [
+      (await u.api('post', `/api/aulas/${aula.id}/visitas`)).body,
+      (await u.api('post', `/api/aulas/${aula.id}/visitas`)).body,
+    ];
+    const r = await Promise.all(
+      visitas.map((v) =>
+        u.api('post', `/api/visitas/${v.id}/respostas`).send({ questao_id: q.id, alternativa: certas[q.id] }),
+      ),
+    );
+    // As duas respostas são gravadas (antes, a segunda esbarrava no índice único e voltava 409).
+    assert.deepEqual(
+      r.map((x) => x.status),
+      [200, 200],
+    );
+    assert.deepEqual(r.map((x) => x.body.pontos_ganhos).sort(), [0, 10]);
+    const { rows } = await pool.query(
+      'SELECT count(*)::int AS n FROM aula_respostas WHERE usuario_id = $1 AND questao_id = $2 AND pontuou',
+      [u.usuario.id, q.id],
+    );
+    assert.equal(rows[0].n, 1);
+    assert.equal((await u.api('get', '/api/auth/me')).body.pontuacao_total, 10);
   });
 
   test('conquistas por quantidade de aulas: 5, 10 e Graduado em 15', async () => {

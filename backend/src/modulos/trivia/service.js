@@ -1,6 +1,6 @@
 const { transacao } = require('../../db/pool');
 const { HttpError, naoEncontrado, conflito } = require('../../lib/erros');
-const { ehAdmin, creditarPontos, pontuacaoAtual, concederBadges } = require('../pontuacao');
+const { ehAdmin, travarUsuario, creditarPontos, pontuacaoAtual, concederBadges } = require('../pontuacao');
 
 async function obterRodada(c, rodadaId, usuarioId) {
   const { rows } = await c.query(
@@ -60,6 +60,7 @@ async function criarRodada(usuarioId, { dificuldade, limite }) {
 
 // Não recusa a rodada finalizada: o reenvio de uma resposta ou da finalização ainda é atendido.
 async function travarRodada(c, rodadaId, usuarioId) {
+  await travarUsuario(c, usuarioId);
   const { rows } = await c.query(
     'SELECT id, finalizada_em FROM trivia_rodadas WHERE id = $1 AND usuario_id = $2 FOR UPDATE',
     [rodadaId, usuarioId],

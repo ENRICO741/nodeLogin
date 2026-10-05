@@ -1,6 +1,6 @@
 const { query, transacao } = require('../../db/pool');
 const { HttpError, naoEncontrado, conflito } = require('../../lib/erros');
-const { ehAdmin, creditarPontos, pontuacaoAtual, concederBadges } = require('../pontuacao');
+const { ehAdmin, travarUsuario, creditarPontos, pontuacaoAtual, concederBadges } = require('../pontuacao');
 const { triviaLiberada } = require('../trivia/service');
 
 // Trilha em sequência: a aula só abre depois de concluída a anterior (aula ativa de ordem imediatamente menor).
@@ -75,6 +75,7 @@ async function iniciarVisita(aulaId, usuarioId) {
 // Não recusa a visita finalizada: o reenvio de uma resposta ou da finalização ainda é atendido.
 // Aula desativada pelo admin com a visita aberta: 404, como em toda rota de aula (não pontua nem paga bônus).
 async function travarVisita(c, visitaId, usuarioId) {
+  await travarUsuario(c, usuarioId);
   const { rows } = await c.query(
     `SELECT v.id, v.aula_id, v.finalizada_em, v.pontos_conclusao_ganhos
      FROM aula_visitas v JOIN aulas a ON a.id = v.aula_id AND a.ativo

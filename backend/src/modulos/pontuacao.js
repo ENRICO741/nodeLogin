@@ -4,6 +4,13 @@
 // Fragmento SQL; `usuario` é o parâmetro com o id (ex.: '$1').
 const ehAdmin = (usuario) => `EXISTS (SELECT 1 FROM usuarios WHERE id = ${usuario} AND papel = 'admin')`;
 
+// Uma escrita de pontuação por usuário por vez (duas abas, dois aparelhos). Sem isso, duas transações
+// leem "ainda não pontuou" ao mesmo tempo e a segunda esbarra no índice único: os pontos ficam certos,
+// mas a resposta legítima dela volta 409 e se perde. Sempre antes de travar a visita ou rodada.
+async function travarUsuario(c, usuarioId) {
+  await c.query('SELECT 1 FROM usuarios WHERE id = $1 FOR UPDATE', [usuarioId]);
+}
+
 // Credita pontos e registra no histórico (pontuacao_historico), que permite reconstruir a evolução no tempo.
 // origem: 'aula_questao' | 'aula_conclusao' | 'trivia_questao'; referenciaId: questão ou aula que gerou os pontos.
 async function creditarPontos(c, usuarioId, pontos, origem, referenciaId) {
@@ -82,4 +89,4 @@ async function concederBadges(c, usuarioId) {
   return rows;
 }
 
-module.exports = { ehAdmin, creditarPontos, pontuacaoAtual, concederBadges };
+module.exports = { ehAdmin, travarUsuario, creditarPontos, pontuacaoAtual, concederBadges };

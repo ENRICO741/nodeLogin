@@ -266,6 +266,28 @@ describe('POST /api/trivia/rodadas/:id/respostas', () => {
     assert.equal((await responder(u, r2.id, q.id, certas[q.id])).body.pontos_ganhos, 5);
   });
 
+  test('primeiro acerto em duas rodadas ao mesmo tempo: as duas gravam, pontua uma vez só', async () => {
+    const u = await novoJogador();
+    // Fácil tem 3 questões: as duas rodadas sorteiam as mesmas.
+    const [r1, r2] = [(await novaRodada(u)).body, (await novaRodada(u)).body];
+    const q = r1.questoes[0];
+    const certas = await gabarito('questoes_trivia', [q.id]);
+    const r = await Promise.all([r1, r2].map((rodada) => responder(u, rodada.id, q.id, certas[q.id])));
+    assert.deepEqual(
+      r.map((x) => x.status),
+      [200, 200],
+    );
+    assert.deepEqual(r.map((x) => x.body.pontos_ganhos).sort(), [0, 5]);
+    const { rows } = await pool.query(
+      `SELECT count(*)::int AS respostas, count(*) FILTER (WHERE pontuou)::int AS pontuou,
+         (SELECT sum(pontos_ganhos)::int FROM trivia_rodadas WHERE usuario_id = $1) AS pontos_rodadas
+       FROM trivia_respostas WHERE usuario_id = $1 AND questao_id = $2`,
+      [u.usuario.id, q.id],
+    );
+    assert.deepEqual(rows[0], { respostas: 2, pontuou: 1, pontos_rodadas: 5 });
+    assert.equal((await u.api('get', '/api/auth/me')).body.pontuacao_total, 5);
+  });
+
   test('alternativa inválida dá 400', async () => {
     const u = await novoJogador();
     const rodada = (await novaRodada(u)).body;
