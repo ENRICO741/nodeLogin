@@ -111,6 +111,10 @@ describe('PATCH /api/perfil', () => {
       .send({ bio: 'x'.repeat(501) })
       .expect(400);
     await u.api('patch', '/api/perfil').send({ nome: 'A' }).expect(400);
+    // Mesma regra do cadastro: nada de quebra de linha ou caractere invisível no nome.
+    for (const nome of ['Ana\nBia', 'Ana\u202Eetla']) {
+      await u.api('patch', '/api/perfil').send({ nome }).expect(400);
+    }
     await u
       .api('patch', '/api/perfil')
       .send({ bio: 'x'.repeat(500) })

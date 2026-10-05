@@ -44,10 +44,9 @@ async function entrar({ identificador, senha }) {
 
 // Sempre termina sem erro para quem chamou: a resposta não revela se o e-mail existe.
 async function solicitarRecuperacao(email) {
-  const { rows } = await query(
-    'SELECT id, nome, email FROM usuarios WHERE ativo AND lower(email) = lower($1)',
-    [email],
-  );
+  const { rows } = await query('SELECT id, email FROM usuarios WHERE ativo AND lower(email) = lower($1)', [
+    email,
+  ]);
   const usuario = rows[0];
   if (!usuario) return;
 
@@ -69,8 +68,10 @@ async function solicitarRecuperacao(email) {
     .enviarEmail({
       para: usuario.email,
       assunto: 'Redefinição de senha',
+      // Só texto fixo: o nome vem de quem cadastrou, e o cadastro não confirma o e-mail. Um nome com
+      // quebras de linha e URL viraria phishing saindo do remetente oficial.
       texto:
-        `Olá, ${usuario.nome}.\n\nPara criar uma nova senha, acesse o link abaixo (válido por 30 minutos):\n${link}\n\n` +
+        `Olá.\n\nPara criar uma nova senha, acesse o link abaixo (válido por 30 minutos):\n${link}\n\n` +
         'Se você não pediu a redefinição, ignore este e-mail. Sua senha continua a mesma.',
     })
     .catch((erro) => logger.error('falha ao enviar e-mail de recuperação', { erro }));

@@ -10,6 +10,12 @@ const textoOpcional = (max) =>
     .transform((v) => v || null)
     .nullable()
     .optional();
+// Nome de pessoa: uma linha só, sem caracteres de controle ou invisíveis (ex.: U+202E inverte o texto).
+// Evita montar parágrafos falsos onde o nome aparece.
+const nome = texto(2, 120).regex(
+  /^[^\p{C}\p{Zl}\p{Zp}]+$/u,
+  'O nome não pode ter quebra de linha nem caracteres invisíveis',
+);
 const urlHttps = z.url({ protocol: /^https$/, error: 'Use uma URL https://' }).max(2000);
 
 const esquemaQuestao = z.object({
@@ -59,6 +65,7 @@ const esquemaPapel = z.strictObject({ admin: z.boolean() });
 module.exports = {
   texto,
   textoOpcional,
+  nome,
   urlHttps,
   esquemaQuestao,
   esquemaResposta,

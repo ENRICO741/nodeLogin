@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const {
   texto,
   textoOpcional,
+  nome,
   urlHttps,
   esquemaQuestao,
   esquemaResposta,
@@ -39,6 +40,36 @@ describe('texto', () => {
   });
   test('recusa tipos que não são string', () => {
     for (const valor of [123, null, undefined, {}, []]) assert.throws(() => texto(1, 3).parse(valor));
+  });
+});
+
+describe('nome', () => {
+  test('aceita acentos, apóstrofo, hífen e espaços internos (trim nas pontas)', () => {
+    for (const valor of ['José da Conceição', "Ana D'Ávila", 'Zoë Müller-Łukasz', 'Ñandú 2º']) {
+      assert.equal(nome.parse(valor), valor);
+    }
+    assert.equal(nome.parse('  Ana  '), 'Ana');
+  });
+  test('recusa quebra de linha, controle e caracteres invisíveis', () => {
+    for (const valor of [
+      'Ana.\n\nSua conta foi bloqueada',
+      'Ana\rBia',
+      'Ana\u0000',
+      'Ana\u202Eetla',
+      'Ana\u200BBia',
+      'Ana\u2028Bia',
+      'Ana\tBia',
+    ]) {
+      const r = nome.safeParse(valor);
+      assert.equal(r.success, false, JSON.stringify(valor));
+      assert.match(r.error.issues[0].message, /quebra de linha/);
+    }
+  });
+  test('mantém os limites de 2 a 120 caracteres', () => {
+    assert.throws(() => nome.parse('A'));
+    assert.equal(nome.parse('Ab'), 'Ab');
+    assert.equal(nome.parse('a'.repeat(120)).length, 120);
+    assert.throws(() => nome.parse('a'.repeat(121)));
   });
 });
 

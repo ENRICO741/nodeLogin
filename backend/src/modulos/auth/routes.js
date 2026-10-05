@@ -8,12 +8,12 @@ const {
   limiteRecuperacaoIp,
   limiteRecuperacaoEmail,
 } = require('../../middleware/limites');
-const { texto, senha } = require('../../lib/validacao');
+const { texto, nome, senha } = require('../../lib/validacao');
 
 const email = z.email('E-mail inválido').max(254);
 
 const esquemaCadastro = z.object({
-  nome: texto(2, 120),
+  nome,
   apelido: z
     .string()
     .trim()

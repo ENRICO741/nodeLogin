@@ -36,6 +36,23 @@ describe('POST /api/auth/cadastro', () => {
     assert.match(rows[0].senha_hash, /^\$2b\$/);
   });
 
+  test('recusa nome com quebra de linha ou caractere invisível (phishing no e-mail), sem criar a conta', async () => {
+    const email = `phish_${Math.random().toString(36).slice(2, 10)}@exemplo.com`;
+    const nomes = [
+      'Ana.\n\nSua conta foi bloqueada. Regularize em https://x.example',
+      'Ana\r\nBia',
+      'Ana\u0000',
+      'Ana\u202Eetla',
+    ];
+    for (const nome of nomes) {
+      const res = await cadastro({ nome, email }).expect(400);
+      assert.deepEqual(camposComErro(res), ['nome'], JSON.stringify(nome));
+    }
+    const { rows } = await pool.query('SELECT 1 FROM usuarios WHERE email = $1', [email]);
+    assert.equal(rows.length, 0);
+    await cadastro({ nome: 'Ana Conceição', email }).expect(201);
+  });
+
   test('aceita apelido com ponto, hífen e sublinhado nos limites de 3 e 30', async () => {
     await cadastro({ apelido: 'a.b' }).expect(201);
     await cadastro({ apelido: 'x'.repeat(28) + '-_' }).expect(201);
@@ -271,6 +288,8 @@ describe('recuperação de senha', () => {
     const { mensagem, token } = await email;
     assert.equal(mensagem.para, u.email);
     assert.match(mensagem.texto, /redefinir-senha\?token=/);
+    assert.match(mensagem.texto, /^Olá\.\n/);
+    assert.ok(!mensagem.texto.includes(u.nome), 'o nome (texto livre do usuário) não vai no e-mail');
     const { rows } = await pool.query(
       'SELECT token_hash FROM tokens_recuperacao_senha WHERE usuario_id = $1',
       [u.usuario.id],
