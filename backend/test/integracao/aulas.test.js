@@ -144,6 +144,44 @@ describe('trilha em sequência', () => {
     }
   });
 
+  test('conclusão é permanente: aula concluída segue aberta mesmo sem a anterior constar como concluída', async () => {
+    const u = await novoUsuario();
+    const [a1, a2, a3, a4] = (await u.api('get', '/api/aulas')).body;
+    for (const a of [a1, a2]) {
+      const { visita } = await responderAula(u, a.id);
+      await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200);
+    }
+    // A aula 01 deixa de constar como concluída (simulado por SQL).
+    await pool.query('DELETE FROM aula_visitas WHERE usuario_id = $1 AND aula_id = $2', [
+      u.usuario.id,
+      a1.id,
+    ]);
+
+    await u.api('get', `/api/aulas/${a2.id}`).expect(200);
+    await u.api('post', `/api/aulas/${a2.id}/visitas`).expect(201);
+    await u.api('get', `/api/aulas/${a3.id}`).expect(200); // liberada pela 02, que segue concluída
+    const res = await u.api('get', `/api/aulas/${a4.id}`).expect(403);
+    assert.equal(res.body.erro.codigo, 'AULA_BLOQUEADA');
+
+    const lista = (await u.api('get', '/api/aulas')).body;
+    const bloqueada = (id) => lista.find((a) => a.id === id).bloqueada;
+    assert.deepEqual(
+      [bloqueada(a1.id), bloqueada(a2.id), bloqueada(a3.id), bloqueada(a4.id)],
+      [false, false, false, true],
+    );
+    assert.equal(lista.find((a) => a.id === a2.id).concluida, true);
+  });
+
+  test('aula não concluída com a anterior pendente continua bloqueada (403)', async () => {
+    const u = await novoUsuario();
+    const [, a2] = (await u.api('get', '/api/aulas')).body;
+    await u.api('get', `/api/aulas/${a2.id}`).expect(403);
+    await u.api('post', `/api/aulas/${a2.id}/visitas`).expect(403);
+    // Visita aberta (não concluída) na própria aula não libera.
+    await pool.query('INSERT INTO aula_visitas (usuario_id, aula_id) VALUES ($1, $2)', [u.usuario.id, a2.id]);
+    await u.api('get', `/api/aulas/${a2.id}`).expect(403);
+  });
+
   test('aluno comum percorre a trilha de 01 a 15 pela tela e a trivia libera no fim', async () => {
     const u = await novoUsuario();
     const aulas = (await u.api('get', '/api/aulas')).body;

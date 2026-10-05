@@ -4,10 +4,13 @@ const { ehAdmin, travarUsuario, creditarPontos, pontuacaoAtual, concederBadges }
 const { triviaLiberada } = require('../trivia/service');
 
 // Trilha em sequência: a aula só abre depois de concluída a anterior (aula ativa de ordem imediatamente menor).
-// Admin não fica preso à trilha.
+// Conclusão é permanente: aula que o aluno já concluiu continua aberta para ele. Admin não fica preso à trilha.
 async function exigirLiberada(aulaId, usuarioId) {
   const { rows } = await query(
-    `SELECT ant.ordem AS ordem_anterior, ant.concluida OR ${ehAdmin('$2')} AS anterior_concluida
+    `SELECT ant.ordem AS ordem_anterior,
+       ant.concluida OR ${ehAdmin('$2')} OR EXISTS (
+         SELECT 1 FROM aula_visitas v WHERE v.aula_id = a.id AND v.usuario_id = $2 AND v.concluida
+       ) AS liberada
      FROM aulas a
      LEFT JOIN LATERAL (
        SELECT p.ordem, EXISTS (
@@ -18,15 +21,16 @@ async function exigirLiberada(aulaId, usuarioId) {
     [aulaId, usuarioId],
   );
   if (!rows[0]) throw naoEncontrado('Aula não encontrada');
-  const { ordem_anterior, anterior_concluida } = rows[0];
-  if (ordem_anterior !== null && !anterior_concluida) {
+  const { ordem_anterior, liberada } = rows[0];
+  if (ordem_anterior !== null && !liberada) {
     throw new HttpError(403, 'AULA_BLOQUEADA', `Conclua a aula ${ordem_anterior} para continuar`);
   }
 }
 
 async function listar(usuarioId) {
   const { rows } = await query(
-    `SELECT *, NOT (COALESCE(lag(concluida) OVER (ORDER BY ordem), true) OR ${ehAdmin('$1')}) AS bloqueada
+    `SELECT *,
+       NOT (concluida OR COALESCE(lag(concluida) OVER (ORDER BY ordem), true) OR ${ehAdmin('$1')}) AS bloqueada
      FROM (
        SELECT a.id, a.titulo, a.ordem, a.pontos_conclusao,
          (SELECT count(*)::int FROM questoes_aula q WHERE q.aula_id = a.id AND q.ativo) AS total_questoes,
