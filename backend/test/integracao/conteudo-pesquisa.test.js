@@ -426,6 +426,9 @@ describe('exportação da pesquisa', () => {
       res.visoes.map((v) => v.id),
       ['uso-diario', 'engajamento', 'retencao', 'sessoes', 'eventos', 'respostas', 'pontos', 'badges'],
     );
+    // A visão conta semanas de calendário (date_trunc), não blocos de 7 dias desde o cadastro.
+    const retencao = res.visoes.find((v) => v.id === 'retencao');
+    assert.match(retencao.descricao, /semanas de calendário desde a semana de entrada/);
   });
 
   test('só admin exporta', async () => {
