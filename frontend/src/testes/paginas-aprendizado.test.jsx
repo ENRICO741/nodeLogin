@@ -184,7 +184,7 @@ describe('Aula', () => {
 
   it('falha ao iniciar mostra erro e mantém o conteúdo', async () => {
     await renderizarApp('/aulas/a1', {
-      rotas: rotasAula({ 'POST /aulas/a1/visitas': erroApi(0, 'SEM_CONEXAO', 'Sem conexão') }),
+      rotas: rotasAula({ 'POST /aulas/a1/visitas': new TypeError('Failed to fetch') }),
     });
     await userEvent.click(await screen.findByRole('button', { name: 'Responder 2 perguntas' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Sem conexão');
