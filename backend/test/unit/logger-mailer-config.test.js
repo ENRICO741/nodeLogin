@@ -200,6 +200,22 @@ describe('config', () => {
     assert.match(saida, /Configuração inválida[\s\S]*DATABASE_URL/);
   });
 
+  test('JWT_EXPIRA_EM aceita número com unidade', async () => {
+    for (const valor of ['7d', '12h', '30m', '3600s']) {
+      const { codigo, saida } = await lerConfig({ JWT_EXPIRA_EM: valor });
+      assert.equal(codigo, 0, saida);
+      assert.equal(JSON.parse(saida).JWT_EXPIRA_EM, valor);
+    }
+  });
+
+  test('falha no boot com JWT_EXPIRA_EM inválido, sem unidade ou zero', async () => {
+    for (const valor of ['abc', '7', '7 d', '7days', '0d', '-1d', '1w']) {
+      const { codigo, saida } = await lerConfig({ JWT_EXPIRA_EM: valor });
+      assert.equal(codigo, 1, valor);
+      assert.match(saida, /JWT_EXPIRA_EM precisa de número e unidade/, valor);
+    }
+  });
+
   test('falha no boot com JWT_SECRET curto', async () => {
     const { codigo, saida } = await lerConfig({ JWT_SECRET: 'curto' });
     assert.equal(codigo, 1);

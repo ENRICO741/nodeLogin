@@ -9,7 +9,12 @@ const esquema = z.object({
   PORT: z.coerce.number().int().default(4000),
   DATABASE_URL: z.string().min(1),
   JWT_SECRET: z.string().min(32, 'JWT_SECRET precisa de pelo menos 32 caracteres'),
-  JWT_EXPIRA_EM: z.string().default('7d'),
+  // Validado no boot: um valor inválido só falharia no jwt.sign, depois do INSERT do cadastro (conta órfã).
+  // Exige a unidade: só dígitos o jsonwebtoken lê como segundos ("7" = 7 s).
+  JWT_EXPIRA_EM: z
+    .string()
+    .regex(/^[1-9]\d*[smhd]$/, 'JWT_EXPIRA_EM precisa de número e unidade (s, m, h ou d), ex.: 7d')
+    .default('7d'),
   // 11: metade da CPU do 12 por cadastro/login (o gargalo no teste de carga), acima do mínimo do OWASP (10).
   // Hashes antigos continuam valendo: o custo fica gravado no próprio hash.
   BCRYPT_CUSTO: z.coerce.number().int().min(4).max(15).default(11),
