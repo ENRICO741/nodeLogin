@@ -689,7 +689,8 @@ describe('GET /api/admin/estatisticas', () => {
       [0, 0, null],
     );
 
-    assert.equal(s.questoesAula.length, 2);
+    // As duas da aula 01 e a provisória de cada uma das aulas 02 a 15.
+    assert.equal(s.questoesAula.length, 16);
     assert.equal(s.questoesAula.find((q) => q.questao_id === detalhe.questoes[0].id).total_acertos, 1);
 
     assert.deepEqual(Object.keys(s.usuariosAula[0]).sort(), [

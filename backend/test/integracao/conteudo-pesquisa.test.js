@@ -462,7 +462,8 @@ describe('exportação da pesquisa', () => {
         linha.visitas_ranking,
         linha.usa_pwa_instalado,
       ],
-      ['1', '1', '1', '2', '2', '40', '2', '1', 'true'],
+      // Só a Primeiros Passos: o Aluno Nota 10 exige também a pergunta das aulas 02 a 15.
+      ['1', '1', '1', '2', '2', '40', '1', '1', 'true'],
     );
     const sessoes = tabela((await baixar('sessoes')).body);
     assert.equal(sessoes[0].participante, linha.participante, 'mesmo pseudônimo nas visões');

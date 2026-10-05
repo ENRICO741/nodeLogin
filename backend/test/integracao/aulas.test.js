@@ -143,6 +143,36 @@ describe('trilha em sequência', () => {
       await pool.query('UPDATE aulas SET ativo = true WHERE id = $1', [segunda.id]);
     }
   });
+
+  test('aluno comum percorre a trilha de 01 a 15 pela tela e a trivia libera no fim', async () => {
+    const u = await novoUsuario();
+    const aulas = (await u.api('get', '/api/aulas')).body;
+    assert.equal(aulas.length, 15);
+    for (const [i, a] of aulas.entries()) {
+      // Toda aula tem ao menos uma pergunta: sem ela, a tela não teria como concluir a aula.
+      const { visita, aula } = await responderAula(u, a.id);
+      assert.ok(aula.questoes.length > 0, `aula ${a.ordem} sem pergunta`);
+      const fim = (await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200)).body;
+      assert.equal(fim.trivia_liberada, i === aulas.length - 1, `trivia na aula ${a.ordem}`);
+      if (i === 0) await u.api('post', '/api/trivia/rodadas').send({ dificuldade: 'facil' }).expect(403);
+    }
+    assert.ok((await u.api('get', '/api/aulas')).body.every((a) => a.concluida && !a.bloqueada));
+    await u.api('post', '/api/trivia/rodadas').send({ dificuldade: 'facil' }).expect(201);
+  });
+
+  test('pergunta provisória das aulas 02 a 15: uma só, chave confirmacao-leitura, "Sim" correta', async () => {
+    const { rows } = await pool.query(
+      `SELECT a.ordem, q.chave, q.resposta_correta, q.alternativa_a, q.pontos
+       FROM aulas a JOIN questoes_aula q ON q.aula_id = a.id AND q.ativo WHERE a.ordem > 1 ORDER BY a.ordem`,
+    );
+    assert.equal(rows.length, 14);
+    for (const q of rows) {
+      assert.deepEqual(
+        [q.chave, q.resposta_correta, q.alternativa_a, q.pontos],
+        ['confirmacao-leitura', 'a', 'Sim', 10],
+      );
+    }
+  });
 });
 
 describe('admin', () => {
@@ -152,7 +182,7 @@ describe('admin', () => {
     assert.ok(aulas.every((a) => !a.bloqueada));
     const ultima = aulas.at(-1);
     await admin.api('get', `/api/aulas/${ultima.id}`).expect(200);
-    const visita = (await admin.api('post', `/api/aulas/${ultima.id}/visitas`).expect(201)).body;
+    const { visita } = await responderAula(admin, ultima.id);
     await admin.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200);
   });
 
@@ -699,8 +729,15 @@ describe('POST /api/visitas/:id/finalizar', () => {
     );
   });
 
+  // Acerta a pergunta das aulas 02 a 15 (trilha liberada): para o Aluno Nota 10 só falta a aula 01.
+  async function acertarOutrasAulas(u) {
+    const [, ...outras] = (await u.api('get', '/api/aulas')).body;
+    for (const a of outras) await responderAula(u, a.id);
+  }
+
   test('Aluno Nota 10: acertar todas as perguntas de todas as aulas, mesmo em outra visita', async () => {
-    const u = await novoUsuario();
+    const u = await novoJogador();
+    await acertarOutrasAulas(u);
     const aula = await primeiraAula(u);
     let { visita } = await responderAula(u, aula.id, (i) => i === 0);
     let fim = (await u.api('post', `/api/visitas/${visita.id}/finalizar`)).body;
@@ -715,7 +752,12 @@ describe('POST /api/visitas/:id/finalizar', () => {
   });
 
   test('Aluno Nota 10 exige as perguntas das outras aulas também', async () => {
-    const u = await novoUsuario();
+    const u = await novoJogador();
+    // Sem a pergunta das aulas 02 a 15, gabaritar a aula 01 não basta.
+    const { visita: primeira } = await responderAula(u, (await primeiraAula(u)).id);
+    const fimSem = (await u.api('post', `/api/visitas/${primeira.id}/finalizar`)).body;
+    assert.ok(!fimSem.novos_badges.some((b) => b.nome === 'Aluno Nota 10'));
+    await acertarOutrasAulas(u);
     const outra = (await u.api('get', '/api/aulas')).body[1];
     const { rows } = await pool.query(
       "INSERT INTO questoes_aula (aula_id, enunciado, alternativa_a, alternativa_b, alternativa_c, alternativa_d, resposta_correta) VALUES ($1, 'Extra', 'a', 'b', 'c', 'd', 'a') RETURNING id",
