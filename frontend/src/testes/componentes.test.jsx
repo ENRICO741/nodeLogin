@@ -286,23 +286,27 @@ describe('CardResultado', () => {
     expect(screen.queryByText(/bônus/)).not.toBeInTheDocument();
   });
 
-  it('admin vê o aviso de conta de admin (e nunca a regra de pontos)', async () => {
-    localStorage.setItem('guardiao.token', 'token-teste');
-    servidorFalso({ 'GET /auth/me': ADMIN });
-    render(
-      <AuthProvider>
-        <MemoryRouter initialEntries={['/aulas/a1']}>
-          <CardResultado {...base} pontosGanhos={0} />
-        </MemoryRouter>
-      </AuthProvider>,
-    );
-    expect(
-      await screen.findByText(
-        'Conta de admin: os pontos não contam e as conquistas aparecem só para conferência.',
-      ),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/primeiro acerto/)).not.toBeInTheDocument();
-  });
+  // Com pontos também: o aviso de admin não depende de ter feito zero.
+  it.each([0, 10])(
+    'admin vê o aviso de conta de admin (e nunca a regra de pontos) com %i pontos',
+    async (pontos) => {
+      localStorage.setItem('guardiao.token', 'token-teste');
+      servidorFalso({ 'GET /auth/me': ADMIN });
+      render(
+        <AuthProvider>
+          <MemoryRouter initialEntries={['/aulas/a1']}>
+            <CardResultado {...base} pontosGanhos={pontos} />
+          </MemoryRouter>
+        </AuthProvider>,
+      );
+      expect(
+        await screen.findByText(
+          'Conta de admin: os pontos não contam e as conquistas aparecem só para conferência.',
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/primeiro acerto/)).not.toBeInTheDocument();
+    },
+  );
 });
 
 describe('ErrorBoundary', () => {
