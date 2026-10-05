@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import DOMPurify from 'dompurify';
 import { ArrowLeft, CheckCircle2, Lock } from 'lucide-react';
@@ -17,6 +17,7 @@ function Quiz({ aula, visitaId, aoFinalizar }) {
   const { atualizarUsuario } = useAuth();
   const [erroFinal, setErroFinal] = useState(null);
   const [finalizando, setFinalizando] = useState(false);
+  const emAndamento = useRef(false); // trava síncrona: o disabled só chega no próximo render
   const tela = `/aulas/${aula.id}`;
 
   const quiz = useQuiz({
@@ -36,7 +37,8 @@ function Quiz({ aula, visitaId, aoFinalizar }) {
   });
 
   async function finalizar() {
-    if (finalizando) return; // toque duplo não finaliza duas vezes
+    if (emAndamento.current) return; // toque duplo não finaliza duas vezes
+    emAndamento.current = true;
     setFinalizando(true);
     setErroFinal(null);
     try {
@@ -48,6 +50,7 @@ function Quiz({ aula, visitaId, aoFinalizar }) {
       setErroFinal(e);
     } finally {
       setFinalizando(false);
+      emAndamento.current = false;
     }
   }
 
@@ -72,6 +75,7 @@ export function Aula() {
   const [resultado, setResultado] = useState(null);
   const [erroInicio, setErroInicio] = useState(null);
   const [iniciando, setIniciando] = useState(false);
+  const emAndamento = useRef(false); // trava síncrona: o disabled só chega no próximo render
   const concluirLeitura = useLeitura(id, Boolean(aula) && etapa === 'conteudo');
 
   if (carregando) return <Carregando texto="Carregando aula…" />;
@@ -89,7 +93,8 @@ export function Aula() {
   if (erro) return <ErroCarregamento erro={erro} onTentarDeNovo={recarregar} />;
 
   async function iniciar() {
-    if (iniciando) return; // toque duplo não abre duas visitas
+    if (emAndamento.current) return; // toque duplo não abre duas visitas
+    emAndamento.current = true;
     setIniciando(true);
     concluirLeitura('iniciou_perguntas');
     setErroInicio(null);
@@ -102,6 +107,7 @@ export function Aula() {
       setErroInicio(e);
     } finally {
       setIniciando(false);
+      emAndamento.current = false;
     }
   }
 

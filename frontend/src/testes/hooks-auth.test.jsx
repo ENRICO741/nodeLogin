@@ -130,7 +130,9 @@ function Painel() {
       </button>
       <button onClick={() => auth.cadastrar({ nome: 'x' })}>cadastrar</button>
       <button onClick={() => auth.atualizarUsuario({ pontuacao_total: 99 })}>pontos</button>
-      <button onClick={() => auth.atualizarUsuario({ consentiu_pesquisa_em: null })}>retirar</button>
+      <button onClick={() => auth.atualizarUsuario({ consentiu_pesquisa_em: null })}>
+        sem consentimento
+      </button>
       <button onClick={() => auth.atualizarUsuario({ consentiu_pesquisa_em: '2026-06-01' })}>conceder</button>
       <button onClick={auth.sair}>sair</button>
     </div>
@@ -176,7 +178,7 @@ describe('AuthProvider', () => {
     expect(servidor.enviados('POST /eventos')).toEqual([]);
   });
 
-  it('retirar o consentimento finaliza a sessão; reconceder abre outra', async () => {
+  it('conta que fica sem consentimento finaliza a sessão; com consentimento abre outra', async () => {
     localStorage.setItem('guardiao.token', 't');
     const servidor = servidorFalso({
       'GET /auth/me': PARTICIPANTE,
@@ -184,9 +186,9 @@ describe('AuthProvider', () => {
     });
     montar();
     await waitFor(() => expect(servidor.enviados('POST /sessoes')).toHaveLength(1));
-    await userEvent.click(screen.getByText('retirar'));
+    await userEvent.click(screen.getByText('sem consentimento'));
     expect(servidor.enviados('POST /sessoes/sessao-1/finalizar')).toHaveLength(1);
-    registrarEvento({ tipo_evento: 'depois_de_retirar' });
+    registrarEvento({ tipo_evento: 'sem_consentimento' });
     await userEvent.click(screen.getByText('conceder'));
     await waitFor(() => expect(servidor.enviados('POST /sessoes')).toHaveLength(2));
     expect(servidor.enviados('POST /eventos')).toEqual([]);

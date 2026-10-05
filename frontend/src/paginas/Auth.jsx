@@ -46,7 +46,7 @@ function useEnvio(acao) {
 export function Entrar() {
   const { entrar } = useAuth();
   // Depois do login, a RotaPublica redireciona (para a página de origem, se houver).
-  const { enviando, erro, enviar } = useEnvio(entrar);
+  const { enviando, erro, porCampo, enviar } = useEnvio(entrar);
 
   return (
     <TelaAuth
@@ -59,9 +59,22 @@ export function Entrar() {
       }
     >
       <form className="pilha" onSubmit={enviar} noValidate>
-        <Aviso tipo="erro">{erro?.message}</Aviso>
-        <Campo label="E-mail ou apelido" name="identificador" autoComplete="username" required />
-        <Campo label="Senha" name="senha" type="password" autoComplete="current-password" required />
+        <Aviso tipo="erro">{erro && !erro.detalhes.length ? erro.message : null}</Aviso>
+        <Campo
+          label="E-mail ou apelido"
+          name="identificador"
+          autoComplete="username"
+          required
+          erro={porCampo.identificador}
+        />
+        <Campo
+          label="Senha"
+          name="senha"
+          type="password"
+          autoComplete="current-password"
+          required
+          erro={porCampo.senha}
+        />
         <button type="submit" className="botao botao--bloco" disabled={enviando}>
           {enviando ? 'Entrando…' : 'Entrar'}
         </button>

@@ -49,7 +49,14 @@ describe('tokenSalvo', () => {
   });
 
   it('com localStorage funcionando, ele é a fonte (memória não ressuscita token limpo em outra aba)', () => {
+    // Uma falha antes deixa o token antigo em memória; o definir com sucesso tem de apagá-lo.
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementationOnce(() => {
+      throw new Error('cota');
+    });
+    tokenSalvo.definir('antigo');
+    setItem.mockRestore();
     tokenSalvo.definir('z');
+    expect(localStorage.getItem('guardiao.token')).toBe('z');
     localStorage.removeItem('guardiao.token');
     expect(tokenSalvo.obter()).toBeNull();
   });
@@ -392,7 +399,7 @@ describe('telemetria', () => {
     expect(servidor.enviados('POST /eventos')[0].sessao_id).toBe('sessao-b');
   });
 
-  it('204 ao criar sessão (consentimento retirado no servidor) não quebra nem envia eventos', async () => {
+  it('204 ao criar sessão (conta sem consentimento no servidor) não quebra nem envia eventos', async () => {
     localStorage.setItem('guardiao.token', 't');
     const servidor = servidorFalso({ 'POST /sessoes': { status: 204 } });
     telemetria.registrarEvento({ tipo_evento: 'x' });

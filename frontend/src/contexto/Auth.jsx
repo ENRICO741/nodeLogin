@@ -49,7 +49,8 @@ export function AuthProvider({ children }) {
     setUsuario(usuario);
   }, []);
 
-  // Coleta segue o consentimento do usuário: retirar ou reconceder no Perfil para ou retoma na hora.
+  // Coleta segue o consentimento do usuário. Ele é obrigatório no cadastro e não se retira pelo app;
+  // a checagem fica como defesa para conta sem ele (aí não abre sessão nem envia eventos).
   // null (sem usuário ainda) não faz nada, para não apagar a fila enquanto o /auth/me carrega.
   const coleta = usuario ? Boolean(usuario.consentiu_pesquisa_em) : null;
   useEffect(() => {

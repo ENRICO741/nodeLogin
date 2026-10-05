@@ -55,6 +55,30 @@ describe('sessões de telemetria', () => {
     expect(servidor.enviados('POST /sessoes')).toHaveLength(1);
   });
 
+  it('logout com o retomar em andamento: a resposta atrasada não vira a sessão do próximo login', async () => {
+    let liberarRetomar;
+    const servidor = servidorFalso({
+      'POST /sessoes': sequencia(
+        { status: 201, corpo: { id: 'sessao-1' } },
+        { status: 201, corpo: { id: 'sessao-b' } },
+      ),
+      'POST /sessoes/sessao-1/finalizar': { status: 204 },
+      'POST /sessoes/sessao-1/retomar': () => new Promise((r) => (liberarRetomar = () => r({ status: 204 }))),
+    });
+    await telemetria.iniciarSessao();
+    mudarVisibilidade('hidden');
+    mudarVisibilidade('visible');
+    await waitFor(() => expect(liberarRetomar).toBeDefined());
+    telemetria.finalizarSessao(); // logout de A
+    localStorage.setItem('guardiao.token', 'token-b');
+    await telemetria.iniciarSessao(); // login de B
+    liberarRetomar();
+    await new Promise((r) => setTimeout(r, 10));
+    telemetria.registrarEvento({ tipo_evento: 'de_b' });
+    await waitFor(() => expect(eventos(servidor, 'de_b')).toHaveLength(1));
+    expect(eventos(servidor, 'de_b')[0].sessao_id).toBe('sessao-b');
+  });
+
   it('se a sessão expirou (404 ao retomar), abre uma nova', async () => {
     const servidor = servidorFalso({
       'POST /sessoes': sequencia(
@@ -414,6 +438,23 @@ describe('useLeitura: tempo de leitura só com a tela visível', () => {
     expect((await lido(servidor)).duracao_ms).toBe(15_000);
   });
 
+  it('vários ciclos somam os trechos visíveis (10 s + fora + 5 s + fora + 3 s = 18 s)', async () => {
+    const servidor = servidorFalso();
+    await telemetria.iniciarSessao();
+    const { result } = renderHook(() => useLeitura('a1', true));
+    vi.setSystemTime(10_000);
+    mudarVisibilidade('hidden');
+    vi.setSystemTime(40_000);
+    mudarVisibilidade('visible');
+    vi.setSystemTime(45_000);
+    mudarVisibilidade('hidden');
+    vi.setSystemTime(80_000);
+    mudarVisibilidade('visible');
+    vi.setSystemTime(83_000);
+    act(() => result.current('iniciou_perguntas'));
+    expect((await lido(servidor)).duracao_ms).toBe(18_000);
+  });
+
   it('sair com a tela em segundo plano conta só até ela sumir; eventos repetidos não somam', async () => {
     const servidor = servidorFalso();
     await telemetria.iniciarSessao();
@@ -437,6 +478,7 @@ describe('useLeitura: tempo de leitura só com a tela visível', () => {
     const { result } = renderHook(() => useLeitura('a1', true));
     vi.setSystemTime(30_000);
     mudarVisibilidade('visible');
+    vi.setSystemTime(32_000);
     mudarVisibilidade('visible'); // repetido: não reinicia a contagem
     vi.setSystemTime(34_000);
     act(() => result.current('iniciou_perguntas'));

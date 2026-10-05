@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { erroApi, PARTICIPANTE, renderizarApp, sequencia, USUARIO } from './utils';
 
@@ -54,6 +54,12 @@ const pendente = (valor) => {
   controle.rota = () => new Promise((r) => (controle.liberar = () => r(valor)));
   return controle;
 };
+// Dois toques no MESMO render: com dois eventos separados o RTL re-renderiza entre eles e só o disabled já barraria.
+const tocarDuasVezes = (botao) =>
+  act(() => {
+    botao.click();
+    botao.click();
+  });
 const alternativa = (texto) => screen.getByRole('button', { name: new RegExp(`^${texto}`) });
 
 describe('Aulas', () => {
@@ -176,14 +182,23 @@ describe('Aula', () => {
     expect(screen.queryByRole('button', { name: /Responder/ })).not.toBeInTheDocument();
   });
 
-  it('falha ao iniciar mostra erro e mantém o conteúdo', async () => {
-    await renderizarApp('/aulas/a1', {
-      rotas: rotasAula({ 'POST /aulas/a1/visitas': erroApi(0, 'SEM_CONEXAO', 'Sem conexão') }),
+  it('falha ao iniciar mostra erro, mantém o conteúdo e deixa tentar de novo', async () => {
+    const { servidor } = await renderizarApp('/aulas/a1', {
+      rotas: rotasAula({
+        'POST /aulas/a1/visitas': sequencia(new TypeError('Failed to fetch'), {
+          status: 201,
+          corpo: { id: 'v1' },
+        }),
+      }),
     });
     await userEvent.click(await screen.findByRole('button', { name: 'Responder 2 perguntas' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Sem conexão');
     expect(screen.getByRole('heading', { name: 'Phishing' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Responder 2 perguntas' })).toBeEnabled();
+    // o segundo toque tem de sair de verdade: a trava não pode ficar presa depois do erro
+    await userEvent.click(screen.getByRole('button', { name: 'Responder 2 perguntas' }));
+    expect(await screen.findByText('Pergunta q1?')).toBeInTheDocument();
+    expect(servidor.enviados('POST /aulas/a1/visitas')).toHaveLength(2);
   });
 
   it('toque duplo em iniciar abre uma visita só', async () => {
@@ -192,7 +207,7 @@ describe('Aula', () => {
       rotas: rotasAula({ 'POST /aulas/a1/visitas': visita.rota }),
     });
     const botao = await screen.findByRole('button', { name: 'Responder 2 perguntas' });
-    await userEvent.dblClick(botao);
+    tocarDuasVezes(botao);
     expect(botao).toBeDisabled();
     visita.liberar();
     expect(await screen.findByText('Pergunta q1?')).toBeInTheDocument();
@@ -217,7 +232,7 @@ describe('Aula', () => {
     });
     await userEvent.click(await screen.findByRole('button', { name: 'Responder 1 pergunta' }));
     await userEvent.click(alternativa('q1-B'));
-    await userEvent.dblClick(await screen.findByRole('button', { name: 'Concluir aula' }));
+    tocarDuasVezes(await screen.findByRole('button', { name: 'Concluir aula' }));
     expect(screen.getByRole('button', { name: 'Concluindo…' })).toBeDisabled();
     fim.liberar();
     expect(await screen.findByRole('heading', { name: 'Aula concluída!' })).toBeInTheDocument();
@@ -263,19 +278,33 @@ describe('Aula', () => {
     expect(await screen.findByRole('link', { name: 'Testar na trivia' })).toHaveAttribute('href', '/trivia');
   });
 
-  it('falha ao concluir mostra erro e mantém a última pergunta', async () => {
-    await renderizarApp('/aulas/a1', {
+  it('falha ao concluir mostra erro, mantém a última pergunta e deixa tentar de novo', async () => {
+    const { servidor } = await renderizarApp('/aulas/a1', {
       rotas: rotasAula({
         'GET /aulas/a1': { ...AULA, questoes: [questao('q1')] },
         'POST /visitas/v1/respostas': feedback(true),
-        'POST /visitas/v1/finalizar': erroApi(409, 'QUESTOES_PENDENTES', 'Responda todas as questões'),
+        'POST /visitas/v1/finalizar': sequencia(
+          erroApi(409, 'QUESTOES_PENDENTES', 'Responda todas as questões'),
+          {
+            acertos: 1,
+            total_questoes: 1,
+            pontos_questoes: 10,
+            bonus_conclusao: 20,
+            pontuacao_total: 80,
+            novos_badges: [],
+          },
+        ),
       }),
     });
     await userEvent.click(await screen.findByRole('button', { name: 'Responder 1 pergunta' }));
     await userEvent.click(alternativa('q1-B'));
     await userEvent.click(await screen.findByRole('button', { name: 'Concluir aula' }));
     expect(await screen.findByText('Responda todas as questões')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Concluir aula' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Concluir aula' })).toBeEnabled();
+    // o segundo toque tem de sair de verdade: a trava não pode ficar presa depois do erro
+    await userEvent.click(screen.getByRole('button', { name: 'Concluir aula' }));
+    expect(await screen.findByRole('heading', { name: 'Aula concluída!' })).toBeInTheDocument();
+    expect(servidor.enviados('POST /visitas/v1/finalizar')).toHaveLength(2);
   });
 
   it('aula bloqueada (403) mostra o aviso e o caminho de volta', async () => {
@@ -318,6 +347,23 @@ describe('Trivia', () => {
     expect(window.location.pathname).toBe('/trivia/r1');
   });
 
+  it('toque duplo ao escolher a dificuldade cria uma rodada só e trava todos os níveis', async () => {
+    const criar = pendente({ status: 201, corpo: RODADA });
+    const { servidor } = await renderizarApp('/trivia', {
+      rotas: {
+        'GET /aulas': AULAS_CONCLUIDAS,
+        'POST /trivia/rodadas': criar.rota,
+        'GET /trivia/rodadas/r1': RODADA,
+      },
+    });
+    tocarDuasVezes(await screen.findByRole('button', { name: /Média/ }));
+    for (const nivel of [/Fácil/, /Média/, /Difícil/])
+      expect(screen.getByRole('button', { name: nivel })).toBeDisabled();
+    criar.liberar();
+    expect(await screen.findByText('Pergunta t1?')).toBeInTheDocument();
+    expect(servidor.enviados('POST /trivia/rodadas')).toHaveLength(1);
+  });
+
   it('nível sem questões suficientes mostra a mensagem e fica desabilitado; os outros seguem', async () => {
     const { servidor } = await renderizarApp('/trivia', {
       rotas: {
@@ -335,7 +381,14 @@ describe('Trivia', () => {
     );
     expect(screen.getByRole('button', { name: /Difícil/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: /Fácil/ })).toBeEnabled();
-    expect(servidor.enviados('POST /trivia/rodadas')).toEqual([{ dificuldade: 'dificil' }]);
+    // o outro nível tem de criar a rodada de verdade: a trava não pode ficar presa depois do erro
+    await userEvent.click(screen.getByRole('button', { name: /Fácil/ }));
+    await waitFor(() =>
+      expect(servidor.enviados('POST /trivia/rodadas')).toEqual([
+        { dificuldade: 'dificil' },
+        { dificuldade: 'facil' },
+      ]),
+    );
   });
 
   it('outro erro ao criar a rodada (rede) mostra a mensagem e não desabilita o nível', async () => {
@@ -465,7 +518,7 @@ describe('TriviaRodada', () => {
       rotas: { 'GET /trivia/rodadas/r1': respondida, 'POST /trivia/rodadas/r1/finalizar': fim.rota },
     });
     const botao = await screen.findByRole('button', { name: 'Ver resultado' });
-    await userEvent.dblClick(botao);
+    tocarDuasVezes(botao);
     expect(botao).toBeDisabled();
     fim.liberar();
     expect(await screen.findByRole('heading', { name: 'Rodada finalizada!' })).toBeInTheDocument();
@@ -488,7 +541,7 @@ describe('TriviaRodada', () => {
       },
     });
     await userEvent.click(await screen.findByRole('button', { name: /^t1-A/ }));
-    await userEvent.dblClick(await screen.findByRole('button', { name: 'Ver resultado' }));
+    tocarDuasVezes(await screen.findByRole('button', { name: 'Ver resultado' }));
     expect(screen.getByRole('button', { name: 'Finalizando…' })).toBeDisabled();
     fim.liberar();
     expect(await screen.findByRole('heading', { name: 'Rodada finalizada!' })).toBeInTheDocument();
@@ -508,17 +561,51 @@ describe('TriviaRodada', () => {
     expect(servidor.enviados('GET /trivia/rodadas/r1')).toHaveLength(2);
   });
 
-  it('erro ao finalizar a última pergunta aparece na tela', async () => {
-    await renderizarApp('/trivia/r1', {
+  it('se finalizar falhar e a rodada seguir aberta, "Ver resultado" volta habilitado', async () => {
+    const respondida = { ...RODADA, questoes: RODADA.questoes.map((q) => ({ ...q, respondida: true })) };
+    const { servidor } = await renderizarApp('/trivia/r1', {
+      rotas: {
+        'GET /trivia/rodadas/r1': sequencia(respondida, respondida),
+        'POST /trivia/rodadas/r1/finalizar': sequencia(new TypeError('Failed to fetch'), {
+          acertos: 1,
+          total_questoes: 2,
+          pontos_ganhos: 5,
+          pontuacao_total: 45,
+          novos_badges: [],
+        }),
+      },
+    });
+    await userEvent.click(await screen.findByRole('button', { name: 'Ver resultado' }));
+    await waitFor(() => expect(servidor.enviados('GET /trivia/rodadas/r1')).toHaveLength(2));
+    const botao = await screen.findByRole('button', { name: 'Ver resultado' });
+    expect(botao).toBeEnabled();
+    await userEvent.click(botao);
+    expect(await screen.findByRole('heading', { name: 'Rodada finalizada!' })).toBeInTheDocument();
+    expect(servidor.enviados('POST /trivia/rodadas/r1/finalizar')).toHaveLength(2);
+  });
+
+  it('erro ao finalizar a última pergunta aparece na tela e deixa tentar de novo', async () => {
+    const { servidor } = await renderizarApp('/trivia/r1', {
       rotas: {
         'GET /trivia/rodadas/r1': { ...RODADA, questoes: [RODADA.questoes[0]] },
         'POST /trivia/rodadas/r1/respostas': feedback(false),
-        'POST /trivia/rodadas/r1/finalizar': erroApi(0, 'SEM_CONEXAO', 'Sem conexão'),
+        'POST /trivia/rodadas/r1/finalizar': sequencia(new TypeError('Failed to fetch'), {
+          acertos: 0,
+          total_questoes: 1,
+          pontos_ganhos: 0,
+          pontuacao_total: 40,
+          novos_badges: [],
+        }),
       },
     });
     await userEvent.click(await screen.findByRole('button', { name: /^t1-A/ }));
     await userEvent.click(await screen.findByRole('button', { name: 'Ver resultado' }));
     expect(await screen.findByText('Sem conexão. Verifique sua internet')).toBeInTheDocument();
+    const botao = screen.getByRole('button', { name: 'Ver resultado' });
+    expect(botao).toBeEnabled();
+    await userEvent.click(botao);
+    expect(await screen.findByRole('heading', { name: 'Rodada finalizada!' })).toBeInTheDocument();
+    expect(servidor.enviados('POST /trivia/rodadas/r1/finalizar')).toHaveLength(2);
   });
 
   it('rodada de outro usuário (404) mostra o erro', async () => {

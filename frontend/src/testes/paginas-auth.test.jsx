@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { erroApi, renderizarApp, sequencia, USUARIO } from './utils';
+import { App } from '../App';
+import { erroApi, renderizarApp, sequencia, servidorFalso, USUARIO } from './utils';
 
 const SESSAO = { token: 'novo-token', usuario: USUARIO };
 const rotasLogado = { 'GET /aulas': [] };
@@ -52,6 +53,24 @@ describe('Entrar', () => {
     expect(screen.getByRole('button', { name: 'Entrar' })).toBeEnabled();
   });
 
+  it('identificador recusado pela validação mostra a orientação junto do campo, sem aviso geral', async () => {
+    await renderizarApp('/entrar', {
+      usuario: null,
+      rotas: {
+        'POST /auth/login': erroApi(400, 'VALIDACAO', 'Dados inválidos', [
+          { campo: 'identificador', mensagem: 'Use seu e-mail ou apelido' },
+        ]),
+      },
+    });
+    const identificador = await screen.findByLabelText('E-mail ou apelido');
+    await userEvent.type(identificador, 'maria silva');
+    await userEvent.type(screen.getByLabelText('Senha'), 'y');
+    await userEvent.click(screen.getByRole('button', { name: 'Entrar' }));
+    await waitFor(() => expect(identificador).toHaveAccessibleDescription('Use seu e-mail ou apelido'));
+    expect(identificador).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('logado não vê a tela de login', async () => {
     await renderizarApp('/entrar', { rotas: rotasLogado });
     expect(await screen.findByRole('heading', { name: 'Aulas' })).toBeInTheDocument();
@@ -64,17 +83,20 @@ describe('sessão salva com o servidor fora do ar', () => {
     return renderizarApp('/aulas', { usuario: null, rotas: { 'GET /auth/me': eu, ...rotasLogado } });
   };
 
-  it('503 no /auth/me mostra "Tentar de novo" sem ir para o login; tentar com sucesso entra', async () => {
-    const { servidor } = await abrir(
-      sequencia(erroApi(503, 'INDISPONIVEL', 'Servidor indisponível'), USUARIO),
-    );
-    expect(await screen.findByRole('alert')).toHaveTextContent('Servidor indisponível');
-    expect(window.location.pathname).toBe('/aulas');
-    expect(localStorage.getItem('guardiao.token')).toBe('token-teste');
-    await userEvent.click(screen.getByRole('button', { name: /Tentar de novo/ }));
-    expect(await screen.findByRole('heading', { name: 'Aulas' })).toBeInTheDocument();
-    expect(servidor.enviados('GET /auth/me')).toHaveLength(2);
-  });
+  it.each([503, 500])(
+    '%i no /auth/me mostra "Tentar de novo" sem ir para o login; tentar com sucesso entra',
+    async (status) => {
+      const { servidor } = await abrir(
+        sequencia(erroApi(status, 'INDISPONIVEL', 'Servidor indisponível'), USUARIO),
+      );
+      expect(await screen.findByRole('alert')).toHaveTextContent('Servidor indisponível');
+      expect(window.location.pathname).toBe('/aulas');
+      expect(localStorage.getItem('guardiao.token')).toBe('token-teste');
+      await userEvent.click(screen.getByRole('button', { name: /Tentar de novo/ }));
+      expect(await screen.findByRole('heading', { name: 'Aulas' })).toBeInTheDocument();
+      expect(servidor.enviados('GET /auth/me')).toHaveLength(2);
+    },
+  );
 
   it('sem rede no /auth/me também não desloga; nova falha continua na tela de erro', async () => {
     await abrir(new TypeError('Failed to fetch'));
@@ -378,7 +400,15 @@ describe('Redefinir senha', () => {
   });
 
   it('funciona mesmo com alguém logado (link aberto em outro aparelho)', async () => {
-    await renderizarApp('/redefinir-senha?token=x', { usuario: USUARIO, rotas: {} }).catch(() => {});
-    expect(await screen.findByRole('heading', { name: 'Nova senha' })).toBeInTheDocument();
+    // Sem renderizarApp: ele espera a navegação do app logado, que esta tela não tem.
+    localStorage.setItem('guardiao.token', 'token-teste');
+    const servidor = servidorFalso({ 'GET /auth/me': USUARIO });
+    window.history.pushState({}, '', '/redefinir-senha?token=x');
+    render(<App />);
+    await waitFor(() => expect(servidor.enviados('GET /auth/me')).toHaveLength(1));
+    const me = servidor.mock.calls.findIndex(([url]) => url === '/api/auth/me');
+    await act(() => servidor.mock.results[me].value); // /auth/me respondeu: o usuário está logado
+    expect(screen.getByRole('heading', { name: 'Nova senha' })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/redefinir-senha');
   });
 });
