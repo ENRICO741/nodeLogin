@@ -12,6 +12,8 @@ coverage/
 *.tfvars
 *.tfstate
 .claude/settings.local.json
+deploy/carga.js
+docs/
 
 # Modelo de ML e dados da pesquisa: fora do Git
 analise/
