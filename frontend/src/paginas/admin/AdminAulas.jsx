@@ -27,7 +27,8 @@ function FormAula({ aula = {}, aoEnviar, textoEnviar }) {
       await aoEnviar({
         ...dados,
         ordem: Number(dados.ordem),
-        pontos_conclusao: Number(dados.pontos_conclusao),
+        // Vazio vira null para a API acusar o campo: Number('') daria 0 e undefined o PATCH ignoraria.
+        pontos_conclusao: dados.pontos_conclusao === '' ? null : Number(dados.pontos_conclusao),
       });
       setSalvo(true);
     } catch (e) {
@@ -139,11 +140,23 @@ export function AdminAulas() {
 
 function ItemQuestao({ questao, aoMudar, somenteLeitura }) {
   const [editando, setEditando] = useState(false);
-  const alternarAtivo = () =>
-    (questao.ativo
-      ? api(`/admin/questoes-aula/${questao.id}`, { metodo: 'DELETE' })
-      : api(`/admin/questoes-aula/${questao.id}`, { metodo: 'PATCH', corpo: { ativo: true } })
-    ).then(aoMudar);
+  const [alternando, setAlternando] = useState(false);
+  const [erro, setErro] = useState(null);
+
+  async function alternarAtivo() {
+    setAlternando(true);
+    setErro(null);
+    try {
+      await (questao.ativo
+        ? api(`/admin/questoes-aula/${questao.id}`, { metodo: 'DELETE' })
+        : api(`/admin/questoes-aula/${questao.id}`, { metodo: 'PATCH', corpo: { ativo: true } }));
+      aoMudar();
+    } catch (e) {
+      setErro(e);
+    } finally {
+      setAlternando(false);
+    }
+  }
 
   if (editando) {
     return (
@@ -178,12 +191,14 @@ function ItemQuestao({ questao, aoMudar, somenteLeitura }) {
           <button
             type="button"
             className={`botao ${questao.ativo ? 'botao--perigo' : 'botao--secundario'}`}
+            disabled={alternando}
             onClick={alternarAtivo}
           >
             {questao.ativo ? 'Desativar' : 'Reativar'}
           </button>
         </>
       )}
+      <Aviso tipo="erro">{erro?.message}</Aviso>
     </li>
   );
 }
@@ -192,25 +207,44 @@ export function AdminAula() {
   const { id } = useParams();
   const { dados: aula, erro, carregando, recarregar } = useApi(`/admin/aulas/${id}`);
   const [adicionando, setAdicionando] = useState(false);
+  const [alternando, setAlternando] = useState(false);
+  const [erroAlternar, setErroAlternar] = useState(null);
+  // Título que o PATCH devolveu: atualiza o cabeçalho sem recarregar (o que apagaria o aviso "Aula salva").
+  const [tituloSalvo, setTituloSalvo] = useState(null);
 
   if (carregando) return <Carregando />;
   if (erro) return <ErroCarregamento erro={erro} onTentarDeNovo={recarregar} />;
 
-  const alternarAula = () =>
-    (aula.ativo
-      ? api(`/admin/aulas/${id}`, { metodo: 'DELETE' })
-      : api(`/admin/aulas/${id}`, { metodo: 'PATCH', corpo: { ativo: true } })
-    ).then(recarregar);
+  async function alternarAula() {
+    setAlternando(true);
+    setErroAlternar(null);
+    try {
+      await (aula.ativo
+        ? api(`/admin/aulas/${id}`, { metodo: 'DELETE' })
+        : api(`/admin/aulas/${id}`, { metodo: 'PATCH', corpo: { ativo: true } }));
+      recarregar();
+    } catch (e) {
+      setErroAlternar(e);
+    } finally {
+      setAlternando(false);
+    }
+  }
 
   return (
     <div className="pagina">
       <VoltarAdmin para="/admin/aulas" rotulo="Aulas" />
       <header className="cabecalho-pagina linha" style={{ justifyContent: 'space-between' }}>
-        <h1>{aula.titulo}</h1>
-        <button type="button" className={`botao ${aula.ativo ? 'botao--perigo' : ''}`} onClick={alternarAula}>
+        <h1>{tituloSalvo ?? aula.titulo}</h1>
+        <button
+          type="button"
+          className={`botao ${aula.ativo ? 'botao--perigo' : ''}`}
+          disabled={alternando}
+          onClick={alternarAula}
+        >
           {aula.ativo ? 'Desativar aula' : 'Reativar aula'}
         </button>
       </header>
+      <Aviso tipo="erro">{erroAlternar?.message}</Aviso>
       {!aula.ativo && <Aviso>Aula inativa: não aparece para os usuários.</Aviso>}
 
       {aula.slug ? (
@@ -223,15 +257,20 @@ export function AdminAula() {
           <p className={styles.itemMeta}>
             Ordem {aula.ordem} · bônus de conclusão {aula.pontos_conclusao} pts
           </p>
-          <Link to={`/aulas/${aula.id}`} className="botao botao--secundario">
-            Ver como o usuário vê
-          </Link>
+          {/* Inativa, o usuário não a vê: o link só daria erro. */}
+          {aula.ativo && (
+            <Link to={`/aulas/${aula.id}`} className="botao botao--secundario">
+              Ver como o usuário vê
+            </Link>
+          )}
         </div>
       ) : (
         <FormAula
           aula={aula}
           textoEnviar="Salvar aula"
-          aoEnviar={(dados) => api(`/admin/aulas/${id}`, { metodo: 'PATCH', corpo: dados })}
+          aoEnviar={async (dados) =>
+            setTituloSalvo((await api(`/admin/aulas/${id}`, { metodo: 'PATCH', corpo: dados })).titulo)
+          }
         />
       )}
 

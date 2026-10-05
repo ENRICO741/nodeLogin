@@ -285,6 +285,9 @@ describe('Editar aula (admin)', () => {
       ordem: 1,
       pontos_conclusao: 20,
     });
+    // O cabeçalho mostra o título salvo sem recarregar a página.
+    expect(screen.getByRole('heading', { level: 1, name: 'Phishing 2.0' })).toBeInTheDocument();
+    expect(servidor.enviados('GET /admin/aulas/a1')).toHaveLength(1);
 
     await userEvent.click(screen.getByRole('button', { name: 'Salvar aula' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Já existe uma aula com essa ordem');
@@ -303,6 +306,33 @@ describe('Editar aula (admin)', () => {
     expect(await screen.findByText('Aula inativa: não aparece para os usuários.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Reativar aula' }));
     await waitFor(() => expect(servidor.enviados('PATCH /admin/aulas/a1')).toEqual([{ ativo: true }]));
+  });
+
+  it('bônus vazio envia null e mostra o erro do campo vindo da API', async () => {
+    const { servidor } = await comoAdmin(
+      '/admin/aulas/a1',
+      rotas({
+        'PATCH /admin/aulas/a1': erroApi(400, 'VALIDACAO', 'Dados inválidos', [
+          { campo: 'pontos_conclusao', mensagem: 'Informe o bônus' },
+        ]),
+      }),
+    );
+    await userEvent.clear(await screen.findByLabelText('Bônus de conclusão (pts)'));
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar aula' }));
+    expect(await screen.findByText('Informe o bônus')).toBeInTheDocument();
+    expect(servidor.enviados('PATCH /admin/aulas/a1')[0].pontos_conclusao).toBeNull();
+    expect(screen.getByRole('heading', { level: 1, name: 'Phishing' })).toBeInTheDocument();
+  });
+
+  it('erro ao desativar a aula aparece e o botão fica desabilitado durante a chamada', async () => {
+    const remover = pendente();
+    await comoAdmin('/admin/aulas/a1', rotas({ 'DELETE /admin/aulas/a1': remover.rota }));
+    const botao = await screen.findByRole('button', { name: 'Desativar aula' });
+    await userEvent.click(botao);
+    expect(botao).toBeDisabled();
+    await remover.liberar(erroApi(500, 'ERRO_INTERNO', 'Falhou ao desativar'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Falhou ao desativar');
+    expect(botao).toBeEnabled();
   });
 
   it('adiciona pergunta com os tipos certos e recarrega', async () => {
@@ -378,6 +408,35 @@ describe('Editar aula (admin)', () => {
     await waitFor(() =>
       expect(servidor.enviados('PATCH /admin/questoes-aula/q2')).toEqual([{ ativo: true }]),
     );
+  });
+
+  it('pontos vazio envia null e o erro do campo aparece', async () => {
+    const { servidor } = await comoAdmin(
+      '/admin/aulas/a1',
+      rotas({
+        'PATCH /admin/questoes-aula/q1': erroApi(400, 'VALIDACAO', 'Dados inválidos', [
+          { campo: 'pontos', mensagem: 'Informe os pontos' },
+        ]),
+      }),
+    );
+    const [ativa] = within(await screen.findByRole('region', { name: 'Perguntas' })).getAllByRole('listitem');
+    await userEvent.click(within(ativa).getByRole('button', { name: 'Editar' }));
+    await userEvent.clear(screen.getByLabelText('Pontos'));
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar questão' }));
+    expect(await screen.findByText('Informe os pontos')).toBeInTheDocument();
+    expect(servidor.enviados('PATCH /admin/questoes-aula/q1')[0].pontos).toBeNull();
+  });
+
+  it('erro ao desativar pergunta aparece no item; o botão fica desabilitado durante a chamada', async () => {
+    const remover = pendente();
+    await comoAdmin('/admin/aulas/a1', rotas({ 'DELETE /admin/questoes-aula/q1': remover.rota }));
+    const [ativa] = within(await screen.findByRole('region', { name: 'Perguntas' })).getAllByRole('listitem');
+    const botao = within(ativa).getByRole('button', { name: 'Desativar' });
+    await userEvent.click(botao);
+    expect(botao).toBeDisabled();
+    await remover.liberar(erroApi(500, 'ERRO_INTERNO', 'Falhou ao desativar'));
+    expect(await within(ativa).findByRole('alert')).toHaveTextContent('Falhou ao desativar');
+    expect(botao).toBeEnabled();
   });
 
   it('cancelar edição de pergunta volta para a lista', async () => {
@@ -472,6 +531,36 @@ describe('Questões de trivia (admin)', () => {
       expect(servidor.enviados('DELETE /admin/questoes-trivia/t1')).toHaveLength(1);
       expect(servidor.enviados('PATCH /admin/questoes-trivia/t2')).toEqual([{ ativo: true }]);
     });
+  });
+
+  it('erro ao reativar aparece no item; o botão fica desabilitado durante a chamada', async () => {
+    const reativar = pendente();
+    await comoAdmin('/admin/trivia', {
+      'GET /admin/questoes-trivia': LISTA,
+      'PATCH /admin/questoes-trivia/t2': reativar.rota,
+    });
+    const dificil = await screen.findByRole('region', { name: /Difícil/ });
+    const botao = within(dificil).getByRole('button', { name: 'Reativar' });
+    await userEvent.click(botao);
+    expect(botao).toBeDisabled();
+    await reativar.liberar(erroApi(500, 'ERRO_INTERNO', 'Falhou ao reativar'));
+    expect(await within(dificil).findByRole('alert')).toHaveTextContent('Falhou ao reativar');
+    expect(botao).toBeEnabled();
+  });
+
+  it('pontos vazio em questão de trivia envia null', async () => {
+    const { servidor } = await comoAdmin('/admin/trivia', {
+      'GET /admin/questoes-trivia': LISTA,
+      'PATCH /admin/questoes-trivia/t1': erroApi(400, 'VALIDACAO', 'Dados inválidos', [
+        { campo: 'pontos', mensagem: 'Informe os pontos' },
+      ]),
+    });
+    const facil = await screen.findByRole('region', { name: /Fácil/ });
+    await userEvent.click(within(facil).getByRole('button', { name: 'Editar' }));
+    await userEvent.clear(screen.getByLabelText('Pontos'));
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar questão' }));
+    expect(await screen.findByText('Informe os pontos')).toBeInTheDocument();
+    expect(servidor.enviados('PATCH /admin/questoes-trivia/t1')[0].pontos).toBeNull();
   });
 
   it('cancelar edição e erro de carregamento', async () => {

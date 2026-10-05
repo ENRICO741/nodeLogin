@@ -272,6 +272,15 @@ describe('admin: aula vinda de arquivo', () => {
     await waitFor(() => expect(servidor.enviados('DELETE /admin/aulas/a1')).toHaveLength(1));
   });
 
+  it('aula inativa não mostra o link "Ver como o usuário vê"', async () => {
+    await renderizarApp('/admin/aulas/a1', {
+      usuario: ADMIN,
+      rotas: { 'GET /admin/aulas/a1': { ...AULA_ARQUIVO, ativo: false } },
+    });
+    expect(await screen.findByText('Aula inativa: não aparece para os usuários.')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Ver como o usuário vê' })).not.toBeInTheDocument();
+  });
+
   it('a lista marca as aulas de arquivo', async () => {
     await renderizarApp('/admin/aulas', {
       usuario: ADMIN,

@@ -18,7 +18,8 @@ export function FormQuestao({ questao = {}, extras, aoEnviar, aoCancelar, textoE
     try {
       await aoEnviar({
         ...dados,
-        pontos: Number(dados.pontos),
+        // Vazio vira null para a API acusar o campo: Number('') daria 0 e undefined o PATCH ignoraria.
+        pontos: dados.pontos === '' ? null : Number(dados.pontos),
         imagem_url: dados.imagem_url || null,
         explicacao: dados.explicacao || null,
       });

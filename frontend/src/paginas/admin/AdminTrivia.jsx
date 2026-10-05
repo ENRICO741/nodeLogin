@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useApi } from '../../hooks/useApi';
 import { Campo } from '../../componentes/Campo';
-import { Carregando, ErroCarregamento, Vazio } from '../../componentes/Estado';
+import { Aviso, Carregando, ErroCarregamento, Vazio } from '../../componentes/Estado';
 import { FormQuestao } from './FormQuestao';
 import { VoltarAdmin } from './Admin';
 import styles from './Admin.module.css';
@@ -34,12 +34,24 @@ const campoDificuldade = (valor) =>
 
 function ItemTrivia({ questao, aoMudar }) {
   const [editando, setEditando] = useState(false);
+  const [alternando, setAlternando] = useState(false);
+  const [erro, setErro] = useState(null);
   const url = `/admin/questoes-trivia/${questao.id}`;
-  const alternarAtivo = () =>
-    (questao.ativo
-      ? api(url, { metodo: 'DELETE' })
-      : api(url, { metodo: 'PATCH', corpo: { ativo: true } })
-    ).then(aoMudar);
+
+  async function alternarAtivo() {
+    setAlternando(true);
+    setErro(null);
+    try {
+      await (questao.ativo
+        ? api(url, { metodo: 'DELETE' })
+        : api(url, { metodo: 'PATCH', corpo: { ativo: true } }));
+      aoMudar();
+    } catch (e) {
+      setErro(e);
+    } finally {
+      setAlternando(false);
+    }
+  }
 
   if (editando) {
     return (
@@ -72,10 +84,12 @@ function ItemTrivia({ questao, aoMudar }) {
       <button
         type="button"
         className={`botao ${questao.ativo ? 'botao--perigo' : 'botao--secundario'}`}
+        disabled={alternando}
         onClick={alternarAtivo}
       >
         {questao.ativo ? 'Desativar' : 'Reativar'}
       </button>
+      <Aviso tipo="erro">{erro?.message}</Aviso>
     </li>
   );
 }
