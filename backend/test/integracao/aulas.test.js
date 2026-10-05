@@ -615,9 +615,17 @@ describe('POST /api/visitas/:id/finalizar', () => {
 
   test('com questões pendentes dá 409', async () => {
     const u = await novoUsuario();
-    const visita = (await u.api('post', `/api/aulas/${(await primeiraAula(u)).id}/visitas`)).body;
-    const res = await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(409);
-    assert.equal(res.body.erro.codigo, 'QUESTOES_PENDENTES');
+    const aula = (await u.api('get', `/api/aulas/${(await primeiraAula(u)).id}`)).body;
+    const visita = (await u.api('post', `/api/aulas/${aula.id}/visitas`)).body;
+    const finalizar = async () =>
+      (await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(409)).body.erro.codigo;
+    assert.equal(await finalizar(), 'QUESTOES_PENDENTES');
+    // Uma das duas respondida ainda não basta.
+    await u
+      .api('post', `/api/visitas/${visita.id}/respostas`)
+      .send({ questao_id: aula.questoes[0].id, alternativa: 'a' })
+      .expect(200);
+    assert.equal(await finalizar(), 'QUESTOES_PENDENTES');
   });
 
   test('aula sem questões pode ser concluída direto', async () => {
@@ -682,7 +690,7 @@ describe('POST /api/visitas/:id/finalizar', () => {
     );
     try {
       const visita = (await u.api('post', `/api/aulas/${rows[0].id}/visitas`)).body;
-      await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200);
+      const fim = (await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200)).body;
       // O admin adicionou uma questão depois.
       const { rows: q } = await pool.query(
         `INSERT INTO questoes_aula (aula_id, enunciado, alternativa_a, alternativa_b, alternativa_c, alternativa_d,
@@ -694,6 +702,12 @@ describe('POST /api/visitas/:id/finalizar', () => {
         .send({ questao_id: q[0].id, alternativa: 'a' })
         .expect(409);
       assert.equal(res.body.erro.codigo, 'VISITA_FINALIZADA');
+      // A questão nova pendente não barra o reenvio da finalização (total_questoes conta as ativas de agora).
+      const reenvio = (await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200)).body;
+      assert.deepEqual(
+        [reenvio.total_questoes, reenvio.acertos, reenvio.bonus_conclusao, reenvio.pontuacao_total],
+        [1, 0, fim.bonus_conclusao, fim.pontuacao_total],
+      );
     } finally {
       await pool.query('DELETE FROM aulas WHERE id = $1', [rows[0].id]);
     }
