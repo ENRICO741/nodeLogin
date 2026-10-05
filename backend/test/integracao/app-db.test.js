@@ -218,6 +218,36 @@ describe('banco', () => {
     assert.deepEqual(rows[0], { total: 10, lgpd: 10 });
   });
 
+  test('seed que rodou antes da aula 01 existir: a subida seguinte liga as questões sem aula', async () => {
+    const { rows: aula } = await pool.query("SELECT id FROM aulas WHERE slug = 'introducao-lgpd'");
+    const outra = (await pool.query('SELECT id FROM aulas WHERE ordem = 2')).rows[0].id;
+    const { rows: q } = await pool.query('SELECT id FROM questoes_trivia ORDER BY id');
+    // Simula o seed sem a aula 01: todas sem aula, menos uma que o admin ligou à aula 02.
+    await pool.query('UPDATE questoes_trivia SET aula_referencia_id = NULL');
+    await pool.query('UPDATE questoes_trivia SET aula_referencia_id = $2 WHERE id = $1', [q[0].id, outra]);
+    try {
+      // Aula 01 ainda ausente (slug trocado): nada acontece e nada quebra.
+      await pool.query("UPDATE aulas SET slug = 'temporario' WHERE id = $1", [aula[0].id]);
+      await semear();
+      const semAula = (
+        await pool.query('SELECT count(*)::int AS n FROM questoes_trivia WHERE aula_referencia_id IS NULL')
+      ).rows[0].n;
+      assert.equal(semAula, q.length - 1);
+      await pool.query("UPDATE aulas SET slug = 'introducao-lgpd' WHERE id = $1", [aula[0].id]);
+      await semear();
+      const { rows } = await pool.query(
+        'SELECT aula_referencia_id, count(*)::int AS n FROM questoes_trivia GROUP BY 1 ORDER BY n DESC',
+      );
+      assert.deepEqual(rows, [
+        { aula_referencia_id: aula[0].id, n: q.length - 1 },
+        { aula_referencia_id: outra, n: 1 },
+      ]);
+    } finally {
+      await pool.query("UPDATE aulas SET slug = 'introducao-lgpd' WHERE id = $1", [aula[0].id]);
+      await pool.query('UPDATE questoes_trivia SET aula_referencia_id = $1', [aula[0].id]);
+    }
+  });
+
   test('migration 008 liga à aula 01 as questões sem aula, sem mexer nas já ligadas', async () => {
     const fs = require('node:fs');
     const path = require('node:path');

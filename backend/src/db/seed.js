@@ -179,6 +179,14 @@ async function semear() {
       logger.info('seed aplicado', { trivia: TRIVIA_QUESTOES.length });
     }
 
+    // Questão sem aula fica fora do sorteio. Se o seed rodou antes de a aula 01 ser importada (conteúdo
+    // inválido na primeira subida, `npm run seed` sozinho), liga a cada subida, assim que ela existir.
+    const { rowCount: religadas } = await c.query(
+      `UPDATE questoes_trivia SET aula_referencia_id = a.id
+       FROM aulas a WHERE a.slug = 'introducao-lgpd' AND questoes_trivia.aula_referencia_id IS NULL`,
+    );
+    if (religadas) logger.info('questões da trivia ligadas à aula 01', { religadas });
+
     // Nome único (badges_nome_uk, migration 007): a conquista que já existe fica como está.
     await c.query(
       `INSERT INTO badges (nome, descricao, tipo_criterio, aula_id)
