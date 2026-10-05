@@ -1,6 +1,13 @@
 const { query, transacao } = require('../../db/pool');
 const { HttpError, naoEncontrado, conflito } = require('../../lib/erros');
-const { ehAdmin, travarUsuario, creditarPontos, pontuacaoAtual, concederBadges } = require('../pontuacao');
+const {
+  ehAdmin,
+  travarUsuario,
+  creditarPontos,
+  pontosCreditados,
+  pontuacaoAtual,
+  concederBadges,
+} = require('../pontuacao');
 const { triviaLiberada } = require('../trivia/service');
 
 // Trilha em sequência: a aula só abre depois de concluída a anterior (aula ativa de ordem imediatamente menor).
@@ -100,11 +107,11 @@ async function responder(visitaId, usuarioId, { questao_id, alternativa }) {
     );
     const questao = questoes[0];
     if (!questao) throw naoEncontrado('Questão não encontrada nesta aula');
-    const resultado = (correta, pontuou, pontuacao_total) => ({
+    const resultado = (correta, pontos_ganhos, pontuacao_total) => ({
       correta,
       resposta_correta: questao.resposta_correta,
       explicacao: questao.explicacao,
-      pontos_ganhos: pontuou ? questao.pontos : 0,
+      pontos_ganhos,
       pontuacao_total,
     });
 
@@ -120,7 +127,12 @@ async function responder(visitaId, usuarioId, { questao_id, alternativa }) {
       if (anterior.alternativa !== alternativa) {
         throw conflito('JA_RESPONDIDA', 'Questão já respondida nesta visita');
       }
-      return resultado(anterior.correta, anterior.pontuou, await pontuacaoAtual(c, usuarioId));
+      // Pontos: o que foi creditado (histórico), não o valor atual da questão, que o admin pode ter editado.
+      return resultado(
+        anterior.correta,
+        anterior.pontuou ? await pontosCreditados(c, usuarioId, 'aula_questao', questao_id) : 0,
+        await pontuacaoAtual(c, usuarioId),
+      );
     }
     if (visita.finalizada_em) throw conflito('VISITA_FINALIZADA', 'Esta visita já foi finalizada');
 
@@ -137,7 +149,7 @@ async function responder(visitaId, usuarioId, { questao_id, alternativa }) {
     );
     return resultado(
       correta,
-      pontuou,
+      pontuou ? questao.pontos : 0,
       pontuou
         ? await creditarPontos(c, usuarioId, questao.pontos, 'aula_questao', questao_id)
         : await pontuacaoAtual(c, usuarioId),

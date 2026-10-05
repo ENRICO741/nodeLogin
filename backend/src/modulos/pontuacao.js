@@ -29,6 +29,16 @@ async function creditarPontos(c, usuarioId, pontos, origem, referenciaId) {
   return total;
 }
 
+// O que o histórico registrou para uma origem/referência (0 se nada: questão de 0 pontos não grava).
+async function pontosCreditados(c, usuarioId, origem, referenciaId) {
+  const { rows } = await c.query(
+    `SELECT COALESCE(sum(pontos), 0)::int AS pontos FROM pontuacao_historico
+     WHERE usuario_id = $1 AND origem = $2 AND referencia_id = $3`,
+    [usuarioId, origem, referenciaId],
+  );
+  return rows[0].pontos;
+}
+
 async function pontuacaoAtual(c, usuarioId) {
   const { rows } = await c.query('SELECT pontuacao_total FROM usuarios WHERE id = $1', [usuarioId]);
   return rows[0].pontuacao_total;
@@ -89,4 +99,4 @@ async function concederBadges(c, usuarioId) {
   return rows;
 }
 
-module.exports = { ehAdmin, travarUsuario, creditarPontos, pontuacaoAtual, concederBadges };
+module.exports = { ehAdmin, travarUsuario, creditarPontos, pontosCreditados, pontuacaoAtual, concederBadges };

@@ -350,6 +350,24 @@ describe('POST /api/visitas/:id/respostas', () => {
     assert.deepEqual(rows, [{ alternativa: certas[q.id] }]);
   });
 
+  test('reenvio de um acerto mostra os pontos creditados, mesmo com a questão editada depois', async () => {
+    const u = await novoUsuario();
+    const aula = (await u.api('get', `/api/aulas/${(await primeiraAula(u)).id}`)).body;
+    const q = aula.questoes[0];
+    const certas = await gabarito('questoes_aula', [q.id]);
+    const visita = (await u.api('post', `/api/aulas/${aula.id}/visitas`)).body;
+    const url = `/api/visitas/${visita.id}/respostas`;
+    const corpo = { questao_id: q.id, alternativa: certas[q.id] };
+    const primeira = (await u.api('post', url).send(corpo).expect(200)).body;
+    assert.equal(primeira.pontos_ganhos, 10);
+    await pool.query('UPDATE questoes_aula SET pontos = 99 WHERE id = $1', [q.id]);
+    try {
+      assert.deepEqual((await u.api('post', url).send(corpo).expect(200)).body, primeira);
+    } finally {
+      await pool.query('UPDATE questoes_aula SET pontos = $2 WHERE id = $1', [q.id, q.pontos]);
+    }
+  });
+
   test('reenvio de resposta errada devolve o mesmo resultado; trocar a alternativa dá 409', async () => {
     const u = await novoUsuario();
     const aula = (await u.api('get', `/api/aulas/${(await primeiraAula(u)).id}`)).body;

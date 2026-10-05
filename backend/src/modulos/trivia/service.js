@@ -1,6 +1,13 @@
 const { transacao } = require('../../db/pool');
 const { HttpError, naoEncontrado, conflito } = require('../../lib/erros');
-const { ehAdmin, travarUsuario, creditarPontos, pontuacaoAtual, concederBadges } = require('../pontuacao');
+const {
+  ehAdmin,
+  travarUsuario,
+  creditarPontos,
+  pontosCreditados,
+  pontuacaoAtual,
+  concederBadges,
+} = require('../pontuacao');
 
 async function obterRodada(c, rodadaId, usuarioId) {
   const { rows } = await c.query(
@@ -98,11 +105,11 @@ async function responder(rodadaId, usuarioId, { questao_id, alternativa }) {
     const questao = questoes[0];
     if (!questao) throw naoEncontrado('Questão não pertence a esta rodada');
     // aula_referencia: de onde veio a questão (o feedback do erro aponta a aula para rever).
-    const resultado = (correta, pontuou, pontuacao_total) => ({
+    const resultado = (correta, pontos_ganhos, pontuacao_total) => ({
       correta,
       resposta_correta: questao.resposta_correta,
       explicacao: questao.explicacao,
-      pontos_ganhos: pontuou ? questao.pontos : 0,
+      pontos_ganhos,
       pontuacao_total,
       aula_referencia: questao.aula_referencia,
     });
@@ -119,7 +126,12 @@ async function responder(rodadaId, usuarioId, { questao_id, alternativa }) {
       if (anterior.alternativa !== alternativa) {
         throw conflito('JA_RESPONDIDA', 'Questão já respondida nesta rodada');
       }
-      return resultado(anterior.correta, anterior.pontuou, await pontuacaoAtual(c, usuarioId));
+      // Pontos: o que foi creditado (histórico), não o valor atual da questão, que o admin pode ter editado.
+      return resultado(
+        anterior.correta,
+        anterior.pontuou ? await pontosCreditados(c, usuarioId, 'trivia_questao', questao_id) : 0,
+        await pontuacaoAtual(c, usuarioId),
+      );
     }
     if (rodada.finalizada_em) throw conflito('RODADA_FINALIZADA', 'Esta rodada já foi finalizada');
 
@@ -142,7 +154,7 @@ async function responder(rodadaId, usuarioId, { questao_id, alternativa }) {
     }
     return resultado(
       correta,
-      pontuou,
+      pontuou ? questao.pontos : 0,
       pontuou
         ? await creditarPontos(c, usuarioId, questao.pontos, 'trivia_questao', questao_id)
         : await pontuacaoAtual(c, usuarioId),

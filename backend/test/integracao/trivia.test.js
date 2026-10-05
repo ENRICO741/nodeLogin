@@ -350,6 +350,21 @@ describe('POST /api/trivia/rodadas/:id/respostas', () => {
     assert.equal((await u.api('get', '/api/auth/me')).body.pontuacao_total, 5);
   });
 
+  test('reenvio de um acerto mostra os pontos creditados, mesmo com a questão editada depois', async () => {
+    const u = await novoJogador();
+    const rodada = (await novaRodada(u)).body;
+    const q = rodada.questoes[0];
+    const certas = await gabarito('questoes_trivia', [q.id]);
+    const primeira = (await responder(u, rodada.id, q.id, certas[q.id]).expect(200)).body;
+    assert.equal(primeira.pontos_ganhos, 5);
+    await pool.query('UPDATE questoes_trivia SET pontos = 99 WHERE id = $1', [q.id]);
+    try {
+      assert.deepEqual((await responder(u, rodada.id, q.id, certas[q.id]).expect(200)).body, primeira);
+    } finally {
+      await pool.query('UPDATE questoes_trivia SET pontos = $2 WHERE id = $1', [q.id, q.pontos]);
+    }
+  });
+
   test('anti-farm: acertar de novo a mesma questão em outra rodada não pontua', async () => {
     const u = await novoJogador();
     const r1 = (await novaRodada(u)).body;
