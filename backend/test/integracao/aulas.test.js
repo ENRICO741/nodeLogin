@@ -79,8 +79,9 @@ describe('GET /api/aulas', () => {
     // a2 = primeira aula (a que tem questões); a1 = a segunda.
     const [a2, a1] = (await u.api('get', '/api/aulas')).body;
     await pool.query('UPDATE aulas SET ativo = false WHERE id = $1', [a1.id]);
-    await pool.query(
-      'UPDATE questoes_aula SET ativo = false WHERE id = (SELECT id FROM questoes_aula WHERE aula_id = $1 LIMIT 1)',
+    // Só uma das ativas: a provisória da aula 01 já está desativada (ver questoesDeTeste) e deve continuar.
+    const { rows } = await pool.query(
+      'UPDATE questoes_aula SET ativo = false WHERE id = (SELECT id FROM questoes_aula WHERE aula_id = $1 AND ativo LIMIT 1) RETURNING id',
       [a2.id],
     );
     try {
@@ -92,7 +93,7 @@ describe('GET /api/aulas', () => {
       assert.equal(aulas.find((a) => a.id === a2.id).total_questoes, 1);
     } finally {
       await pool.query('UPDATE aulas SET ativo = true WHERE id = $1', [a1.id]);
-      await pool.query('UPDATE questoes_aula SET ativo = true WHERE aula_id = $1', [a2.id]);
+      await pool.query('UPDATE questoes_aula SET ativo = true WHERE id = $1', [rows[0].id]);
     }
   });
 

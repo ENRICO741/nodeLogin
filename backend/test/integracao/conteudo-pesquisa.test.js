@@ -164,7 +164,7 @@ describe('admin com aula vinda de arquivo', () => {
     const aula = await aulaPorSlug('introducao-lgpd');
     const detalhe = (await admin.api('get', `/api/admin/aulas/${aula.id}`).expect(200)).body;
     assert.equal(detalhe.slug, 'introducao-lgpd');
-    assert.equal(detalhe.questoes[0].chave, 'numero-da-lei');
+    assert.equal(detalhe.questoes[0].chave, 'confirmacao-leitura');
     const lista = (await admin.api('get', '/api/admin/aulas')).body;
     assert.equal(lista.find((a) => a.id === aula.id).slug, 'introducao-lgpd');
 
