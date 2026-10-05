@@ -10,6 +10,8 @@ let pendentes = [];
 let consentiu = null;
 // Criação em andamento: chamadas simultâneas esperam a mesma (antes saíam dois POST /sessoes).
 let iniciando = null;
+// Muda a cada finalizarSessao (logout, 401): resposta que chega depois é de quem saiu e não vira a sessão atual.
+let geracao = 0;
 
 export function definirConsentimento(valor) {
   consentiu = valor;
@@ -29,22 +31,25 @@ const contexto = () => ({
   largura_tela: window.innerWidth,
 });
 
-async function criarSessao() {
+async function criarSessao(minhaGeracao) {
   try {
     const sessao = await api('/sessoes', { metodo: 'POST', corpo: contexto() });
-    if (!sessao) return; // 204: o servidor sabe que o consentimento foi retirado
+    if (!sessao || minhaGeracao !== geracao) return; // 204 (sem consentimento) ou saiu no meio do POST
     sessaoId = sessao.id;
     liberarPendentes();
   } catch {
     /* telemetria nunca atrapalha o uso do app */
-  } finally {
-    iniciando = null;
   }
 }
 
 export async function iniciarSessao() {
   if (consentiu !== true || sessaoId || !tokenSalvo.obter()) return;
-  iniciando ??= criarSessao();
+  if (!iniciando) {
+    const minhaGeracao = geracao;
+    iniciando = criarSessao(minhaGeracao).finally(() => {
+      if (minhaGeracao === geracao) iniciando = null;
+    });
+  }
   return iniciando;
 }
 
@@ -68,6 +73,8 @@ function encerrar(id) {
 
 export function finalizarSessao() {
   encerrar(sessaoId);
+  geracao += 1;
+  iniciando = null;
   sessaoId = null;
   sessaoPausada = null;
   pendentes = [];
@@ -87,8 +94,10 @@ async function retomar() {
   sessaoPausada = null;
   if (consentiu !== true) return;
   if (!id || !tokenSalvo.obter()) return iniciarSessao();
+  const minhaGeracao = geracao;
   try {
     await api(`/sessoes/${id}/retomar`, { metodo: 'POST' });
+    if (minhaGeracao !== geracao) return; // saiu enquanto retomava
     sessaoId = id;
     liberarPendentes();
   } catch {

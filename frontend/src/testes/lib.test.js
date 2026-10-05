@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { api, definirAoSessaoExpirar, ErroApi, tokenSalvo } from '../lib/api';
 import { MINIMO_SENHA, REQUISITOS_SENHA, senhaLongaDemais, temCaractereInvalido } from '../lib/senha';
-import { servidorFalso, erroApi } from './utils';
+import { servidorFalso, erroApi, sequencia } from './utils';
 
 describe('tokenSalvo', () => {
   it('guarda, lê e limpa o token', () => {
@@ -368,6 +368,28 @@ describe('telemetria', () => {
     // Terminada a criação, uma nova chamada não abre outra.
     await telemetria.iniciarSessao();
     expect(servidor.enviados('POST /sessoes')).toHaveLength(1);
+  });
+
+  it('logout com o POST /sessoes em andamento: a resposta atrasada não vira a sessão do próximo login', async () => {
+    localStorage.setItem('guardiao.token', 'token-a');
+    let responderPrimeira;
+    const servidor = servidorFalso({
+      'POST /sessoes': sequencia(
+        () => new Promise((r) => (responderPrimeira = () => r({ status: 201, corpo: { id: 'sessao-a' } }))),
+        { status: 201, corpo: { id: 'sessao-b' } },
+      ),
+    });
+    const primeira = telemetria.iniciarSessao();
+    await vi.waitFor(() => expect(responderPrimeira).toBeDefined());
+    telemetria.finalizarSessao(); // logout ou 401 de A
+    localStorage.setItem('guardiao.token', 'token-b');
+    await telemetria.iniciarSessao(); // login de B: não espera a criação de A
+    responderPrimeira();
+    await primeira;
+    telemetria.registrarEvento({ tipo_evento: 'de_b' });
+    expect(servidor.enviados('POST /sessoes')).toHaveLength(2);
+    await vi.waitFor(() => expect(servidor.enviados('POST /eventos')).toHaveLength(1));
+    expect(servidor.enviados('POST /eventos')[0].sessao_id).toBe('sessao-b');
   });
 
   it('204 ao criar sessão (consentimento retirado no servidor) não quebra nem envia eventos', async () => {
