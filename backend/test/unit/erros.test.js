@@ -106,6 +106,35 @@ describe('middleware tratarErros', () => {
     }
   });
 
+  test('NUL em texto (pg 22021) vira 400 VALIDACAO', () => {
+    const res = tratar(
+      Object.assign(new Error('invalid byte sequence for encoding "UTF8": 0x00'), { code: '22021' }),
+    );
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.corpo.erro.codigo, 'VALIDACAO');
+    assert.doesNotMatch(JSON.stringify(res.corpo), /0x00/);
+  });
+
+  test('outro erro 4xx exposto (body-parser) mantém o status com mensagem genérica, sem log', () => {
+    const erroLog = mock.method(console, 'error', () => {});
+    const res = tratar(
+      Object.assign(new Error('unsupported charset "LATIN-9"'), {
+        expose: true,
+        status: 415,
+        type: 'charset.unsupported',
+      }),
+    );
+    assert.equal(res.statusCode, 415);
+    assert.deepEqual(res.corpo, { erro: { codigo: 'REQUISICAO_INVALIDA', mensagem: 'Requisição inválida' } });
+    assert.equal(erroLog.mock.callCount(), 0);
+  });
+
+  test('erro 5xx ou não exposto continua 500', () => {
+    mock.method(console, 'error', () => {});
+    assert.equal(tratar(Object.assign(new Error('x'), { expose: true, status: 503 })).statusCode, 500);
+    assert.equal(tratar(Object.assign(new Error('x'), { expose: false, status: 400 })).statusCode, 500);
+  });
+
   test('violação de unicidade desconhecida usa mensagem genérica', () => {
     const res = tratar(Object.assign(new Error('dup'), { code: '23505', constraint: 'outra' }));
     assert.equal(res.corpo.erro.mensagem, 'Registro já existe');

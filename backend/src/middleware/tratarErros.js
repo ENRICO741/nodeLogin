@@ -4,6 +4,7 @@ const logger = require('../lib/logger');
 
 const PG_VIOLACAO_UNICA = '23505';
 const PG_VIOLACAO_FK = '23503';
+const PG_CARACTERE_INVALIDO = '22021';
 const MENSAGENS_UNICIDADE = {
   usuarios_apelido_uk: 'Este apelido já está em uso',
   usuarios_email_uk: 'Este e-mail já está cadastrado',
@@ -29,6 +30,12 @@ function tratarErros(erro, req, res, _next) {
   }
   if (erro.code === PG_VIOLACAO_UNICA) {
     return responder(res, 409, 'CONFLITO', MENSAGENS_UNICIDADE[erro.constraint] ?? 'Registro já existe');
+  }
+  // \u0000 em qualquer texto: o Postgres não guarda NUL em text.
+  if (erro.code === PG_CARACTERE_INVALIDO) return responder(res, 400, 'VALIDACAO', 'Dados inválidos');
+  // Outros erros do body-parser (charset, encoding, corpo truncado) são do cliente, não 500.
+  if (erro.expose && erro.status >= 400 && erro.status < 500) {
+    return responder(res, erro.status, 'REQUISICAO_INVALIDA', 'Requisição inválida');
   }
 
   logger.error('erro não tratado', { erro, metodo: req.method, url: req.originalUrl, req_id: req.id });

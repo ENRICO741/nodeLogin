@@ -93,6 +93,33 @@ describe('app', () => {
     assert.equal(res.body.erro.codigo, 'MUITO_GRANDE');
   });
 
+  test('charset que o body-parser não conhece dá 415, não 500', async (t) => {
+    const log = t.mock.method(console, 'error', () => {});
+    const res = await request(app)
+      .post('/api/auth/login')
+      .set('Content-Type', 'application/json; charset=latin-9')
+      .send('{"identificador":"a","senha":"b"}')
+      .expect(415);
+    assert.equal(res.body.erro.codigo, 'REQUISICAO_INVALIDA');
+    assert.equal(log.mock.callCount(), 0);
+  });
+
+  test('NUL (\\u0000) num texto dá 400, não 500', async (t) => {
+    const log = t.mock.method(console, 'error', () => {});
+    const u = await novoUsuario();
+    // nome tem validação própria; a bio chega ao banco e o Postgres recusa o NUL.
+    const res = await u
+      .api('patch', '/api/perfil')
+      .send({ bio: 'Olá' + String.fromCharCode(0) + 'mundo' })
+      .expect(400);
+    assert.equal(res.body.erro.codigo, 'VALIDACAO');
+    await u
+      .api('patch', '/api/perfil')
+      .send({ nome: 'Ana' + String.fromCharCode(0) })
+      .expect(400);
+    assert.equal(log.mock.callCount(), 0);
+  });
+
   test('Content-Type diferente de JSON é tratado como corpo ausente (400, não 500)', async () => {
     await request(app).post('/api/auth/login').set('Content-Type', 'text/plain').send('oi').expect(400);
   });
