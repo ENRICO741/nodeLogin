@@ -206,6 +206,12 @@ export function RedefinirSenha() {
         <form className="pilha" onSubmit={enviar} noValidate>
           <Aviso tipo="erro">{erro && !erro.detalhes.length ? erro.message : null}</Aviso>
           {!token && <Aviso tipo="erro">Link incompleto. Abra o link do e-mail novamente.</Aviso>}
+          {/* O token não tem campo na tela: o erro de validação dele vira este aviso. */}
+          {porCampo.token && (
+            <Aviso tipo="erro">
+              Link inválido ou expirado. <Link to="/esqueci-senha">Peça um novo</Link>
+            </Aviso>
+          )}
           <CampoSenhaNova label="Nova senha" name="senha" erro={porCampo.senha} />
           <Campo
             label="Confirme a nova senha"

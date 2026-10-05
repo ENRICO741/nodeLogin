@@ -296,6 +296,18 @@ describe('Redefinir senha', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Link inválido ou expirado');
   });
 
+  it('token com tamanho inválido (erro de validação do campo token) mostra o aviso de link inválido', async () => {
+    await abrir('?token=curto', {
+      'POST /auth/redefinir-senha': erroApi(400, 'VALIDACAO', 'Dados inválidos', [
+        { campo: 'token', mensagem: 'Too small' },
+      ]),
+    });
+    await preencher('Nova-senha-1', 'Nova-senha-1');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Link inválido ou expirado. Peça um novo');
+    expect(screen.getByRole('link', { name: 'Peça um novo' })).toHaveAttribute('href', '/esqueci-senha');
+    expect(screen.queryByText('Too small')).not.toBeInTheDocument();
+  });
+
   it('senha fraca mostra erro no campo', async () => {
     await abrir('?token=abc', {
       'POST /auth/redefinir-senha': erroApi(400, 'VALIDACAO', 'Dados inválidos', [
