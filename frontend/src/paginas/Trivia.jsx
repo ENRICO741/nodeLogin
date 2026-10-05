@@ -28,6 +28,8 @@ export function Trivia() {
   const aulas = useApi('/aulas');
   const [iniciando, setIniciando] = useState(null);
   const [erro, setErro] = useState(null);
+  // Níveis que o servidor disse não ter questões suficientes (409 NIVEL_INDISPONIVEL) nesta visita à tela.
+  const [indisponiveis, setIndisponiveis] = useState([]);
 
   if (aulas.carregando) return <Carregando />;
   if (aulas.erro) return <ErroCarregamento erro={aulas.erro} onTentarDeNovo={aulas.recarregar} />;
@@ -57,6 +59,7 @@ export function Trivia() {
       navigate(`/trivia/${rodada.id}`);
     } catch (e) {
       setErro(e);
+      if (e.codigo === 'NIVEL_INDISPONIVEL') setIndisponiveis((atual) => [...atual, dificuldade]);
       setIniciando(null);
     }
   }
@@ -74,7 +77,7 @@ export function Trivia() {
             key={valor}
             type="button"
             className={`cartao ${styles.opcao}`}
-            disabled={Boolean(iniciando)}
+            disabled={Boolean(iniciando) || indisponiveis.includes(valor)}
             onClick={() => iniciar(valor)}
           >
             <Icone aria-hidden="true" size={28} className={styles.icone} />

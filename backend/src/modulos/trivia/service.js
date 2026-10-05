@@ -35,7 +35,11 @@ async function triviaLiberada(c, usuarioId) {
   return rows[0].liberada;
 }
 
-async function criarRodada(usuarioId, { dificuldade, limite }) {
+// Rodada de 5 questões; com 3 ou 4 disponíveis no nível, sai com elas; com menos de 3, o nível fica indisponível.
+const TAMANHO_RODADA = 5;
+const MINIMO_RODADA = 3;
+
+async function criarRodada(usuarioId, { dificuldade }) {
   return transacao(async (c) => {
     if (!(await triviaLiberada(c, usuarioId))) {
       throw new HttpError(403, 'TRIVIA_BLOQUEADA', 'Conclua todas as aulas para liberar a trivia');
@@ -57,9 +61,12 @@ async function criarRodada(usuarioId, { dificuldade, limite }) {
            WHERE v.aula_id = q.aula_referencia_id AND v.usuario_id = $4 AND v.concluida))
          ORDER BY random() LIMIT $3
        ) sorteadas`,
-      [rodada.id, dificuldade, limite, usuarioId],
+      [rodada.id, dificuldade, TAMANHO_RODADA, usuarioId],
     );
-    if (rowCount === 0) throw conflito('SEM_QUESTOES', 'Ainda não há questões para esta dificuldade');
+    // A transação desfaz a rodada criada acima.
+    if (rowCount < MINIMO_RODADA) {
+      throw conflito('NIVEL_INDISPONIVEL', 'Este nível ainda não tem questões suficientes');
+    }
     return obterRodada(c, rodada.id, usuarioId);
   });
 }

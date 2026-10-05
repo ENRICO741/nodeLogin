@@ -150,46 +150,86 @@ describe('POST /api/trivia/rodadas', () => {
     }
   });
 
-  test('respeita o limite pedido e não repete questão na rodada', async () => {
-    const u = await novoJogador();
-    for (let i = 0; i < 5; i++) {
-      await pool.query(
-        "INSERT INTO questoes_trivia (dificuldade, enunciado, alternativa_a, alternativa_b, alternativa_c, alternativa_d, resposta_correta, aula_referencia_id) VALUES ('media', $1, 'a', 'b', 'c', 'd', 'a', (SELECT id FROM aulas WHERE ordem = 1))",
-        [`Extra ${i}`],
-      );
-    }
-    const rodada = (await novaRodada(u, { dificuldade: 'media', limite: 5 }).expect(201)).body;
-    assert.equal(rodada.questoes.length, 5);
-    assert.equal(new Set(rodada.questoes.map((q) => q.id)).size, 5);
-    await pool.query("DELETE FROM questoes_trivia WHERE enunciado LIKE 'Extra %'");
-  });
+  // Deixa exatamente `n` questões médias ativas e ligadas à aula 01 (o seed tem 3); devolve a limpeza.
+  async function mediasDisponiveis(n) {
+    const extras = Math.max(0, n - 3);
+    const { rows } = await pool.query(
+      `INSERT INTO questoes_trivia (dificuldade, enunciado, alternativa_a, alternativa_b, alternativa_c,
+         alternativa_d, resposta_correta, aula_referencia_id)
+       SELECT 'media', 'Extra ' || i, 'a', 'b', 'c', 'd', 'a', (SELECT id FROM aulas WHERE ordem = 1)
+       FROM generate_series(1, $1::int) i RETURNING id`,
+      [extras],
+    );
+    const { rows: desligadas } = await pool.query(
+      `UPDATE questoes_trivia SET ativo = false WHERE id IN (
+         SELECT id FROM questoes_trivia WHERE dificuldade = 'media' AND ativo ORDER BY criado_em LIMIT $1)
+       RETURNING id`,
+      [Math.max(0, 3 - n)],
+    );
+    return async () => {
+      await pool.query('DELETE FROM questoes_trivia WHERE id = ANY($1)', [rows.map((r) => r.id)]);
+      await pool.query('UPDATE questoes_trivia SET ativo = true WHERE id = ANY($1)', [
+        desligadas.map((r) => r.id),
+      ]);
+    };
+  }
 
-  test('limite fora de 5–20, dificuldade inválida ou ausente dá 400', async () => {
+  test('rodada tem 5 questões; com 3 ou 4 disponíveis sai com elas, sem repetir', async () => {
     const u = await novoJogador();
-    for (const corpo of [
-      { dificuldade: 'facil', limite: 4 },
-      { dificuldade: 'facil', limite: 21 },
-      { dificuldade: 'facil', limite: '10' },
-      { dificuldade: 'impossivel' },
-      {},
+    for (const [disponiveis, esperado] of [
+      [3, 3],
+      [4, 4],
+      [5, 5],
+      [8, 5],
     ]) {
-      await novaRodada(u, corpo).expect(400);
+      const limpar = await mediasDisponiveis(disponiveis);
+      try {
+        const rodada = (await novaRodada(u, { dificuldade: 'media' }).expect(201)).body;
+        assert.equal(rodada.questoes.length, esperado, `${disponiveis} disponíveis`);
+        assert.equal(new Set(rodada.questoes.map((q) => q.id)).size, esperado);
+      } finally {
+        await limpar();
+      }
     }
   });
 
-  test('sem questões ativas na dificuldade dá 409 e não deixa rodada vazia', async () => {
+  test('menos de 3 disponíveis no nível: 409 NIVEL_INDISPONIVEL e nenhuma rodada criada', async () => {
     const u = await novoJogador();
-    await pool.query("UPDATE questoes_trivia SET ativo = false WHERE dificuldade = 'dificil'");
+    for (const disponiveis of [2, 0]) {
+      const limpar = await mediasDisponiveis(disponiveis);
+      try {
+        const res = await novaRodada(u, { dificuldade: 'media' }).expect(409);
+        assert.deepEqual(res.body.erro, {
+          codigo: 'NIVEL_INDISPONIVEL',
+          mensagem: 'Este nível ainda não tem questões suficientes',
+        });
+      } finally {
+        await limpar();
+      }
+    }
+    const { rows } = await pool.query('SELECT count(*)::int AS n FROM trivia_rodadas WHERE usuario_id = $1', [
+      u.usuario.id,
+    ]);
+    assert.equal(rows[0].n, 0, 'transação desfeita');
+  });
+
+  test('o tamanho é do servidor: limite enviado pelo cliente é ignorado', async () => {
+    const u = await novoJogador();
+    const limpar = await mediasDisponiveis(8);
     try {
-      const res = await novaRodada(u, { dificuldade: 'dificil' }).expect(409);
-      assert.equal(res.body.erro.codigo, 'SEM_QUESTOES');
-      const { rows } = await pool.query(
-        'SELECT count(*)::int AS n FROM trivia_rodadas WHERE usuario_id = $1',
-        [u.usuario.id],
-      );
-      assert.equal(rows[0].n, 0, 'transação desfeita');
+      for (const limite of [20, 1, '10']) {
+        const rodada = (await novaRodada(u, { dificuldade: 'media', limite }).expect(201)).body;
+        assert.equal(rodada.questoes.length, 5, `limite ${limite}`);
+      }
     } finally {
-      await pool.query("UPDATE questoes_trivia SET ativo = true WHERE dificuldade = 'dificil'");
+      await limpar();
+    }
+  });
+
+  test('dificuldade inválida ou ausente dá 400', async () => {
+    const u = await novoJogador();
+    for (const corpo of [{ dificuldade: 'impossivel' }, { dificuldade: 'MEDIA' }, {}]) {
+      await novaRodada(u, corpo).expect(400);
     }
   });
 });

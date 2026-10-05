@@ -5,10 +5,8 @@ const { pool } = require('../../db/pool');
 const { idDaRota, esquemaResposta } = require('../../lib/validacao');
 const { limiteEscrita } = require('../../middleware/limites');
 
-const esquemaNovaRodada = z.object({
-  dificuldade: z.enum(['facil', 'media', 'dificil']),
-  limite: z.number().int().min(5).max(20).default(10),
-});
+// O tamanho da rodada é do servidor (trivia/service.js): um `limite` vindo do cliente é descartado.
+const esquemaNovaRodada = z.object({ dificuldade: z.enum(['facil', 'media', 'dificil']) });
 
 const router = Router();
 

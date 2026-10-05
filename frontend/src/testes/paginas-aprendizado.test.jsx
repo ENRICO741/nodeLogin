@@ -318,15 +318,32 @@ describe('Trivia', () => {
     expect(window.location.pathname).toBe('/trivia/r1');
   });
 
-  it('sem questões na dificuldade mostra o erro e reabilita as opções', async () => {
-    await renderizarApp('/trivia', {
+  it('nível sem questões suficientes mostra a mensagem e fica desabilitado; os outros seguem', async () => {
+    const { servidor } = await renderizarApp('/trivia', {
       rotas: {
         'GET /aulas': AULAS_CONCLUIDAS,
-        'POST /trivia/rodadas': erroApi(409, 'SEM_QUESTOES', 'Ainda não há questões para esta dificuldade'),
+        'POST /trivia/rodadas': erroApi(
+          409,
+          'NIVEL_INDISPONIVEL',
+          'Este nível ainda não tem questões suficientes',
+        ),
       },
     });
     await userEvent.click(await screen.findByRole('button', { name: /Difícil/ }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Ainda não há questões');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Este nível ainda não tem questões suficientes',
+    );
+    expect(screen.getByRole('button', { name: /Difícil/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Fácil/ })).toBeEnabled();
+    expect(servidor.enviados('POST /trivia/rodadas')).toEqual([{ dificuldade: 'dificil' }]);
+  });
+
+  it('outro erro ao criar a rodada (rede) mostra a mensagem e não desabilita o nível', async () => {
+    await renderizarApp('/trivia', {
+      rotas: { 'GET /aulas': AULAS_CONCLUIDAS, 'POST /trivia/rodadas': new TypeError('Failed to fetch') },
+    });
+    await userEvent.click(await screen.findByRole('button', { name: /Difícil/ }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Sem conexão');
     expect(screen.getByRole('button', { name: /Difícil/ })).toBeEnabled();
   });
 
