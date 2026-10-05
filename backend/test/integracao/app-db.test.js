@@ -133,6 +133,12 @@ describe('app', () => {
       .api('patch', '/api/perfil')
       .send({ nome: 'Ana' + String.fromCharCode(0) })
       .expect(400);
+    // jsonb (metadata da telemetria): o Postgres recusa com outro código (22P05).
+    const evento = await u
+      .api('post', '/api/eventos')
+      .send({ tipo_evento: 'tela_visualizada', metadata: { a: 'x' + String.fromCharCode(0) } })
+      .expect(400);
+    assert.equal(evento.body.erro.codigo, 'VALIDACAO');
     assert.equal(log.mock.callCount(), 0);
   });
 

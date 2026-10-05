@@ -115,6 +115,12 @@ describe('middleware tratarErros', () => {
     assert.doesNotMatch(JSON.stringify(res.corpo), /0x00/);
   });
 
+  test('NUL em jsonb (pg 22P05) também vira 400 VALIDACAO', () => {
+    const res = tratar(Object.assign(new Error('unsupported Unicode escape sequence'), { code: '22P05' }));
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.corpo.erro.codigo, 'VALIDACAO');
+  });
+
   test('outro erro 4xx exposto (body-parser) mantém o status com mensagem genérica, sem log', () => {
     const erroLog = mock.method(console, 'error', () => {});
     const res = tratar(
