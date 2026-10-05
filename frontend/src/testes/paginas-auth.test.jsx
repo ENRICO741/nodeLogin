@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { erroApi, renderizarApp, sequencia, USUARIO } from './utils';
+import { App } from '../App';
+import { erroApi, renderizarApp, sequencia, servidorFalso, USUARIO } from './utils';
 
 const SESSAO = { token: 'novo-token', usuario: USUARIO };
 const rotasLogado = { 'GET /aulas': [] };
@@ -399,7 +400,14 @@ describe('Redefinir senha', () => {
   });
 
   it('funciona mesmo com alguém logado (link aberto em outro aparelho)', async () => {
-    await renderizarApp('/redefinir-senha?token=x', { usuario: USUARIO, rotas: {} }).catch(() => {});
-    expect(await screen.findByRole('heading', { name: 'Nova senha' })).toBeInTheDocument();
+    // Sem renderizarApp: ele espera a navegação do app logado, que esta tela não tem.
+    localStorage.setItem('guardiao.token', 'token-teste');
+    const servidor = servidorFalso({ 'GET /auth/me': USUARIO });
+    window.history.pushState({}, '', '/redefinir-senha?token=x');
+    render(<App />);
+    await waitFor(() => expect(servidor.enviados('GET /auth/me')).toHaveLength(1));
+    await act(() => servidor.mock.results[0].value); // /auth/me respondeu: o usuário está logado
+    expect(screen.getByRole('heading', { name: 'Nova senha' })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/redefinir-senha');
   });
 });
