@@ -36,6 +36,7 @@ function Quiz({ aula, visitaId, aoFinalizar }) {
   });
 
   async function finalizar() {
+    if (finalizando) return; // toque duplo não finaliza duas vezes
     setFinalizando(true);
     setErroFinal(null);
     try {
@@ -56,6 +57,7 @@ function Quiz({ aula, visitaId, aoFinalizar }) {
         quiz={quiz}
         textoFinal={finalizando ? 'Concluindo…' : 'Concluir aula'}
         onFinal={finalizar}
+        finalizando={finalizando}
       />
       <Aviso tipo="erro">{erroFinal?.message}</Aviso>
     </div>
@@ -69,6 +71,7 @@ export function Aula() {
   const [visitaId, setVisitaId] = useState(null);
   const [resultado, setResultado] = useState(null);
   const [erroInicio, setErroInicio] = useState(null);
+  const [iniciando, setIniciando] = useState(false);
   const concluirLeitura = useLeitura(id, Boolean(aula) && etapa === 'conteudo');
 
   if (carregando) return <Carregando texto="Carregando aula…" />;
@@ -86,6 +89,8 @@ export function Aula() {
   if (erro) return <ErroCarregamento erro={erro} onTentarDeNovo={recarregar} />;
 
   async function iniciar() {
+    if (iniciando) return; // toque duplo não abre duas visitas
+    setIniciando(true);
     concluirLeitura('iniciou_perguntas');
     setErroInicio(null);
     try {
@@ -95,6 +100,8 @@ export function Aula() {
       registrarEvento({ tipo_evento: 'aula_iniciada', tela: `/aulas/${id}`, elemento: id });
     } catch (e) {
       setErroInicio(e);
+    } finally {
+      setIniciando(false);
     }
   }
 
@@ -123,7 +130,7 @@ export function Aula() {
           />
           <Aviso tipo="erro">{erroInicio?.message}</Aviso>
           {aula.questoes.length > 0 ? (
-            <button type="button" className="botao botao--bloco" onClick={iniciar}>
+            <button type="button" className="botao botao--bloco" disabled={iniciando} onClick={iniciar}>
               {aula.concluida
                 ? 'Refazer perguntas'
                 : `Responder ${aula.questoes.length} ${aula.questoes.length === 1 ? 'pergunta' : 'perguntas'}`}

@@ -48,6 +48,12 @@ const feedback = (correta, extra = {}) => ({
   pontuacao_total: 50,
   ...extra,
 });
+// Resposta que só chega quando o teste chamar liberar(): simula a rede lenta durante um toque duplo.
+const pendente = (valor) => {
+  const controle = {};
+  controle.rota = () => new Promise((r) => (controle.liberar = () => r(valor)));
+  return controle;
+};
 const alternativa = (texto) => screen.getByRole('button', { name: new RegExp(`^${texto}`) });
 
 describe('Aulas', () => {
@@ -177,6 +183,45 @@ describe('Aula', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Responder 2 perguntas' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Sem conexão');
     expect(screen.getByRole('heading', { name: 'Phishing' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Responder 2 perguntas' })).toBeEnabled();
+  });
+
+  it('toque duplo em iniciar abre uma visita só', async () => {
+    const visita = pendente({ status: 201, corpo: { id: 'v1' } });
+    const { servidor } = await renderizarApp('/aulas/a1', {
+      rotas: rotasAula({ 'POST /aulas/a1/visitas': visita.rota }),
+    });
+    const botao = await screen.findByRole('button', { name: 'Responder 2 perguntas' });
+    await userEvent.dblClick(botao);
+    expect(botao).toBeDisabled();
+    visita.liberar();
+    expect(await screen.findByText('Pergunta q1?')).toBeInTheDocument();
+    expect(servidor.enviados('POST /aulas/a1/visitas')).toHaveLength(1);
+  });
+
+  it('toque duplo em concluir finaliza uma vez só', async () => {
+    const fim = pendente({
+      acertos: 1,
+      total_questoes: 1,
+      pontos_questoes: 10,
+      bonus_conclusao: 20,
+      pontuacao_total: 80,
+      novos_badges: [],
+    });
+    const { servidor } = await renderizarApp('/aulas/a1', {
+      rotas: rotasAula({
+        'GET /aulas/a1': { ...AULA, questoes: [questao('q1')] },
+        'POST /visitas/v1/respostas': feedback(true),
+        'POST /visitas/v1/finalizar': fim.rota,
+      }),
+    });
+    await userEvent.click(await screen.findByRole('button', { name: 'Responder 1 pergunta' }));
+    await userEvent.click(alternativa('q1-B'));
+    await userEvent.dblClick(await screen.findByRole('button', { name: 'Concluir aula' }));
+    expect(screen.getByRole('button', { name: 'Concluindo…' })).toBeDisabled();
+    fim.liberar();
+    expect(await screen.findByRole('heading', { name: 'Aula concluída!' })).toBeInTheDocument();
+    expect(servidor.enviados('POST /visitas/v1/finalizar')).toHaveLength(1);
   });
 
   it('falha ao responder mostra erro e deixa tentar de novo', async () => {
@@ -366,6 +411,49 @@ describe('TriviaRodada', () => {
     });
     await userEvent.click(await screen.findByRole('button', { name: 'Ver resultado' }));
     expect(await screen.findByRole('heading', { name: 'Rodada finalizada!' })).toBeInTheDocument();
+  });
+
+  it('toque duplo em "Ver resultado" (todas respondidas) finaliza uma vez só', async () => {
+    const respondida = { ...RODADA, questoes: RODADA.questoes.map((q) => ({ ...q, respondida: true })) };
+    const fim = pendente({
+      acertos: 1,
+      total_questoes: 2,
+      pontos_ganhos: 5,
+      pontuacao_total: 45,
+      novos_badges: [],
+    });
+    const { servidor } = await renderizarApp('/trivia/r1', {
+      rotas: { 'GET /trivia/rodadas/r1': respondida, 'POST /trivia/rodadas/r1/finalizar': fim.rota },
+    });
+    const botao = await screen.findByRole('button', { name: 'Ver resultado' });
+    await userEvent.dblClick(botao);
+    expect(botao).toBeDisabled();
+    fim.liberar();
+    expect(await screen.findByRole('heading', { name: 'Rodada finalizada!' })).toBeInTheDocument();
+    expect(servidor.enviados('POST /trivia/rodadas/r1/finalizar')).toHaveLength(1);
+  });
+
+  it('toque duplo ao finalizar a última pergunta finaliza uma vez só', async () => {
+    const fim = pendente({
+      acertos: 1,
+      total_questoes: 1,
+      pontos_ganhos: 5,
+      pontuacao_total: 45,
+      novos_badges: [],
+    });
+    const { servidor } = await renderizarApp('/trivia/r1', {
+      rotas: {
+        'GET /trivia/rodadas/r1': { ...RODADA, questoes: [RODADA.questoes[0]] },
+        'POST /trivia/rodadas/r1/respostas': feedback(true),
+        'POST /trivia/rodadas/r1/finalizar': fim.rota,
+      },
+    });
+    await userEvent.click(await screen.findByRole('button', { name: /^t1-A/ }));
+    await userEvent.dblClick(await screen.findByRole('button', { name: 'Ver resultado' }));
+    expect(screen.getByRole('button', { name: 'Finalizando…' })).toBeDisabled();
+    fim.liberar();
+    expect(await screen.findByRole('heading', { name: 'Rodada finalizada!' })).toBeInTheDocument();
+    expect(servidor.enviados('POST /trivia/rodadas/r1/finalizar')).toHaveLength(1);
   });
 
   it('se finalizar falhar nesse caso, recarrega a rodada', async () => {

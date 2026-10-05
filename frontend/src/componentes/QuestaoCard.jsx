@@ -5,7 +5,7 @@ import styles from './QuestaoCard.module.css';
 
 const LETRAS = ['a', 'b', 'c', 'd'];
 
-export function QuestaoCard({ quiz, textoFinal = 'Ver resultado', onFinal }) {
+export function QuestaoCard({ quiz, textoFinal = 'Ver resultado', onFinal, finalizando = false }) {
   const { questao, indice, total, ultima, escolha, feedback, enviando, erro, responder, avancar } = quiz;
   const botaoProximaRef = useRef(null);
 
@@ -87,6 +87,7 @@ export function QuestaoCard({ quiz, textoFinal = 'Ver resultado', onFinal }) {
           ref={botaoProximaRef}
           type="button"
           className="botao botao--bloco"
+          disabled={ultima && finalizando}
           onClick={ultima ? onFinal : avancar}
         >
           {ultima ? textoFinal : 'Próxima pergunta'}

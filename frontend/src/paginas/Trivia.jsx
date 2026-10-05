@@ -93,6 +93,7 @@ export function Trivia() {
 function QuizRodada({ rodada, aoFinalizar }) {
   const { atualizarUsuario } = useAuth();
   const [erroFinal, setErroFinal] = useState(null);
+  const [finalizando, setFinalizando] = useState(false);
   const pendente = rodada.questoes.findIndex((q) => !q.respondida);
 
   const quiz = useQuiz({
@@ -113,17 +114,26 @@ function QuizRodada({ rodada, aoFinalizar }) {
   });
 
   async function finalizar() {
+    if (finalizando) return; // toque duplo não finaliza duas vezes
+    setFinalizando(true);
     setErroFinal(null);
     try {
       aoFinalizar(await api(`/trivia/rodadas/${rodada.id}/finalizar`, { metodo: 'POST' }));
     } catch (e) {
       setErroFinal(e);
+    } finally {
+      setFinalizando(false);
     }
   }
 
   return (
     <div className="pilha">
-      <QuestaoCard quiz={quiz} onFinal={finalizar} />
+      <QuestaoCard
+        quiz={quiz}
+        textoFinal={finalizando ? 'Finalizando…' : 'Ver resultado'}
+        onFinal={finalizar}
+        finalizando={finalizando}
+      />
       <Aviso tipo="erro">{erroFinal?.message}</Aviso>
     </div>
   );
@@ -133,11 +143,24 @@ export function TriviaRodada() {
   const { id } = useParams();
   const { dados: rodada, erro, carregando, recarregar } = useApi(`/trivia/rodadas/${id}`);
   const [resultado, setResultado] = useState(null);
+  const [finalizando, setFinalizando] = useState(false);
 
   if (carregando) return <Carregando texto="Carregando rodada…" />;
   if (erro) return <ErroCarregamento erro={erro} onTentarDeNovo={recarregar} />;
 
   const todasRespondidas = rodada.questoes.every((q) => q.respondida);
+
+  async function verResultado() {
+    if (finalizando) return; // toque duplo não finaliza duas vezes
+    setFinalizando(true);
+    try {
+      setResultado(await api(`/trivia/rodadas/${id}/finalizar`, { metodo: 'POST' }));
+    } catch {
+      recarregar();
+    } finally {
+      setFinalizando(false);
+    }
+  }
   const acoes = (
     <>
       <Link to="/trivia" className="botao botao--bloco">
@@ -179,13 +202,7 @@ export function TriviaRodada() {
       ) : todasRespondidas ? (
         // Todas respondidas mas não finalizada (ex.: recarregou antes de ver o resultado).
         <Vazio icone={Gauge} titulo="Você respondeu todas as perguntas">
-          <button
-            type="button"
-            className="botao"
-            onClick={() =>
-              api(`/trivia/rodadas/${id}/finalizar`, { metodo: 'POST' }).then(setResultado, recarregar)
-            }
-          >
+          <button type="button" className="botao" disabled={finalizando} onClick={verResultado}>
             Ver resultado
           </button>
         </Vazio>
