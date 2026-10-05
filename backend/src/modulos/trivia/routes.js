@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const { z } = require('zod');
 const service = require('./service');
+const { exigirPre } = require('../questionarios/service');
 const { pool } = require('../../db/pool');
 const { idDaRota, esquemaResposta } = require('../../lib/validacao');
 const { limiteEscrita } = require('../../middleware/limites');
@@ -11,6 +12,7 @@ const esquemaNovaRodada = z.object({ dificuldade: z.enum(['facil', 'media', 'dif
 const router = Router();
 
 router.post('/rodadas', limiteEscrita(), async (req, res) => {
+  await exigirPre(req.usuario);
   res.status(201).json(await service.criarRodada(req.usuario.id, esquemaNovaRodada.parse(req.body)));
 });
 

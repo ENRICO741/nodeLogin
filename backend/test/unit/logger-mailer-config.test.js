@@ -172,6 +172,7 @@ describe('config', () => {
       APP_URL: '',
       SMTP_HOST: '',
       BCRYPT_CUSTO: '',
+      PESQUISA_DATA_FIM: '',
       DATABASE_URL,
       JWT_SECRET,
       ...env,
@@ -220,6 +221,28 @@ describe('config', () => {
     const { codigo, saida } = await lerConfig({ JWT_SECRET: 'curto' });
     assert.equal(codigo, 1);
     assert.match(saida, /JWT_SECRET precisa de pelo menos 32 caracteres/);
+  });
+
+  test('PESQUISA_DATA_FIM: data AAAA-MM-DD; ausente ou vazia = sem teto', async () => {
+    const { codigo, saida } = await lerConfig({ PESQUISA_DATA_FIM: '2026-11-08' });
+    assert.equal(codigo, 0, saida);
+    assert.equal(JSON.parse(saida).PESQUISA_DATA_FIM, '2026-11-08');
+    assert.equal(JSON.parse((await lerConfig({})).saida).PESQUISA_DATA_FIM, undefined);
+  });
+
+  test('falha no boot com PESQUISA_DATA_FIM fora do formato ou inexistente', async () => {
+    for (const valor of [
+      '08/11/2026',
+      '2026-11-8',
+      '2026-13-01',
+      '2026-02-30',
+      '2026-11-08T00:00:00',
+      'amanhã',
+    ]) {
+      const { codigo, saida } = await lerConfig({ PESQUISA_DATA_FIM: valor });
+      assert.equal(codigo, 1, valor);
+      assert.match(saida, /PESQUISA_DATA_FIM/, valor);
+    }
   });
 
   test('falha com NODE_ENV desconhecido, APP_URL inválida ou BCRYPT_CUSTO fora da faixa', async () => {

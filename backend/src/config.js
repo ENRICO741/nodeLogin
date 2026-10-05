@@ -26,6 +26,9 @@ const esquema = z.object({
   SMTP_REMETENTE: z.string().default('Guardião Impacta <no-reply@localhost>'),
   CONTEUDO_DIR: z.string().default(path.resolve(__dirname, '..', '..', 'conteudo')),
   PESQUISA_SEGREDO: z.string().min(16, 'PESQUISA_SEGREDO precisa de pelo menos 16 caracteres').optional(),
+  // Último dia da pesquisa (AAAA-MM-DD), aceito inteiro no fuso de SP: o pós fecha à 00:00 do dia seguinte,
+  // mesmo antes do dia 28 de quem entrou tarde. Sem valor, não há teto.
+  PESQUISA_DATA_FIM: z.iso.date().optional(),
 });
 
 // Variável vazia no .env (ex.: SMTP_HOST=) conta como ausente.

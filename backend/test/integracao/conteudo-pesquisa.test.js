@@ -424,7 +424,17 @@ describe('exportação da pesquisa', () => {
     assert.equal(res.participantes, 1);
     assert.deepEqual(
       res.visoes.map((v) => v.id),
-      ['uso-diario', 'engajamento', 'retencao', 'sessoes', 'eventos', 'respostas', 'pontos', 'badges'],
+      [
+        'uso-diario',
+        'engajamento',
+        'retencao',
+        'sessoes',
+        'eventos',
+        'respostas',
+        'pontos',
+        'badges',
+        'questionario',
+      ],
     );
     // A visão conta semanas de calendário (date_trunc), não blocos de 7 dias desde o cadastro.
     const retencao = res.visoes.find((v) => v.id === 'retencao');

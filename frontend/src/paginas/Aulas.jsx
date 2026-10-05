@@ -1,11 +1,20 @@
+import { useEffect } from 'react';
 import { Link } from 'react-router';
 import { BookOpen, CheckCircle2, ChevronRight, Lock } from 'lucide-react';
+import { useAuth } from '../contexto/Auth';
 import { useApi } from '../hooks/useApi';
+import { prazoPos } from '../lib/questionario';
 import { Carregando, ErroCarregamento, Vazio } from '../componentes/Estado';
 import styles from './Aulas.module.css';
 
 export function Aulas() {
   const { dados: aulas, erro, carregando, recarregar } = useApi('/aulas');
+  const { usuario, atualizarSituacao } = useAuth();
+  const pos = usuario.questionarios;
+  // O pós abre no dia 14 sem a pessoa sair do app: confere a situação a cada abertura da tela.
+  useEffect(() => {
+    atualizarSituacao();
+  }, [atualizarSituacao]);
 
   if (carregando) return <Carregando />;
   if (erro) return <ErroCarregamento erro={erro} onTentarDeNovo={recarregar} />;
@@ -18,6 +27,21 @@ export function Aulas() {
         <h1>Aulas</h1>
         <p>Leia o conteúdo e responda às perguntas para ganhar pontos.</p>
       </header>
+
+      {/* Convite ao pós: opcional, sem pontos; some quando é enviado ou o prazo termina. */}
+      {pos?.pos_pendente && (
+        <section className={`cartao pilha ${styles.pesquisa}`} aria-labelledby="titulo-pos">
+          <h2 id="titulo-pos">Questionário final disponível</h2>
+          <p>
+            Agradecemos pela sua participação na pesquisa. Responda ao questionário final para avaliarmos o
+            resultado. Leva cerca de 10 minutos. Participação voluntária.
+          </p>
+          {pos.pos_fecha_em && <p className={styles.prazo}>{prazoPos(pos.pos_fecha_em)}</p>}
+          <Link to="/questionario" className="botao">
+            Responder
+          </Link>
+        </section>
+      )}
 
       {aulas.length === 0 ? (
         <Vazio icone={BookOpen} titulo="Nenhuma aula disponível ainda" />

@@ -69,6 +69,7 @@ function Quiz({ aula, visitaId, aoFinalizar }) {
 
 export function Aula() {
   const { id } = useParams();
+  const { usuario, atualizarUsuario } = useAuth();
   const { dados: aula, erro, carregando, recarregar } = useApi(`/aulas/${id}`);
   const [etapa, setEtapa] = useState('conteudo'); // conteudo | quiz | resultado
   const [visitaId, setVisitaId] = useState(null);
@@ -105,6 +106,9 @@ export function Aula() {
       registrarEvento({ tipo_evento: 'aula_iniciada', tela: `/aulas/${id}`, elemento: id });
     } catch (e) {
       setErroInicio(e);
+      // Servidor barra quem ainda não respondeu o questionário inicial: a RotaProtegida leva a ele.
+      if (e.codigo === 'QUESTIONARIO_PRE_PENDENTE')
+        atualizarUsuario({ questionarios: { ...usuario.questionarios, pre_pendente: true } });
     } finally {
       setIniciando(false);
       emAndamento.current = false;

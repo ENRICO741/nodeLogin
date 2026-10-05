@@ -28,7 +28,9 @@ let contador = 0;
 const autenticado = (token) => (metodo, url) =>
   request(app)[metodo](url).set('Authorization', `Bearer ${token}`);
 
-async function novoUsuario(extra = {}) {
+// Por padrão o questionário pré já vem respondido (direto no banco), para não barrar aulas e trivia.
+// `{ respondeuPre: false }` deixa o pré pendente (testes dos questionários).
+async function novoUsuario(extra = {}, { respondeuPre = true } = {}) {
   contador += 1;
   const sufixo = `${process.pid}_${contador}`;
   const dados = {
@@ -40,6 +42,11 @@ async function novoUsuario(extra = {}) {
     ...extra,
   };
   const res = await request(app).post('/api/auth/cadastro').send(dados).expect(201);
+  if (respondeuPre) {
+    await pool.query("INSERT INTO questionario_envios (usuario_id, momento) VALUES ($1, 'pre')", [
+      res.body.usuario.id,
+    ]);
+  }
   return { ...dados, token: res.body.token, usuario: res.body.usuario, api: autenticado(res.body.token) };
 }
 

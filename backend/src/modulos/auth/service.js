@@ -6,6 +6,7 @@ const { HttpError } = require('../../lib/erros');
 const mailer = require('../../lib/mailer');
 const logger = require('../../lib/logger');
 const { CAMPOS_USUARIO, emitirToken } = require('../../middleware/autenticacao');
+const questionarios = require('../questionarios/service');
 
 const VALIDADE_TOKEN_RECUPERACAO = '30 minutes';
 // Comparar contra um hash fixo quando o usuário não existe deixa o tempo de resposta igual (não revela contas).
@@ -13,7 +14,9 @@ const HASH_FALSO = bcrypt.hashSync('usuario-inexistente', config.BCRYPT_CUSTO);
 
 const hashSha256 = (valor) => crypto.createHash('sha256').update(valor).digest('hex');
 
-function sessao({ senha_alterada_em, ...usuario }) {
+// O usuário sai com a situação dos questionários: o app decide na hora se manda para o pré.
+async function sessao({ senha_alterada_em, ...usuario }) {
+  usuario.questionarios = await questionarios.situacao(usuario);
   return { token: emitirToken(usuario.id, senha_alterada_em), usuario };
 }
 

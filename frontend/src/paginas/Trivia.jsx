@@ -24,7 +24,7 @@ const DIFICULDADES = [
 
 export function Trivia() {
   const navigate = useNavigate();
-  const { usuario } = useAuth();
+  const { usuario, atualizarUsuario } = useAuth();
   const aulas = useApi('/aulas');
   const [iniciando, setIniciando] = useState(null);
   const [erro, setErro] = useState(null);
@@ -64,6 +64,9 @@ export function Trivia() {
     } catch (e) {
       setErro(e);
       if (e.codigo === 'NIVEL_INDISPONIVEL') setIndisponiveis((atual) => [...atual, dificuldade]);
+      // Servidor barra quem ainda não respondeu o questionário inicial: a RotaProtegida leva a ele.
+      if (e.codigo === 'QUESTIONARIO_PRE_PENDENTE')
+        atualizarUsuario({ questionarios: { ...usuario.questionarios, pre_pendente: true } });
       setIniciando(null);
       emAndamento.current = false; // no sucesso a tela sai, e a trava fica até lá
     }

@@ -15,6 +15,7 @@ function montar(caminho) {
         </Route>
         <Route path="/aulas" element={<p>tela de aulas</p>} />
         <Route element={<RotaProtegida />}>
+          <Route path="/questionario/pre" element={<p>questionário inicial</p>} />
           <Route path="/perfil" element={<p>tela de perfil</p>} />
           <Route element={<RotaAdmin />}>
             <Route path="/admin" element={<p>tela de admin</p>} />
@@ -40,6 +41,23 @@ describe('RotaProtegida', () => {
 
   it('logado vê a tela', () => {
     auth.atual = { usuario: { papel: 'usuario' }, carregando: false };
+    montar('/perfil');
+    expect(screen.getByText('tela de perfil')).toBeInTheDocument();
+  });
+
+  it('com o questionário inicial pendente, qualquer tela leva a ele (inclusive a admin)', () => {
+    auth.atual = { usuario: { papel: 'usuario', questionarios: { pre_pendente: true } }, carregando: false };
+    montar('/perfil');
+    expect(screen.getByText('questionário inicial')).toBeInTheDocument();
+    montar('/admin');
+    expect(screen.getAllByText('questionário inicial')).toHaveLength(2);
+  });
+
+  it('a própria tela do questionário não redireciona; sem pendência a rota segue normal', () => {
+    auth.atual = { usuario: { papel: 'usuario', questionarios: { pre_pendente: true } }, carregando: false };
+    montar('/questionario/pre');
+    expect(screen.getByText('questionário inicial')).toBeInTheDocument();
+    auth.atual = { usuario: { papel: 'usuario', questionarios: { pre_pendente: false } }, carregando: false };
     montar('/perfil');
     expect(screen.getByText('tela de perfil')).toBeInTheDocument();
   });

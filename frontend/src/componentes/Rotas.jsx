@@ -9,6 +9,9 @@ export function RotaProtegida() {
   // Falha de rede/servidor ao conferir a sessão: mandar para o login seria deslogar à toa.
   if (erro) return <ErroCarregamento erro={erro} onTentarDeNovo={tentarDeNovo} />;
   if (!usuario) return <Navigate to="/entrar" replace state={{ de: location.pathname }} />;
+  // Participante sem o questionário inicial da pesquisa responde antes de usar o app.
+  if (usuario.questionarios?.pre_pendente && location.pathname !== '/questionario/pre')
+    return <Navigate to="/questionario/pre" replace />;
   return <Outlet />;
 }
 

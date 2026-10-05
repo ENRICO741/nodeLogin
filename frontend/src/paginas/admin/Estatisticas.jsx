@@ -141,6 +141,10 @@ function DadosPesquisa() {
         {dados.participantes} participante(s) autorizaram o uso dos dados. Os arquivos CSV trazem só essas
         pessoas, identificadas por um pseudônimo (sem nome, e-mail ou apelido). Horários em Brasília.
       </p>
+      <p className={styles.itemMeta}>
+        Questionário inicial: {dados.questionarios.pre} resposta(s). Questionário final:{' '}
+        {dados.questionarios.pos} resposta(s).
+      </p>
       <Aviso tipo="erro">{erroDownload?.message}</Aviso>
       <ul className="cartao" style={{ listStyle: 'none', margin: 0, paddingBlock: 'var(--esp-2)' }}>
         {dados.visoes.map((v) => (

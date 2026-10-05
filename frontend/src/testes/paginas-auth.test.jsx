@@ -17,7 +17,8 @@ describe('Entrar', () => {
   it('login com sucesso salva o token e abre as aulas', async () => {
     const { servidor } = await renderizarApp('/entrar', {
       usuario: null,
-      rotas: { 'POST /auth/login': SESSAO, ...rotasLogado },
+      // GET /auth/me: a tela de Aulas confere a situação ao abrir.
+      rotas: { 'POST /auth/login': SESSAO, 'GET /auth/me': USUARIO, ...rotasLogado },
     });
     await userEvent.type(await screen.findByLabelText('E-mail ou apelido'), 'maria');
     await userEvent.type(screen.getByLabelText('Senha'), 'senha-forte');
@@ -94,7 +95,8 @@ describe('sessão salva com o servidor fora do ar', () => {
       expect(localStorage.getItem('guardiao.token')).toBe('token-teste');
       await userEvent.click(screen.getByRole('button', { name: /Tentar de novo/ }));
       expect(await screen.findByRole('heading', { name: 'Aulas' })).toBeInTheDocument();
-      expect(servidor.enviados('GET /auth/me')).toHaveLength(2);
+      // Duas da sessão e uma da tela de Aulas ao abrir.
+      expect(servidor.enviados('GET /auth/me')).toHaveLength(3);
     },
   );
 
@@ -185,7 +187,11 @@ describe('Cadastro', () => {
   it('cria a conta e entra', async () => {
     const { servidor } = await renderizarApp('/cadastro', {
       usuario: null,
-      rotas: { 'POST /auth/cadastro': { status: 201, corpo: SESSAO }, ...rotasLogado },
+      rotas: {
+        'POST /auth/cadastro': { status: 201, corpo: SESSAO },
+        'GET /auth/me': USUARIO,
+        ...rotasLogado,
+      },
     });
     await preencher();
     expect(await screen.findByRole('heading', { name: 'Aulas' })).toBeInTheDocument();

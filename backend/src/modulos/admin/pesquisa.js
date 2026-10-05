@@ -46,6 +46,11 @@ const VISOES = {
     titulo: 'Conquistas',
     descricao: 'Cada conquista obtida, com a data',
   },
+  questionario: {
+    visao: 'pesquisa_questionario',
+    titulo: 'Questionários',
+    descricao: 'Respostas do pré e do pós: uma linha por item (múltipla escolha: uma por opção marcada)',
+  },
 };
 
 const BOOL = 16;
@@ -78,11 +83,17 @@ async function lerVisao(visao) {
 const router = Router();
 
 router.get('/', async (_req, res) => {
+  // Um envio por usuário e momento (UNIQUE): contar envios = contar quem respondeu.
   const { rows } = await query(
-    "SELECT count(*)::int AS n FROM usuarios WHERE consentiu_pesquisa_em IS NOT NULL AND papel = 'usuario'",
+    `SELECT count(DISTINCT u.id)::int AS n,
+       count(e.id) FILTER (WHERE e.momento = 'pre')::int AS pre,
+       count(e.id) FILTER (WHERE e.momento = 'pos')::int AS pos
+     FROM usuarios u LEFT JOIN questionario_envios e ON e.usuario_id = u.id
+     WHERE u.consentiu_pesquisa_em IS NOT NULL AND u.papel = 'usuario'`,
   );
   res.json({
     participantes: rows[0].n,
+    questionarios: { pre: rows[0].pre, pos: rows[0].pos },
     visoes: Object.entries(VISOES).map(([id, { titulo, descricao }]) => ({ id, titulo, descricao })),
   });
 });

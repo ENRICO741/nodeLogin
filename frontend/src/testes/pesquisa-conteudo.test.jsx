@@ -338,6 +338,7 @@ describe('admin: dados da pesquisa', () => {
   };
   const PESQUISA = {
     participantes: 12,
+    questionarios: { pre: 9, pos: 0 },
     visoes: [
       { id: 'uso-diario', titulo: 'Uso diário', descricao: 'DAU por dia' },
       { id: 'engajamento', titulo: 'Engajamento por participante', descricao: 'Uma linha por pessoa' },
@@ -362,6 +363,9 @@ describe('admin: dados da pesquisa', () => {
       },
     });
     expect(await screen.findByText(/12 participante\(s\) autorizaram/)).toBeInTheDocument();
+    expect(
+      screen.getByText('Questionário inicial: 9 resposta(s). Questionário final: 0 resposta(s).'),
+    ).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Baixar Uso diário em CSV' }));
     await waitFor(() => expect(clique).toHaveBeenCalled());
     const [url, opcoes] = servidor.mock.calls.find(([u]) => u.endsWith('.csv'));

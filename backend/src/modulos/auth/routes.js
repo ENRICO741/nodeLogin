@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const { z } = require('zod');
 const service = require('./service');
+const { situacao } = require('../questionarios/service');
 const { autenticar } = require('../../middleware/autenticacao');
 const {
   limiteAuthIp,
@@ -33,8 +34,9 @@ router.post('/login', limiteAuthIp, limiteLogin, async (req, res) => {
   res.json(await service.entrar(esquemaLogin.parse(req.body)));
 });
 
-router.get('/me', autenticar, (req, res) => {
-  res.json(req.usuario);
+// A situação dos questionários entra só aqui (não no autenticar, que roda em toda requisição).
+router.get('/me', autenticar, async (req, res) => {
+  res.json({ ...req.usuario, questionarios: await situacao(req.usuario) });
 });
 
 router.post('/esqueci-senha', limiteRecuperacaoIp, limiteRecuperacaoEmail, async (req, res) => {

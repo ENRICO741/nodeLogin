@@ -1,5 +1,6 @@
 const { Router } = require('express');
 const service = require('./service');
+const { exigirPre } = require('../questionarios/service');
 const { idDaRota, esquemaResposta } = require('../../lib/validacao');
 const { limiteEscrita } = require('../../middleware/limites');
 
@@ -14,6 +15,7 @@ router.get('/aulas/:id', async (req, res) => {
 });
 
 router.post('/aulas/:id/visitas', limiteEscrita(), async (req, res) => {
+  await exigirPre(req.usuario);
   res.status(201).json(await service.iniciarVisita(idDaRota(req), req.usuario.id));
 });
 

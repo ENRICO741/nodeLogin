@@ -1,0 +1,209 @@
+/* Pré-questionário em tela cheia: só a barra escura da marca e o "Sair". */
+.telaCheia {
+  min-height: 100dvh;
+}
+.barra {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esp-3);
+  padding: calc(var(--esp-2) + env(safe-area-inset-top)) calc(var(--esp-4) + env(safe-area-inset-right))
+    var(--esp-2) calc(var(--esp-4) + env(safe-area-inset-left));
+  background: var(--cor-cabecalho);
+  color: var(--cor-sobre-cabecalho);
+  border-bottom: 1px solid var(--cor-borda-cabecalho);
+}
+.marca {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-2);
+  font-weight: 800;
+  letter-spacing: var(--espaco-letras);
+}
+.sair {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--esp-1);
+  min-height: var(--alvo-toque);
+  padding: 0 var(--esp-2);
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+/* O título do passo fica abaixo do cabeçalho fixo ao rolar até ele. */
+.abertura h1,
+.tituloBloco {
+  scroll-margin-top: 8rem;
+}
+.abertura p {
+  margin: 0;
+}
+
+.formulario {
+  display: grid;
+  gap: var(--esp-4);
+}
+.nome {
+  margin: 0;
+  font-size: var(--texto-xs);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: var(--espaco-letras-largo);
+  color: var(--cor-primaria);
+}
+.progressoTopo {
+  display: grid;
+  gap: var(--esp-2);
+  justify-items: start;
+}
+.progressoTopo > :global(.progresso) {
+  width: 100%;
+}
+
+.bloco {
+  display: grid;
+  gap: var(--esp-2);
+}
+.tituloBloco {
+  margin: 0;
+}
+.intro {
+  margin: 0;
+  color: var(--cor-texto-suave);
+}
+/* Aviso de mudança de escala: precisa chamar atenção sem parecer erro. */
+.atencao {
+  margin: 0;
+  padding: var(--esp-2) var(--esp-3);
+  border-left: 3px solid var(--cor-conquista);
+  border-radius: 0 var(--raio-sm) var(--raio-sm) 0;
+  background: var(--cor-conquista-suave);
+  color: var(--cor-sobre-conquista-suave);
+  font-weight: 700;
+}
+
+.item {
+  display: grid;
+  gap: var(--esp-2);
+  min-width: 0;
+  margin: 0;
+  padding: var(--esp-4) 0 0;
+  border: 0;
+  border-top: 1px solid var(--cor-borda);
+}
+.item + .item {
+  margin-top: var(--esp-2);
+}
+.pergunta {
+  float: left; /* flutuando, a legend deixa de cortar a borda e vira item do grid */
+  width: 100%;
+  padding: 0;
+  margin-bottom: var(--esp-1);
+  font-size: var(--texto-md);
+  font-weight: 600;
+  text-wrap: pretty;
+}
+.opcional {
+  font-weight: 400;
+  color: var(--cor-texto-suave);
+}
+.comErro .pergunta {
+  color: var(--cor-erro);
+}
+
+.opcoes {
+  display: grid;
+  gap: var(--esp-2);
+}
+/* Cada opção é um cartão inteiro clicável, com o radio/checkbox real à esquerda. */
+.opcao {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-3);
+  min-height: var(--alvo-toque);
+  padding: var(--esp-2) var(--esp-3);
+  border: 1px solid var(--cor-borda-campo);
+  border-radius: var(--raio);
+  background: var(--cor-superficie);
+  cursor: pointer;
+  transition:
+    border-color var(--transicao),
+    background-color var(--transicao);
+}
+.opcao input {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  accent-color: var(--cor-primaria);
+}
+.opcao:has(input:checked) {
+  background: var(--cor-primaria-suave);
+  color: var(--cor-sobre-primaria-suave);
+  box-shadow: inset 0 0 0 1px var(--cor-primaria);
+  font-weight: 600;
+}
+.opcao:has(input:focus-visible) {
+  outline: 3px solid var(--cor-foco);
+  outline-offset: 2px;
+}
+@media (hover: hover) {
+  .opcao:hover {
+    background: var(--cor-superficie-2);
+  }
+}
+.comErro .opcao:not(:has(input:checked)) {
+  border-color: var(--cor-erro);
+}
+.naoUsei {
+  border-style: dashed;
+}
+
+/* Escala na horizontal quando cabe: um ponto por coluna, rótulo embaixo do botão. */
+@media (min-width: 40rem) {
+  .escala {
+    grid-template-columns: repeat(var(--pontos), minmax(0, 1fr));
+    gap: var(--esp-1);
+  }
+  .escala .opcao {
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: var(--esp-2);
+    padding: var(--esp-2) var(--esp-1);
+    font-size: var(--texto-xs);
+    text-align: center;
+    hyphens: auto;
+  }
+}
+
+.mensagens:empty {
+  display: none;
+}
+.navegacao {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-2);
+}
+.navegacao > :global(.botao) {
+  flex: 1 1 8rem;
+}
+
+.fim {
+  display: grid;
+  justify-items: center;
+  gap: var(--esp-3);
+  text-align: center;
+}
+.fim p {
+  margin: 0;
+}
+.iconeFim {
+  color: var(--cor-sucesso);
+}

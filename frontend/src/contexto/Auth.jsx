@@ -4,6 +4,17 @@ import { definirConsentimento, finalizarSessao, iniciarSessao } from '../lib/tel
 
 const AuthContexto = createContext(null);
 
+// Rascunho dos questionários tem dados pessoais: não fica no aparelho (pode ser compartilhado).
+function apagarRascunhos() {
+  try {
+    for (const chave of Object.keys(localStorage)) {
+      if (chave.startsWith('guardiao.questionario.')) localStorage.removeItem(chave);
+    }
+  } catch {
+    /* sem armazenamento: não há rascunho */
+  }
+}
+
 export function AuthProvider({ children }) {
   const [usuario, setUsuario] = useState(null);
   const [carregando, setCarregando] = useState(() => Boolean(tokenSalvo.obter()));
@@ -12,6 +23,7 @@ export function AuthProvider({ children }) {
   const sair = useCallback(() => {
     finalizarSessao();
     tokenSalvo.limpar();
+    apagarRascunhos();
     setUsuario(null);
   }, []);
 
@@ -38,10 +50,32 @@ export function AuthProvider({ children }) {
       // Encerra a sessão de telemetria: senão o próximo login herdaria o id dela.
       finalizarSessao();
       tokenSalvo.limpar();
+      apagarRascunhos();
       setUsuario(null);
     });
     if (tokenSalvo.obter()) buscarEu();
   }, [buscarEu]);
+
+  // Revalida a situação (ex.: o pós abre no dia 14) sem mexer em carregando/erro: falha de rede fica com
+  // o que já tem, 401 já passa por aoSessaoExpirar. Resposta de outra conta (saiu no meio) ou 200 sem JSON
+  // (portal cativo do Wi-Fi: api devolve null) é ignorada.
+  const atualizarSituacao = useCallback(
+    () =>
+      api('/auth/me').then(
+        (novo) => setUsuario((atual) => (novo && atual?.id === novo.id ? novo : atual)),
+        () => {},
+      ),
+    [],
+  );
+
+  // App de volta do segundo plano (PWA fica aberto dias): mesma revalidação.
+  const logado = Boolean(usuario);
+  useEffect(() => {
+    if (!logado) return;
+    const aoVoltar = () => document.visibilityState === 'visible' && atualizarSituacao();
+    document.addEventListener('visibilitychange', aoVoltar);
+    return () => document.removeEventListener('visibilitychange', aoVoltar);
+  }, [logado, atualizarSituacao]);
 
   const iniciar = useCallback(({ token, usuario }) => {
     tokenSalvo.definir(token);
@@ -65,6 +99,7 @@ export function AuthProvider({ children }) {
       carregando,
       erro,
       tentarDeNovo,
+      atualizarSituacao,
       entrar: async (credenciais) =>
         iniciar(await api('/auth/login', { metodo: 'POST', corpo: credenciais })),
       cadastrar: async (dados) => iniciar(await api('/auth/cadastro', { metodo: 'POST', corpo: dados })),
@@ -72,7 +107,7 @@ export function AuthProvider({ children }) {
       // Mescla dados novos (ex.: pontuacao_total depois de uma resposta) sem recarregar /auth/me.
       atualizarUsuario: (parcial) => setUsuario((atual) => (atual ? { ...atual, ...parcial } : atual)),
     }),
-    [usuario, carregando, erro, tentarDeNovo, iniciar, sair],
+    [usuario, carregando, erro, tentarDeNovo, atualizarSituacao, iniciar, sair],
   );
 
   return <AuthContexto.Provider value={valor}>{children}</AuthContexto.Provider>;

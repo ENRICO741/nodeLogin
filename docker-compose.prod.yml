@@ -46,6 +46,7 @@ services:
       SMTP_SENHA: ${SMTP_SENHA:-}
       SMTP_REMETENTE: ${SMTP_REMETENTE:-}
       PESQUISA_SEGREDO: ${PESQUISA_SEGREDO:-}
+      PESQUISA_DATA_FIM: ${PESQUISA_DATA_FIM:-}
     depends_on:
       db:
         condition: service_healthy

@@ -17,6 +17,16 @@ Adições da migration `002_aulas_arquivo_e_pesquisa.sql`:
 - **Visões `pesquisa_*`**: pseudonimizadas e filtradas por consentimento, para exportação.
 - **Migration `005`**: a visão interna `sessoes_app_fim` estima o fim das sessões sem `finalizada_em` (último evento da sessão ou o início), usada por `pesquisa_sessoes` (coluna `fim_estimado`), `pesquisa_uso_diario` e `pesquisa_engajamento_usuario`; `pesquisa_badges` traz cada conquista com a data.
 
+Adições da migration `011_questionarios.sql` (questionários pré e pós da pesquisa; o texto das perguntas fica em `backend/src/modulos/questionarios/definicao.js`):
+
+- **Tabela `questionario_envios`**: `usuario_id`, `momento` (`pre` ou `pos`) e `enviado_em`. Único por `(usuario_id, momento)`: cada pessoa responde cada questionário uma vez.
+- **Tabela `questionario_respostas`**: formato longo, uma linha por item (múltipla escolha: uma por opção marcada). `item` (código, ex.: `K1_R`) e `valor` (texto: número da escala, índice da opção ou o texto da pergunta aberta). Único por `(envio_id, item, valor)`.
+- **Visão `pesquisa_questionario`**: mesmo padrão das outras `pesquisa_*`, com `participante, momento, item, valor, respondido_em`.
+
+Adição da migration `012_questionario_emails.sql`:
+
+- **Tabela `questionario_emails`**: e-mails do questionário pós já enviados. `usuario_id`, `tipo` (`convite_pos` ou `lembrete_pos`) e `enviado_em`. Única por `(usuario_id, tipo)`: a linha é reservada antes do envio, então cada pessoa recebe cada e-mail uma vez só.
+
 ## Regras garantidas pelo banco
 
 - `apelido` e `email` são únicos, sem diferenciar maiúsculas de minúsculas.
@@ -34,6 +44,9 @@ erDiagram
   USUARIOS ||--o{ USUARIO_BADGES : conquista
   USUARIOS ||--o{ SESSOES_APP : abre
   USUARIOS ||--o{ EVENTOS : gera
+  USUARIOS ||--o{ QUESTIONARIO_ENVIOS : responde_questionario
+  QUESTIONARIO_ENVIOS ||--o{ QUESTIONARIO_RESPOSTAS : contem
+  USUARIOS ||--o{ QUESTIONARIO_EMAILS : recebe_email
 
   AULAS ||--o{ QUESTOES_AULA : contem
   AULAS ||--o{ AULA_VISITAS : recebe_visita
@@ -206,5 +219,24 @@ erDiagram
     int duracao_ms
     jsonb metadata
     timestamp criado_em
+  }
+
+  QUESTIONARIO_ENVIOS {
+    uuid id PK
+    uuid usuario_id FK
+    string momento
+    timestamp enviado_em
+  }
+
+  QUESTIONARIO_RESPOSTAS {
+    uuid envio_id FK
+    string item
+    text valor
+  }
+
+  QUESTIONARIO_EMAILS {
+    uuid usuario_id FK
+    string tipo
+    timestamp enviado_em
   }
 ```

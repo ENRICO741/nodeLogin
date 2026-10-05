@@ -77,6 +77,7 @@ app.use('/api/trivia', require('./modulos/trivia/routes'));
 app.use('/api/badges', require('./modulos/badges/routes'));
 app.use('/api/ranking', require('./modulos/ranking/routes'));
 app.use('/api', require('./modulos/telemetria/routes'));
+app.use('/api/questionarios', require('./modulos/questionarios/routes'));
 app.use('/api/admin', exigirAdmin, require('./modulos/admin/routes'));
 
 app.use(() => {

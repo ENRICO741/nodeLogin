@@ -42,6 +42,7 @@ Só as portas 80 e 443 ficam expostas. A API e o banco ficam na rede interna do 
    | `POSTGRES_PASSWORD` | Gere com `openssl rand -hex 24` |
    | `JWT_SECRET` | Gere com `openssl rand -base64 48` |
    | `SMTP_*` | Os dados do provedor de e-mail |
+   | `PESQUISA_DATA_FIM` | Opcional: último dia da coleta (`AAAA-MM-DD`); vazia = sem teto. Nesta pesquisa: `2026-11-07` (último dia aceito; o site recusa a partir de 08/11, 00:00 de SP). Ver o README da raiz |
 
 3. Suba a stack:
    ```bash

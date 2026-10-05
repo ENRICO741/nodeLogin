@@ -11,6 +11,7 @@ import { Trivia, TriviaRodada } from './paginas/Trivia';
 import { Ranking } from './paginas/Ranking';
 import { Conquistas } from './paginas/Conquistas';
 import { Perfil } from './paginas/Perfil';
+import { Questionario } from './paginas/Questionario';
 import { PainelAdmin } from './paginas/admin/Admin';
 import { Estatisticas } from './paginas/admin/Estatisticas';
 import { AdminAula, AdminAulas } from './paginas/admin/AdminAulas';
@@ -32,6 +33,7 @@ export function App() {
             <Route path="/redefinir-senha" element={<RedefinirSenha />} />
 
             <Route element={<RotaProtegida />}>
+              <Route path="/questionario/pre" element={<Questionario tipo="pre" />} />
               <Route element={<Layout />}>
                 <Route path="/aulas" element={<Aulas />} />
                 <Route path="/aulas/:id" element={<Aula />} />
@@ -40,6 +42,7 @@ export function App() {
                 <Route path="/ranking" element={<Ranking />} />
                 <Route path="/conquistas" element={<Conquistas />} />
                 <Route path="/perfil" element={<Perfil />} />
+                <Route path="/questionario" element={<Questionario tipo="pos" />} />
                 <Route path="/admin" element={<RotaAdmin />}>
                   <Route index element={<PainelAdmin />} />
                   <Route path="estatisticas" element={<Estatisticas />} />

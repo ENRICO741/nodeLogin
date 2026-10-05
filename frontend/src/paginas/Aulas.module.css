@@ -126,3 +126,23 @@
     align-self: center;
   }
 }
+
+.pesquisa {
+  margin-bottom: var(--esp-4);
+  border-left: 4px solid var(--cor-primaria);
+}
+.pesquisa h2,
+.pesquisa p {
+  margin: 0;
+}
+.pesquisa h2 {
+  font-size: var(--texto-md);
+}
+.prazo {
+  font-size: var(--texto-sm);
+  font-weight: 700;
+  color: var(--cor-texto-suave);
+}
+.pesquisa > :global(.botao) {
+  justify-self: start;
+}

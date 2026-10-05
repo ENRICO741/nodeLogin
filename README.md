@@ -74,7 +74,8 @@ As aulas são arquivos HTML em [`conteudo/aulas/`](conteudo/), uma pasta por aul
   - `aula_iniciada`, `quiz_respondido` e `aula_concluida`;
   - `trivia_iniciada`;
   - `resultado_visualizado`;
-  - `app_instalado`.
+  - `app_instalado`;
+  - `questionario_iniciado` e `questionario_concluido`, com o `momento` (ver Questionários).
 - **No banco, com data e hora:** respostas, conclusões, badges e o **histórico de pontos** (`pontuacao_historico`).
 
 **Consentimento:** ter conta é participar da pesquisa de forma anônima. O aceite é obrigatório no cadastro (sem ele, a conta não é criada) e não pode ser retirado pelo app: o perfil não tem essa opção e a API ignora o campo. Admins ficam fora da pesquisa.
@@ -87,6 +88,28 @@ As aulas são arquivos HTML em [`conteudo/aulas/`](conteudo/), uma pasta por aul
 - sessões (sem fim registrado, o fim é o último evento da sessão e `fim_estimado` marca), eventos, respostas, pontos e conquistas com a data (`pesquisa_badges`, migration `005`).
 
 Os CSVs não trazem nome, e-mail nem apelido. Cada pessoa aparece como um pseudônimo, gerado com `PESQUISA_SEGREDO`. Os horários estão em America/Sao_Paulo.
+
+### Questionários (pré e pós)
+
+Os textos ficam só em `backend/src/modulos/questionarios/definicao.js` (base: `docs/questionario-pesquisa.txt`); o app recebe tudo por `GET /api/questionarios/:momento` (`pre` ou `pos`) e o servidor valida cada envio (`POST`, corpo `{ respostas }`): código existe, valor na faixa, obrigatórios presentes, desvios e "Nenhuma" exclusiva em A6.
+
+- **Quem participa:** usuário comum com `consentiu_pesquisa_em` preenchido. Admins e contas sem consentimento nunca veem os questionários nem são bloqueados.
+- **Pré (40 itens, cerca de 10 minutos):** obrigatório para todo participante, inclusive contas antigas. `/auth/me`, `/auth/login` e `/auth/cadastro` devolvem `usuario.questionarios.pre_pendente`; com ele `true`, o app só mostra o questionário. O servidor também barra o início de aula (`POST /api/aulas/:id/visitas`) e de trivia (`POST /api/trivia/rodadas`) com 403 `QUESTIONARIO_PRE_PENDENTE` até o pré ser enviado.
+- **Desvio:** C1 diferente de "Sim" esconde C2–C4 e o bloco de experiência com o treinamento; respostas enviadas para eles são descartadas.
+- **Pós (32 itens, opcional):** abre 14 dias depois do envio do pré e fecha no dia 28 ou no fim de `PESQUISA_DATA_FIM`, o que vier antes (relógio do servidor). Dentro da janela, `usuario.questionarios.pos_pendente` é `true` e `pos_fecha_em` traz o instante em que fecha (o app e os e-mails mostram como prazo o último dia inteiro, o anterior ao fechamento); o app mostra um card na tela inicial, mas nada é bloqueado. Antes de abrir (ou sem o pré) a API dá 404; depois de fechar, 410 `QUESTIONARIO_ENCERRADO`. O aviso de resposta única vem no campo `aviso` da definição. CMP só aparece para quem respondeu C1 = Sim no pré (para os outros, CMP enviado é pergunta desconhecida). Responder não dá pontos nem conquistas.
+- **`PESQUISA_DATA_FIM` (produção):** último dia da coleta, `AAAA-MM-DD`, aceito inteiro no fuso de São Paulo (o pós fecha à 00:00 do dia seguinte), mesmo para quem entrou tarde e ainda não chegou ao dia 28. Vazia = sem teto. Defina no `.env` da VM antes de encerrar a coleta e rode `docker compose -f docker-compose.prod.yml up -d api` para aplicar (a API lê a variável só ao subir); valor fora de `AAAA-MM-DD` impede a API de subir.
+- **E-mails do pós:** a API manda o convite a partir do dia 14 e o lembrete a partir do dia 18 (no mínimo 1 dia depois do convite), só para participantes ativos com o pós aberto e sem resposta. Uma rodada ao subir e depois a cada hora (fora de teste; em produção só com `SMTP_HOST`). Cada envio é reservado antes em `questionario_emails` (migration `012`, único por pessoa e tipo): reinício, deploy ou rodadas simultâneas não duplicam, e uma falha de envio libera a reserva para a rodada seguinte. Texto fixo, sem o nome da pessoa, com o link `APP_URL/questionario` e o prazo.
+- **Uma resposta por pessoa e momento** (`questionario_envios`, único por usuário e momento; reenvio dá 409). O rascunho fica no aparelho até o envio.
+
+**Exportação:** visão `pesquisa_questionario` em Dados da pesquisa (CSV `questionario`, migration `011`), formato longo com as colunas `participante, momento, item, valor, respondido_em`. A tela mostra também quantos participantes já responderam o pré e o pós.
+
+**Codificação:**
+
+- `item`: código do .txt (`FA1`, `K3_R`, `A6`, `ABR1`…).
+- `valor`: escalas de concordância = 1..5 ou 1..7 (1 = Discordo totalmente); "Não vi / não usei esse recurso" (só GAM1, GAM2, GAM3 e GAM5) = 0, tratar como ausente; escolha = índice a partir de 0 na ordem do .txt (C1: 0 = Sim, 1 = Não, 2 = Não lembro); aberta = o texto; múltipla escolha (A6) = uma linha por opção marcada.
+- Item escondido por desvio não tem linha. `respondido_em` é a hora do envio, igual em todas as linhas dele.
+- Itens com final `_R` são invertidos só na análise: nota = (máximo da escala + 1) − valor. O ATN deve ser 1; quem errar sai da análise.
+- O tempo de resposta vem dos eventos `questionario_iniciado` e `questionario_concluido` (metadata `momento`).
 
 ## Desenvolvimento
 
