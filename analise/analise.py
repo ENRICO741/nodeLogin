@@ -60,8 +60,10 @@ def features(dados):
     acertos_antes = r.groupby(['participante', 'questao_id']).correta.cumsum() - r.correta
     f['repeticoes_sem_pontos'] = (acertos_antes > 0).groupby(r.participante).sum()
     # Acerto nas aulas sem a pergunta provisória (o engajamento a inclui em acertos_aulas/respostas_aulas).
-    aulas = r[(r.tipo == 'aula') & (r.get('chave') != PERGUNTA_PROVISORIA)]  # CSV antigo: sem a coluna
+    provisoria = (r.tipo == 'aula') & (r.get('chave') == PERGUNTA_PROVISORIA)  # CSV antigo: sem a coluna
+    aulas = r[(r.tipo == 'aula') & ~provisoria]
     f['acerto_aulas'] = aulas.groupby('participante').correta.mean()
+    ids_provisoria = set(r.loc[provisoria, 'questao_id'].astype(str))
 
     ev = ler(dados, 'eventos')
     leitura = ev[ev.tipo_evento == 'aula_conteudo_lido'].copy()
@@ -70,7 +72,9 @@ def features(dados):
     f['rolagem_mediana'] = leitura.groupby('participante').rolagem.median()
     quiz = ev[ev.tipo_evento == 'quiz_respondido']
     na_trivia = quiz.tela.fillna('').str.startswith('/trivia')
-    f['resposta_mediana_aula_s'] = quiz[~na_trivia].groupby('participante').duracao_ms.median() / 1000
+    # O "Terminou?" (elemento = id da questão) é um toque em "Sim": fora do tempo de resposta das aulas.
+    real = ~quiz.elemento.astype(str).isin(ids_provisoria)
+    f['resposta_mediana_aula_s'] = quiz[~na_trivia & real].groupby('participante').duracao_ms.median() / 1000
     f['resposta_mediana_trivia_s'] = quiz[na_trivia].groupby('participante').duracao_ms.median() / 1000
 
     f[COMPORTAMENTO] = f[COMPORTAMENTO].fillna(0)
@@ -242,12 +246,14 @@ def demo():
                          'chave': np.tile(['a', 'a', 'a', 'b', 'b', 'c', PERGUNTA_PROVISORIA, None], n),
                          'correta': np.tile([True, False, True, False, False, True, True, False], n),
                          'respondido_em': base + pd.to_timedelta(np.tile(range(8), n), 'h')})
-    ev = pd.DataFrame({'participante': np.repeat(ids, 3),
-                       'tipo_evento': np.tile(['aula_conteudo_lido', 'quiz_respondido', 'quiz_respondido'], n),
-                       'tela': np.tile(['/aulas/a1', '/aulas/a1', '/trivia'], n),
-                       'duracao_ms': np.tile([60_000, 8_000, 20_000], n),
-                       'metadata': np.tile([json.dumps({'rolagem_max': 80}), json.dumps({'correta': True}),
-                                            json.dumps({'correta': False})], n)})
+    # Eventos: leitura, resposta real de aula (8 s), dois "Terminou?" (1 s, questão 4) e uma de trivia (20 s).
+    ev = pd.DataFrame({'participante': np.repeat(ids, 5),
+                       'tipo_evento': np.tile(['aula_conteudo_lido'] + ['quiz_respondido'] * 4, n),
+                       'tela': np.tile(['/aulas/a1', '/aulas/a1', '/aulas/a2', '/aulas/a3', '/trivia'], n),
+                       'elemento': np.tile(['a1', '1', '4', '4', '5'], n),
+                       'duracao_ms': np.tile([60_000, 8_000, 1_000, 1_000, 20_000], n),
+                       'metadata': np.tile([json.dumps({'rolagem_max': 80})] + [json.dumps({'correta': True})] * 4,
+                                           n)})
     codigos = [i[:8] for i in ids]
 
     def likert(delta):
