@@ -1,22 +1,27 @@
 const CHAVE_TOKEN = 'guardiao.token';
 
-// localStorage pode lançar (modo privado, armazenamento bloqueado): o app segue sem sessão persistida.
+// localStorage pode lançar (modo privado, armazenamento bloqueado): o token fica só em memória,
+// e a sessão vale até fechar a aba. Só é preenchido quando o localStorage falha: se ele funciona, é a fonte.
+let emMemoria = null;
+
 export const tokenSalvo = {
   obter() {
     try {
-      return localStorage.getItem(CHAVE_TOKEN);
+      return localStorage.getItem(CHAVE_TOKEN) ?? emMemoria;
     } catch {
-      return null;
+      return emMemoria;
     }
   },
   definir(valor) {
     try {
       localStorage.setItem(CHAVE_TOKEN, valor);
+      emMemoria = null;
     } catch {
-      /* segue só em memória */
+      emMemoria = valor; // segue só em memória
     }
   },
   limpar() {
+    emMemoria = null;
     try {
       localStorage.removeItem(CHAVE_TOKEN);
     } catch {
@@ -66,7 +71,8 @@ export async function api(caminho, { metodo = 'GET', corpo, sinal } = {}) {
 
   const dados = resposta.status === 204 ? null : await resposta.json().catch(() => null);
   if (!resposta.ok) {
-    if (resposta.status === 401 && token) aoSessaoExpirar();
+    // 401 de um token que já foi trocado (login novo no meio da requisição) não derruba a sessão nova.
+    if (resposta.status === 401 && token && tokenSalvo.obter() === token) aoSessaoExpirar();
     throw new ErroApi(resposta.status, dados);
   }
   return dados;

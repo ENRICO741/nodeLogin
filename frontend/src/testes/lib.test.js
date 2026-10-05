@@ -20,7 +20,38 @@ describe('tokenSalvo', () => {
     vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(erro);
     expect(tokenSalvo.obter()).toBeNull();
     expect(() => tokenSalvo.definir('x')).not.toThrow();
+    expect(tokenSalvo.obter()).toBe('x'); // segue em memória
     expect(() => tokenSalvo.limpar()).not.toThrow();
+    expect(tokenSalvo.obter()).toBeNull();
+  });
+
+  it('com localStorage bloqueado, o token definido vai nas requisições seguintes', async () => {
+    const erro = () => {
+      throw new Error('bloqueado');
+    };
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(erro);
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(erro);
+    const servidor = servidorFalso({ 'GET /x': {} });
+    tokenSalvo.definir('x');
+    await api('/x');
+    expect(servidor.mock.calls[0][1].headers.Authorization).toBe('Bearer x');
+    tokenSalvo.limpar();
+  });
+
+  it('setItem lançando com getItem funcionando (Safari privado antigo) também guarda em memória', () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('cota');
+    });
+    tokenSalvo.definir('y');
+    expect(tokenSalvo.obter()).toBe('y');
+    tokenSalvo.limpar();
+    expect(tokenSalvo.obter()).toBeNull();
+  });
+
+  it('com localStorage funcionando, ele é a fonte (memória não ressuscita token limpo em outra aba)', () => {
+    tokenSalvo.definir('z');
+    localStorage.removeItem('guardiao.token');
+    expect(tokenSalvo.obter()).toBeNull();
   });
 });
 
@@ -234,6 +265,20 @@ describe('api()', () => {
     tokenSalvo.definir('tok');
     await api('/x').catch(() => {});
     expect(aoExpirar).toHaveBeenCalledTimes(1);
+  });
+
+  it('401 de requisição feita com token antigo não expira o token novo', async () => {
+    const aoExpirar = vi.fn();
+    definirAoSessaoExpirar(aoExpirar);
+    let responder;
+    servidorFalso({ 'GET /x': () => new Promise((r) => (responder = r)) });
+    tokenSalvo.definir('antigo');
+    const pedido = api('/x').catch((e) => e);
+    tokenSalvo.definir('novo'); // login novo enquanto a requisição antiga estava no ar
+    responder(erroApi(401, 'NAO_AUTENTICADO', 'x'));
+    expect((await pedido).status).toBe(401);
+    expect(aoExpirar).not.toHaveBeenCalled();
+    expect(tokenSalvo.obter()).toBe('novo');
   });
 
   it('passa o sinal de cancelamento para o fetch', async () => {
