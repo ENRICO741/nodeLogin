@@ -324,9 +324,9 @@ describe('POST /api/trivia/rodadas/:id/respostas', () => {
     const { rows } = await pool.query("SELECT id, ordem, titulo FROM aulas WHERE slug = 'introducao-lgpd'");
     assert.deepEqual(erro.aula_referencia, rows[0]);
     assert.deepEqual(certo.aula_referencia, rows[0]);
-    // O reenvio idempotente também traz a aula.
+    // O reenvio idempotente do erro devolve o mesmo resultado, com a aula.
     const reenvio = (await responder(u, rodada.id, q2.id, errada(certas[q2.id])).expect(200)).body;
-    assert.deepEqual(reenvio.aula_referencia, rows[0]);
+    assert.deepEqual(reenvio, erro);
   });
 
   test('questão sem aula de referência (dado antigo) responde com aula_referencia null', async () => {
@@ -360,6 +360,16 @@ describe('POST /api/trivia/rodadas/:id/respostas', () => {
     const rodada = (await novaRodada(u)).body;
     await responder(u, rodada.id, rodada.questoes[0].id, 'a').expect(200);
     const res = await responder(u, rodada.id, rodada.questoes[0].id, 'b').expect(409);
+    assert.equal(res.body.erro.codigo, 'JA_RESPONDIDA');
+  });
+
+  test('resposta antiga sem alternativa gravada (antes da migration 006): reenvio continua 409', async () => {
+    const u = await novoJogador();
+    const rodada = (await novaRodada(u)).body;
+    const q = rodada.questoes[0];
+    await responder(u, rodada.id, q.id, 'a').expect(200);
+    await pool.query('UPDATE trivia_respostas SET alternativa = NULL WHERE rodada_id = $1', [rodada.id]);
+    const res = await responder(u, rodada.id, q.id, 'a').expect(409);
     assert.equal(res.body.erro.codigo, 'JA_RESPONDIDA');
   });
 
