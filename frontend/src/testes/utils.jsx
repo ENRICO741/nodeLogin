@@ -14,6 +14,8 @@ export const USUARIO = {
   profissao: null,
   empresa: null,
 };
+// Quem autorizou a pesquisa: só ele gera sessões e eventos de telemetria.
+export const PARTICIPANTE = { ...USUARIO, consentiu_pesquisa_em: '2026-05-01T12:00:00Z' };
 export const ADMIN = { ...USUARIO, id: 'a1', nome: 'Ana Admin', apelido: 'ana', papel: 'admin' };
 
 const SEQUENCIA = Symbol('sequencia');

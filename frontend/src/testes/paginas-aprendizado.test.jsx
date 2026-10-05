@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { erroApi, renderizarApp, sequencia, USUARIO } from './utils';
+import { erroApi, PARTICIPANTE, renderizarApp, sequencia, USUARIO } from './utils';
 
 const questao = (id, extra = {}) => ({
   id,
@@ -115,6 +115,7 @@ describe('Aula', () => {
 
   it('fluxo completo: conteúdo → perguntas → resultado com pontos e badge', async () => {
     const { servidor } = await renderizarApp('/aulas/a1', {
+      usuario: PARTICIPANTE,
       rotas: rotasAula({
         'POST /visitas/v1/respostas': sequencia(feedback(true), feedback(false, { pontuacao_total: 50 })),
         'POST /visitas/v1/finalizar': {

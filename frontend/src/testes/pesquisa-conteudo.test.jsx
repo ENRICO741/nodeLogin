@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import * as telemetria from '../lib/telemetria';
 import { baixarArquivo } from '../lib/api';
-import { ADMIN, erroApi, renderizarApp, sequencia, servidorFalso, USUARIO } from './utils';
+import { ADMIN, erroApi, PARTICIPANTE, renderizarApp, sequencia, servidorFalso, USUARIO } from './utils';
 
 let visibilidade = 'visible';
 Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => visibilidade });
@@ -19,7 +19,10 @@ beforeEach(() => {
 });
 
 describe('sessões de telemetria', () => {
-  beforeEach(() => localStorage.setItem('guardiao.token', 't'));
+  beforeEach(() => {
+    localStorage.setItem('guardiao.token', 't');
+    telemetria.definirConsentimento(true);
+  });
 
   it('a sessão leva o contexto: PWA instalado ou navegador e largura da tela', async () => {
     const servidor = servidorFalso();
@@ -86,6 +89,17 @@ describe('sessões de telemetria', () => {
     expect(servidor.enviados('POST /sessoes/sessao-1/retomar')).toEqual([]);
   });
 
+  it('sem consentimento, voltar ao app não retoma nem abre sessão', async () => {
+    const servidor = servidorFalso({ 'POST /sessoes/sessao-1/finalizar': { status: 204 } });
+    await telemetria.iniciarSessao();
+    mudarVisibilidade('hidden');
+    telemetria.definirConsentimento(false);
+    mudarVisibilidade('visible');
+    await new Promise((r) => setTimeout(r, 10));
+    expect(servidor.enviados('POST /sessoes/sessao-1/retomar')).toEqual([]);
+    expect(servidor.enviados('POST /sessoes')).toHaveLength(1);
+  });
+
   it('instalar o PWA registra app_instalado', async () => {
     const servidor = servidorFalso();
     await telemetria.iniciarSessao();
@@ -134,7 +148,10 @@ describe('eventos de navegação, leitura e resultado', () => {
   };
 
   it('tela_visualizada leva a tela anterior (caminho de navegação)', async () => {
-    const { servidor } = await renderizarApp('/aulas', { rotas: { ...rotas, 'GET /badges': [] } });
+    const { servidor } = await renderizarApp('/aulas', {
+      usuario: PARTICIPANTE,
+      rotas: { ...rotas, 'GET /badges': [] },
+    });
     await userEvent.click(screen.getByRole('link', { name: 'Conquistas' }));
     await screen.findByRole('heading', { name: 'Conquistas' });
     await waitFor(() => {
@@ -145,7 +162,7 @@ describe('eventos de navegação, leitura e resultado', () => {
   });
 
   it('ao começar as perguntas registra a leitura (tempo e rolagem) e depois o resultado exibido', async () => {
-    const { servidor } = await renderizarApp('/aulas/a1', { rotas });
+    const { servidor } = await renderizarApp('/aulas/a1', { usuario: PARTICIPANTE, rotas });
     expect((await screen.findByText('Importante')).closest('aside')).toHaveClass('nota');
     await userEvent.click(screen.getByRole('button', { name: 'Responder 1 pergunta' }));
     await userEvent.click(await screen.findByRole('button', { name: 'A' }));
@@ -169,7 +186,7 @@ describe('eventos de navegação, leitura e resultado', () => {
 
   it('sair da aula sem responder registra a leitura com motivo "saiu" e a rolagem máxima', async () => {
     Object.defineProperty(document.documentElement, 'scrollHeight', { configurable: true, value: 3000 });
-    const { servidor } = await renderizarApp('/aulas/a1', { rotas });
+    const { servidor } = await renderizarApp('/aulas/a1', { usuario: PARTICIPANTE, rotas });
     await screen.findByRole('heading', { name: 'Phishing' });
     window.scrollY = 1100; // (1100 / (3000 - 768)) ≈ 49%
     window.dispatchEvent(new Event('scroll'));

@@ -1,10 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useApi } from '../hooks/useApi';
 import { useQuiz } from '../hooks/useQuiz';
 import { AuthProvider, useAuth } from '../contexto/Auth';
-import { erroApi, servidorFalso, USUARIO } from './utils';
+import { definirConsentimento, finalizarSessao, registrarEvento } from '../lib/telemetria';
+import { erroApi, PARTICIPANTE, sequencia, servidorFalso, USUARIO } from './utils';
 
 describe('useApi', () => {
   it('começa carregando e entrega os dados', async () => {
@@ -129,6 +130,8 @@ function Painel() {
       </button>
       <button onClick={() => auth.cadastrar({ nome: 'x' })}>cadastrar</button>
       <button onClick={() => auth.atualizarUsuario({ pontuacao_total: 99 })}>pontos</button>
+      <button onClick={() => auth.atualizarUsuario({ consentiu_pesquisa_em: null })}>retirar</button>
+      <button onClick={() => auth.atualizarUsuario({ consentiu_pesquisa_em: '2026-06-01' })}>conceder</button>
       <button onClick={auth.sair}>sair</button>
     </div>
   );
@@ -141,6 +144,11 @@ const montar = () =>
   );
 
 describe('AuthProvider', () => {
+  beforeEach(() => {
+    finalizarSessao(); // zera o estado do módulo de telemetria entre os testes
+    definirConsentimento(null);
+  });
+
   it('sem token não chama a API e começa sem usuário', () => {
     const servidor = servidorFalso();
     montar();
@@ -150,11 +158,38 @@ describe('AuthProvider', () => {
 
   it('com token carrega /auth/me e abre sessão de telemetria', async () => {
     localStorage.setItem('guardiao.token', 't');
-    const servidor = servidorFalso({ 'GET /auth/me': USUARIO });
+    const servidor = servidorFalso({ 'GET /auth/me': PARTICIPANTE });
     montar();
     expect(screen.getByText('carregando')).toBeInTheDocument();
     expect(await screen.findByText('usuario: maria 40')).toBeInTheDocument();
     await waitFor(() => expect(servidor.enviados('POST /sessoes')).toHaveLength(1));
+  });
+
+  it('sem consentimento não abre sessão de telemetria nem envia eventos', async () => {
+    localStorage.setItem('guardiao.token', 't');
+    const servidor = servidorFalso({ 'GET /auth/me': USUARIO });
+    montar();
+    await screen.findByText('usuario: maria 40');
+    registrarEvento({ tipo_evento: 'x' });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(servidor.enviados('POST /sessoes')).toEqual([]);
+    expect(servidor.enviados('POST /eventos')).toEqual([]);
+  });
+
+  it('retirar o consentimento finaliza a sessão; reconceder abre outra', async () => {
+    localStorage.setItem('guardiao.token', 't');
+    const servidor = servidorFalso({
+      'GET /auth/me': PARTICIPANTE,
+      'POST /sessoes/sessao-1/finalizar': { status: 204 },
+    });
+    montar();
+    await waitFor(() => expect(servidor.enviados('POST /sessoes')).toHaveLength(1));
+    await userEvent.click(screen.getByText('retirar'));
+    expect(servidor.enviados('POST /sessoes/sessao-1/finalizar')).toHaveLength(1);
+    registrarEvento({ tipo_evento: 'depois_de_retirar' });
+    await userEvent.click(screen.getByText('conceder'));
+    await waitFor(() => expect(servidor.enviados('POST /sessoes')).toHaveLength(2));
+    expect(servidor.enviados('POST /eventos')).toEqual([]);
   });
 
   it('token inválido termina sem usuário', async () => {
@@ -209,5 +244,30 @@ describe('AuthProvider', () => {
     const { api } = await import('../lib/api');
     await act(() => api('/x').catch(() => {}));
     expect(screen.getByText('usuario: nenhum')).toBeInTheDocument();
+  });
+
+  it('depois de um 401, o novo login abre outra sessão e os eventos usam o id novo', async () => {
+    localStorage.setItem('guardiao.token', 't');
+    const servidor = servidorFalso({
+      'GET /auth/me': PARTICIPANTE,
+      'GET /x': erroApi(401, 'NAO_AUTENTICADO', 'x'),
+      'POST /auth/login': { token: 'novo', usuario: PARTICIPANTE },
+      'POST /sessoes': sequencia(
+        { status: 201, corpo: { id: 'sessao-1' } },
+        { status: 201, corpo: { id: 'sessao-2' } },
+      ),
+      'POST /sessoes/sessao-1/finalizar': { status: 204 },
+    });
+    montar();
+    await waitFor(() => expect(servidor.enviados('POST /sessoes')).toHaveLength(1));
+    const { api } = await import('../lib/api');
+    await act(() => api('/x').catch(() => {}));
+    expect(servidor.enviados('POST /sessoes/sessao-1/finalizar')).toHaveLength(1);
+
+    await userEvent.click(screen.getByText('entrar'));
+    await waitFor(() => expect(servidor.enviados('POST /sessoes')).toHaveLength(2));
+    registrarEvento({ tipo_evento: 'depois' });
+    await waitFor(() => expect(servidor.enviados('POST /eventos')).toHaveLength(1));
+    expect(servidor.enviados('POST /eventos')[0].sessao_id).toBe('sessao-2');
   });
 });

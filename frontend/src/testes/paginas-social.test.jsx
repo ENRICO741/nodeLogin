@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ADMIN, erroApi, renderizarApp, USUARIO } from './utils';
+import { ADMIN, erroApi, PARTICIPANTE, renderizarApp, USUARIO } from './utils';
 
 describe('Ranking', () => {
   const lider = (apelido, pontos, posicao, eu = false) => ({
@@ -231,6 +231,7 @@ describe('Perfil', () => {
 describe('navegação', () => {
   it('a tab bar leva a cada seção e registra a tela vista', async () => {
     const { servidor } = await renderizarApp('/aulas', {
+      usuario: PARTICIPANTE,
       rotas: {
         'GET /aulas': [],
         'GET /ranking': { lideres: [], minha_posicao: 1, pontuacao_total: 0 },

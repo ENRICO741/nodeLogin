@@ -6,6 +6,16 @@ let sessaoId = null;
 // Sessão encerrada ao ocultar o app; se ele voltar a tempo, o servidor a reabre (ver retomar).
 let sessaoPausada = null;
 let pendentes = [];
+// null: ainda não se sabe (eventos esperam na fila); false: não coleta; true: coleta.
+let consentiu = null;
+// Criação em andamento: chamadas simultâneas esperam a mesma (antes saíam dois POST /sessoes).
+let iniciando = null;
+
+export function definirConsentimento(valor) {
+  consentiu = valor;
+  // Só o "não" explícito descarta a fila: null é o carregamento do /auth/me e não pode apagar a primeira tela.
+  if (valor === false) pendentes = [];
+}
 
 const enviar = (evento) =>
   api('/eventos', { metodo: 'POST', corpo: { ...evento, sessao_id: sessaoId } }).catch(() => {});
@@ -19,19 +29,28 @@ const contexto = () => ({
   largura_tela: window.innerWidth,
 });
 
-export async function iniciarSessao() {
-  if (sessaoId || !tokenSalvo.obter()) return;
+async function criarSessao() {
   try {
-    sessaoId = (await api('/sessoes', { metodo: 'POST', corpo: contexto() })).id;
+    const sessao = await api('/sessoes', { metodo: 'POST', corpo: contexto() });
+    if (!sessao) return; // 204: o servidor sabe que o consentimento foi retirado
+    sessaoId = sessao.id;
     liberarPendentes();
   } catch {
     /* telemetria nunca atrapalha o uso do app */
+  } finally {
+    iniciando = null;
   }
+}
+
+export async function iniciarSessao() {
+  if (consentiu !== true || sessaoId || !tokenSalvo.obter()) return;
+  iniciando ??= criarSessao();
+  return iniciando;
 }
 
 // Eventos antes da sessão existir ficam na fila (antes, a primeira tela vista era perdida).
 export function registrarEvento(evento) {
-  if (!tokenSalvo.obter()) return;
+  if (consentiu === false || !tokenSalvo.obter()) return;
   if (sessaoId) enviar(evento);
   else if (pendentes.length < MAXIMO_PENDENTES) pendentes.push(evento);
 }
@@ -66,6 +85,7 @@ function pausar() {
 async function retomar() {
   const id = sessaoPausada;
   sessaoPausada = null;
+  if (consentiu !== true) return;
   if (!id || !tokenSalvo.obter()) return iniciarSessao();
   try {
     await api(`/sessoes/${id}/retomar`, { metodo: 'POST' });

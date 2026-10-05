@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { api, definirAoSessaoExpirar, tokenSalvo } from '../lib/api';
-import { finalizarSessao, iniciarSessao } from '../lib/telemetria';
+import { definirConsentimento, finalizarSessao, iniciarSessao } from '../lib/telemetria';
 
 const AuthContexto = createContext(null);
 
@@ -16,15 +16,14 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     definirAoSessaoExpirar(() => {
+      // Encerra a sessão de telemetria: senão o próximo login herdaria o id dela.
+      finalizarSessao();
       tokenSalvo.limpar();
       setUsuario(null);
     });
     if (!tokenSalvo.obter()) return;
     api('/auth/me')
-      .then((eu) => {
-        setUsuario(eu);
-        iniciarSessao();
-      })
+      .then(setUsuario)
       .catch(() => {})
       .finally(() => setCarregando(false));
   }, []);
@@ -32,8 +31,16 @@ export function AuthProvider({ children }) {
   const iniciar = useCallback(({ token, usuario }) => {
     tokenSalvo.definir(token);
     setUsuario(usuario);
-    iniciarSessao();
   }, []);
+
+  // Coleta segue o consentimento do usuário: retirar ou reconceder no Perfil para ou retoma na hora.
+  // null (sem usuário ainda) não faz nada, para não apagar a fila enquanto o /auth/me carrega.
+  const coleta = usuario ? Boolean(usuario.consentiu_pesquisa_em) : null;
+  useEffect(() => {
+    definirConsentimento(coleta);
+    if (coleta === true) iniciarSessao();
+    else if (coleta === false) finalizarSessao();
+  }, [coleta]);
 
   const valor = useMemo(
     () => ({

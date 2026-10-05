@@ -249,6 +249,7 @@ describe('telemetria', () => {
   beforeEach(async () => {
     vi.resetModules();
     telemetria = await import('../lib/telemetria');
+    telemetria.definirConsentimento(true);
   });
 
   it('sem login não faz nada', async () => {
@@ -281,6 +282,59 @@ describe('telemetria', () => {
     telemetria.registrarEvento({ tipo_evento: 'clique' });
     expect(servidor.enviados('POST /sessoes')).toHaveLength(1);
     expect(servidor.enviados('POST /eventos')).toHaveLength(1);
+  });
+
+  it('sem consentimento não cria sessão, não envia evento e descarta a fila', async () => {
+    localStorage.setItem('guardiao.token', 't');
+    const servidor = servidorFalso();
+    telemetria.definirConsentimento(null);
+    telemetria.registrarEvento({ tipo_evento: 'antes' }); // ainda não se sabe: vai para a fila
+    await telemetria.iniciarSessao();
+    expect(servidor).not.toHaveBeenCalled();
+
+    telemetria.definirConsentimento(false);
+    telemetria.registrarEvento({ tipo_evento: 'recusado' });
+    await telemetria.iniciarSessao();
+    expect(servidor).not.toHaveBeenCalled();
+
+    telemetria.definirConsentimento(true);
+    await telemetria.iniciarSessao();
+    telemetria.registrarEvento({ tipo_evento: 'depois' });
+    expect(servidor.enviados('POST /sessoes')).toHaveLength(1);
+    await vi.waitFor(() => expect(servidor.enviados('POST /eventos')).toHaveLength(1));
+    expect(servidor.enviados('POST /eventos')[0].tipo_evento).toBe('depois');
+  });
+
+  it('com consentimento ainda não sabido, a fila espera e sai quando ele chega', async () => {
+    localStorage.setItem('guardiao.token', 't');
+    const servidor = servidorFalso();
+    telemetria.definirConsentimento(null);
+    telemetria.registrarEvento({ tipo_evento: 'primeira_tela' });
+    telemetria.definirConsentimento(true);
+    await telemetria.iniciarSessao();
+    await vi.waitFor(() => expect(servidor.enviados('POST /eventos')).toHaveLength(1));
+  });
+
+  it('duas chamadas simultâneas de iniciarSessao criam uma sessão só', async () => {
+    localStorage.setItem('guardiao.token', 't');
+    const servidor = servidorFalso();
+    await Promise.all([telemetria.iniciarSessao(), telemetria.iniciarSessao()]);
+    expect(servidor.enviados('POST /sessoes')).toHaveLength(1);
+    // Terminada a criação, uma nova chamada não abre outra.
+    await telemetria.iniciarSessao();
+    expect(servidor.enviados('POST /sessoes')).toHaveLength(1);
+  });
+
+  it('204 ao criar sessão (consentimento retirado no servidor) não quebra nem envia eventos', async () => {
+    localStorage.setItem('guardiao.token', 't');
+    const servidor = servidorFalso({ 'POST /sessoes': { status: 204 } });
+    telemetria.registrarEvento({ tipo_evento: 'x' });
+    await expect(telemetria.iniciarSessao()).resolves.toBeUndefined();
+    telemetria.registrarEvento({ tipo_evento: 'y' });
+    expect(servidor.enviados('POST /eventos')).toEqual([]);
+    // Sem sessão, a próxima chamada tenta de novo.
+    await telemetria.iniciarSessao();
+    expect(servidor.enviados('POST /sessoes')).toHaveLength(2);
   });
 
   it('a fila tem limite de 50 eventos', async () => {
