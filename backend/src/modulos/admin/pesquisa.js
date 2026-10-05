@@ -68,6 +68,8 @@ function paraCsv(campos, linhas) {
 
 async function lerVisao(visao) {
   return transacao(async (c) => {
+    // A visão de eventos cresce com o uso: mais folga que os 10 s do pool, só nesta transação.
+    await c.query("SET LOCAL statement_timeout = '60s'");
     await c.query("SELECT set_config('app.pesquisa_segredo', $1, true)", [config.PESQUISA_SEGREDO]);
     return c.query({ text: `SELECT * FROM ${visao}`, types: TIPOS_TEXTO });
   });

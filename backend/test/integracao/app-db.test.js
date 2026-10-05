@@ -19,6 +19,22 @@ describe('pool', () => {
   });
 });
 
+describe('statement_timeout', () => {
+  test('consulta acima de 10 s é cancelada (57014) e o pool segue atendendo', async () => {
+    await assert.rejects(pool.query('SELECT pg_sleep(11)'), (erro) => erro.code === '57014');
+    assert.equal((await pool.query('SELECT 1 AS ok')).rows[0].ok, 1);
+  });
+
+  test('SET LOCAL da exportação vale só na transação', async () => {
+    const dentro = await transacao(async (c) => {
+      await c.query("SET LOCAL statement_timeout = '60s'");
+      return (await c.query('SHOW statement_timeout')).rows[0].statement_timeout;
+    });
+    assert.equal(dentro, '1min');
+    assert.equal((await pool.query('SHOW statement_timeout')).rows[0].statement_timeout, '10s');
+  });
+});
+
 describe('app', () => {
   test('GET /api/saude responde sem login; sem SMTP fica "degradado" (200)', async () => {
     const res = await request(app).get('/api/saude').expect(200);

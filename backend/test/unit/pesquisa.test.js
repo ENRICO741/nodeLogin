@@ -20,6 +20,32 @@ describe('VISOES', () => {
   });
 });
 
+describe('lerVisao', () => {
+  test('aumenta o statement_timeout só na própria transação, antes de ler a visão', async (t) => {
+    const { pool } = require('../../src/db/pool');
+    const { lerVisao } = require('../../src/modulos/admin/pesquisa');
+    const comandos = [];
+    const cliente = {
+      on() {},
+      off() {},
+      release() {},
+      query: async (sql) => {
+        comandos.push(typeof sql === 'string' ? sql : sql.text);
+        return { rows: [], fields: [] };
+      },
+    };
+    t.mock.method(pool, 'connect', async () => cliente);
+    await lerVisao('pesquisa_eventos');
+    assert.deepEqual(comandos, [
+      'BEGIN',
+      "SET LOCAL statement_timeout = '60s'",
+      "SELECT set_config('app.pesquisa_segredo', $1, true)",
+      'SELECT * FROM pesquisa_eventos',
+      'COMMIT',
+    ]);
+  });
+});
+
 describe('paraCsv com fim_estimado', () => {
   test('booleanos viram true/false; fim ausente vira célula vazia', () => {
     assert.equal(

@@ -45,9 +45,10 @@ describe('chaveLogin', () => {
 });
 
 describe('pool', () => {
-  test('até 20 conexões e 5 s de espera por uma livre', () => {
+  test('até 20 conexões, 5 s de espera por uma livre e 10 s por consulta', () => {
     assert.equal(pool.options.max, 20);
     assert.equal(pool.options.connectionTimeoutMillis, 5000);
+    assert.equal(pool.options.statement_timeout, 10_000);
   });
 });
 

@@ -5,7 +5,14 @@ const logger = require('../lib/logger');
 // Banco fora do ar: a requisição falha em 5 s em vez de esperar uma conexão para sempre.
 // 20 conexões (o padrão do pg é 10): no teste de carga com 100 usuários, 10 esgotaram no pico de
 // cadastros e duas requisições estouraram os 5 s. O Postgres aceita 100.
-const pool = new Pool({ connectionString: config.DATABASE_URL, connectionTimeoutMillis: 5000, max: 20 });
+// statement_timeout: uma consulta travada (lock, plano ruim) não segura a conexão para sempre.
+// A exportação da pesquisa, a única consulta pesada, aumenta o limite só para ela (lerVisao).
+const pool = new Pool({
+  connectionString: config.DATABASE_URL,
+  connectionTimeoutMillis: 5000,
+  max: 20,
+  statement_timeout: 10_000,
+});
 // Banco reiniciou/caiu: o pg avisa pelas conexões ociosas. Sem este listener o Node derruba a API.
 pool.on('error', (erro) => logger.error('conexão ociosa com o banco caiu', { erro }));
 
