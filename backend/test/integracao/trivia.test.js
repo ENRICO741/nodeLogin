@@ -96,6 +96,14 @@ describe('POST /api/trivia/rodadas', () => {
       rows[0].id,
     ]);
     await pool.query('UPDATE questoes_trivia SET aula_referencia_id = NULL WHERE id = $1', [semReferencia]);
+    // Visita aberta do aluno e visita concluída de outro na aula não dada: nenhuma das duas conta.
+    // Por SQL: a aula é inativa, o POST da visita daria 404.
+    const outro = await novoUsuario();
+    await pool.query(
+      `INSERT INTO aula_visitas (usuario_id, aula_id, finalizada_em, concluida)
+       VALUES ($1, $3, NULL, false), ($2, $3, now(), true)`,
+      [u.usuario.id, outro.usuario.id, rows[0].id],
+    );
     try {
       for (let i = 0; i < 3; i++) {
         const ids = (await novaRodada(u, { dificuldade: 'dificil' }).expect(201)).body.questoes.map(
