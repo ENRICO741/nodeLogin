@@ -531,17 +531,51 @@ describe('TriviaRodada', () => {
     expect(servidor.enviados('GET /trivia/rodadas/r1')).toHaveLength(2);
   });
 
-  it('erro ao finalizar a última pergunta aparece na tela', async () => {
-    await renderizarApp('/trivia/r1', {
+  it('se finalizar falhar e a rodada seguir aberta, "Ver resultado" volta habilitado', async () => {
+    const respondida = { ...RODADA, questoes: RODADA.questoes.map((q) => ({ ...q, respondida: true })) };
+    const { servidor } = await renderizarApp('/trivia/r1', {
+      rotas: {
+        'GET /trivia/rodadas/r1': sequencia(respondida, respondida),
+        'POST /trivia/rodadas/r1/finalizar': sequencia(new TypeError('Failed to fetch'), {
+          acertos: 1,
+          total_questoes: 2,
+          pontos_ganhos: 5,
+          pontuacao_total: 45,
+          novos_badges: [],
+        }),
+      },
+    });
+    await userEvent.click(await screen.findByRole('button', { name: 'Ver resultado' }));
+    await waitFor(() => expect(servidor.enviados('GET /trivia/rodadas/r1')).toHaveLength(2));
+    const botao = await screen.findByRole('button', { name: 'Ver resultado' });
+    expect(botao).toBeEnabled();
+    await userEvent.click(botao);
+    expect(await screen.findByRole('heading', { name: 'Rodada finalizada!' })).toBeInTheDocument();
+    expect(servidor.enviados('POST /trivia/rodadas/r1/finalizar')).toHaveLength(2);
+  });
+
+  it('erro ao finalizar a última pergunta aparece na tela e deixa tentar de novo', async () => {
+    const { servidor } = await renderizarApp('/trivia/r1', {
       rotas: {
         'GET /trivia/rodadas/r1': { ...RODADA, questoes: [RODADA.questoes[0]] },
         'POST /trivia/rodadas/r1/respostas': feedback(false),
-        'POST /trivia/rodadas/r1/finalizar': erroApi(0, 'SEM_CONEXAO', 'Sem conexão'),
+        'POST /trivia/rodadas/r1/finalizar': sequencia(new TypeError('Failed to fetch'), {
+          acertos: 0,
+          total_questoes: 1,
+          pontos_ganhos: 0,
+          pontuacao_total: 40,
+          novos_badges: [],
+        }),
       },
     });
     await userEvent.click(await screen.findByRole('button', { name: /^t1-A/ }));
     await userEvent.click(await screen.findByRole('button', { name: 'Ver resultado' }));
     expect(await screen.findByText('Sem conexão. Verifique sua internet')).toBeInTheDocument();
+    const botao = screen.getByRole('button', { name: 'Ver resultado' });
+    expect(botao).toBeEnabled();
+    await userEvent.click(botao);
+    expect(await screen.findByRole('heading', { name: 'Rodada finalizada!' })).toBeInTheDocument();
+    expect(servidor.enviados('POST /trivia/rodadas/r1/finalizar')).toHaveLength(2);
   });
 
   it('rodada de outro usuário (404) mostra o erro', async () => {
