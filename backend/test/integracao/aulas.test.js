@@ -34,6 +34,32 @@ async function responderAula(u, aulaId, acertar = () => true) {
   return { aula, visita, respostas, certas };
 }
 
+// Corrida forçada: segura o usuário (FOR UPDATE) numa conexão à parte, dispara os pedidos e só solta
+// quando os dois estão esperando lock no banco. Assim eles se cruzam sempre, não por sorte.
+async function emCorrida(usuarioId, disparar) {
+  const c = await pool.connect();
+  let pendentes;
+  try {
+    await c.query('BEGIN');
+    await c.query('SELECT 1 FROM usuarios WHERE id = $1 FOR UPDATE', [usuarioId]);
+    pendentes = Promise.all(disparar()); // o supertest só envia no .then
+    for (let i = 0; ; i++) {
+      // Pelo pool, fora da transação: dentro dela o pg_stat_activity fica no retrato da primeira leitura.
+      const { rows } = await pool.query(
+        `SELECT count(*)::int AS n FROM pg_stat_activity
+         WHERE datname = current_database() AND wait_event_type = 'Lock'`,
+      );
+      if (rows[0].n >= 2) break;
+      if (i === 250) throw new Error('os pedidos não chegaram a esperar o lock');
+      await new Promise((r) => setTimeout(r, 20));
+    }
+  } finally {
+    await c.query('COMMIT');
+    c.release();
+  }
+  return pendentes;
+}
+
 describe('GET /api/aulas', () => {
   test('lista aulas ativas em ordem, com total de questões e status de conclusão', async () => {
     const u = await novoUsuario();
@@ -291,6 +317,17 @@ describe('POST /api/aulas/:id/visitas', () => {
   test('aula inexistente ou desativada dá 404', async () => {
     const u = await novoUsuario();
     await u.api('post', `/api/aulas/${UUID_INEXISTENTE}/visitas`).expect(404);
+    const aula = await primeiraAula(u);
+    await pool.query('UPDATE aulas SET ativo = false WHERE id = $1', [aula.id]);
+    try {
+      await u.api('post', `/api/aulas/${aula.id}/visitas`).expect(404);
+    } finally {
+      await pool.query('UPDATE aulas SET ativo = true WHERE id = $1', [aula.id]);
+    }
+    const { rows } = await pool.query('SELECT count(*)::int AS n FROM aula_visitas WHERE usuario_id = $1', [
+      u.usuario.id,
+    ]);
+    assert.equal(rows[0].n, 0);
   });
 });
 
@@ -348,6 +385,24 @@ describe('POST /api/visitas/:id/respostas', () => {
       visita.id,
     ]);
     assert.deepEqual(rows, [{ alternativa: certas[q.id] }]);
+  });
+
+  test('reenvio de um acerto mostra os pontos creditados, mesmo com a questão editada depois', async () => {
+    const u = await novoUsuario();
+    const aula = (await u.api('get', `/api/aulas/${(await primeiraAula(u)).id}`)).body;
+    const q = aula.questoes[0];
+    const certas = await gabarito('questoes_aula', [q.id]);
+    const visita = (await u.api('post', `/api/aulas/${aula.id}/visitas`)).body;
+    const url = `/api/visitas/${visita.id}/respostas`;
+    const corpo = { questao_id: q.id, alternativa: certas[q.id] };
+    const primeira = (await u.api('post', url).send(corpo).expect(200)).body;
+    assert.equal(primeira.pontos_ganhos, 10);
+    await pool.query('UPDATE questoes_aula SET pontos = 99 WHERE id = $1', [q.id]);
+    try {
+      assert.deepEqual((await u.api('post', url).send(corpo).expect(200)).body, primeira);
+    } finally {
+      await pool.query('UPDATE questoes_aula SET pontos = $2 WHERE id = $1', [q.id, q.pontos]);
+    }
   });
 
   test('reenvio de resposta errada devolve o mesmo resultado; trocar a alternativa dá 409', async () => {
@@ -591,13 +646,23 @@ describe('POST /api/visitas/:id/finalizar', () => {
     assert.equal(segunda.pontos_questoes, 0);
     assert.equal(segunda.pontuacao_total, primeira.pontuacao_total);
     assert.deepEqual(segunda.novos_badges, []);
+    // Reenvio de uma finalização que não deu conquista continua sem nenhuma.
+    assert.deepEqual((await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200)).body, segunda);
   });
 
   test('com questões pendentes dá 409', async () => {
     const u = await novoUsuario();
-    const visita = (await u.api('post', `/api/aulas/${(await primeiraAula(u)).id}/visitas`)).body;
-    const res = await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(409);
-    assert.equal(res.body.erro.codigo, 'QUESTOES_PENDENTES');
+    const aula = (await u.api('get', `/api/aulas/${(await primeiraAula(u)).id}`)).body;
+    const visita = (await u.api('post', `/api/aulas/${aula.id}/visitas`)).body;
+    const finalizar = async () =>
+      (await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(409)).body.erro.codigo;
+    assert.equal(await finalizar(), 'QUESTOES_PENDENTES');
+    // Uma das duas respondida ainda não basta.
+    await u
+      .api('post', `/api/visitas/${visita.id}/respostas`)
+      .send({ questao_id: aula.questoes[0].id, alternativa: 'a' })
+      .expect(200);
+    assert.equal(await finalizar(), 'QUESTOES_PENDENTES');
   });
 
   test('aula sem questões pode ser concluída direto', async () => {
@@ -632,7 +697,9 @@ describe('POST /api/visitas/:id/finalizar', () => {
     ]);
     const nHistorico = await historico();
     const segunda = (await u.api('post', url).expect(200)).body;
-    assert.deepEqual(segunda, { ...primeira, novos_badges: [] });
+    // Mesmas conquistas: se o retorno se perdeu, o aluno ainda vê "Nova conquista!".
+    assert.deepEqual(segunda, primeira);
+    assert.ok(primeira.novos_badges.length > 0);
     assert.equal(segunda.bonus_conclusao, aula.pontos_conclusao);
     assert.equal(segunda.pontuacao_total, 20 + aula.pontos_conclusao);
     assert.equal(await historico(), nHistorico);
@@ -660,7 +727,7 @@ describe('POST /api/visitas/:id/finalizar', () => {
     );
     try {
       const visita = (await u.api('post', `/api/aulas/${rows[0].id}/visitas`)).body;
-      await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200);
+      const fim = (await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200)).body;
       // O admin adicionou uma questão depois.
       const { rows: q } = await pool.query(
         `INSERT INTO questoes_aula (aula_id, enunciado, alternativa_a, alternativa_b, alternativa_c, alternativa_d,
@@ -672,6 +739,12 @@ describe('POST /api/visitas/:id/finalizar', () => {
         .send({ questao_id: q[0].id, alternativa: 'a' })
         .expect(409);
       assert.equal(res.body.erro.codigo, 'VISITA_FINALIZADA');
+      // A questão nova pendente não barra o reenvio da finalização (total_questoes conta as ativas de agora).
+      const reenvio = (await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200)).body;
+      assert.deepEqual(
+        [reenvio.total_questoes, reenvio.acertos, reenvio.bonus_conclusao, reenvio.pontuacao_total],
+        [1, 0, fim.bonus_conclusao, fim.pontuacao_total],
+      );
     } finally {
       await pool.query('DELETE FROM aulas WHERE id = $1', [rows[0].id]);
     }
@@ -687,7 +760,17 @@ describe('POST /api/visitas/:id/finalizar', () => {
       [200, 200, 200],
     );
     for (const x of r) assert.equal(x.body.pontuacao_total, 20 + aula.pontos_conclusao);
-    assert.equal(r.filter((x) => x.body.novos_badges.length > 0).length, 1, 'badges novos só na primeira');
+    // Todas trazem as conquistas da finalização que pagou; cada uma gravada uma vez só.
+    assert.ok(r[0].body.novos_badges.length > 0);
+    for (const x of r) assert.deepEqual(x.body.novos_badges, r[0].body.novos_badges);
+    const { rows } = await pool.query(
+      'SELECT count(*)::int AS linhas, count(DISTINCT badge_id)::int AS badges FROM usuario_badges WHERE usuario_id = $1',
+      [u.usuario.id],
+    );
+    assert.deepEqual(rows[0], {
+      linhas: r[0].body.novos_badges.length,
+      badges: r[0].body.novos_badges.length,
+    });
     const me = (await u.api('get', '/api/auth/me')).body;
     assert.equal(me.pontuacao_total, 20 + aula.pontos_conclusao);
   });
@@ -721,7 +804,7 @@ describe('POST /api/visitas/:id/finalizar', () => {
       (await u.api('post', `/api/aulas/${aula.id}/visitas`)).body,
       (await u.api('post', `/api/aulas/${aula.id}/visitas`)).body,
     ];
-    const r = await Promise.all(
+    const r = await emCorrida(u.usuario.id, () =>
       visitas.map((v) =>
         u.api('post', `/api/visitas/${v.id}/respostas`).send({ questao_id: q.id, alternativa: certas[q.id] }),
       ),

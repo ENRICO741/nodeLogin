@@ -29,6 +29,16 @@ async function creditarPontos(c, usuarioId, pontos, origem, referenciaId) {
   return total;
 }
 
+// O que o histórico registrou para uma origem/referência (0 se nada: questão de 0 pontos não grava).
+async function pontosCreditados(c, usuarioId, origem, referenciaId) {
+  const { rows } = await c.query(
+    `SELECT COALESCE(sum(pontos), 0)::int AS pontos FROM pontuacao_historico
+     WHERE usuario_id = $1 AND origem = $2 AND referencia_id = $3`,
+    [usuarioId, origem, referenciaId],
+  );
+  return rows[0].pontos;
+}
+
 async function pontuacaoAtual(c, usuarioId) {
   const { rows } = await c.query('SELECT pontuacao_total FROM usuarios WHERE id = $1', [usuarioId]);
   return rows[0].pontuacao_total;
@@ -89,4 +99,25 @@ async function concederBadges(c, usuarioId) {
   return rows;
 }
 
-module.exports = { ehAdmin, travarUsuario, creditarPontos, pontuacaoAtual, concederBadges };
+// Conquistas gravadas no instante dado (fragmento SQL que usa $2 = `param`). O reenvio de uma finalização
+// devolve as da original: concederBadges as grava com o now() da mesma transação que marcou o fim.
+// A comparação fica no SQL: o Date do JS perderia os microssegundos.
+async function badgesObtidosEm(c, usuarioId, instante, param) {
+  const { rows } = await c.query(
+    `SELECT b.id, b.nome, b.descricao, b.imagem_url, b.tipo_criterio
+     FROM usuario_badges ub JOIN badges b ON b.id = ub.badge_id
+     WHERE ub.usuario_id = $1 AND ub.obtida_em = (${instante})`,
+    [usuarioId, param],
+  );
+  return rows;
+}
+
+module.exports = {
+  ehAdmin,
+  travarUsuario,
+  creditarPontos,
+  pontosCreditados,
+  pontuacaoAtual,
+  concederBadges,
+  badgesObtidosEm,
+};
