@@ -512,12 +512,16 @@ describe('Questões de trivia (admin)', () => {
     expect(servidor.enviados('POST /admin/questoes-trivia')[0].aula_referencia_id).toBe('');
   });
 
-  it('erro ao carregar as aulas mostra "Tentar de novo"', async () => {
+  it('erro ao carregar as aulas mostra "Tentar de novo", que recarrega a tela', async () => {
     await comoAdmin('/admin/trivia', {
-      'GET /admin/aulas': erroApi(500, 'ERRO_INTERNO', 'Falhou'),
+      'GET /admin/aulas': sequencia(erroApi(500, 'ERRO_INTERNO', 'Falhou'), AULAS_TRIVIA),
       'GET /admin/questoes-trivia': LISTA,
     });
-    expect(await screen.findByRole('button', { name: /Tentar de novo/ })).toBeInTheDocument();
+    expect(await screen.findByText('Falhou')).toBeInTheDocument();
+    // O ErrorBoundary também tem "Tentar de novo": aqui tem de ser o erro da tela, não ela quebrada.
+    expect(screen.queryByText('Algo deu errado nesta tela.')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Tentar de novo/ }));
+    expect(await screen.findByRole('region', { name: /Fácil/ })).toBeInTheDocument();
   });
 
   it('agrupa por dificuldade com contagem de ativas e nível vazio', async () => {
