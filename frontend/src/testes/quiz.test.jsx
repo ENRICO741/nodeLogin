@@ -96,6 +96,22 @@ describe('quiz', () => {
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
 
+    it('500 também fica sem retorno: outra alternativa recusada com JA_RESPONDIDA reenvia a anterior', async () => {
+      const enviarResposta = vi
+        .fn()
+        .mockRejectedValueOnce(
+          new ErroApi(500, { erro: { codigo: 'ERRO_INTERNO', mensagem: 'Erro interno.' } }),
+        )
+        .mockRejectedValueOnce(jaRespondida())
+        .mockResolvedValueOnce({ correta: false, resposta_correta: 'c', pontos_ganhos: 0 });
+      render(<Quiz enviarResposta={enviarResposta} />);
+      await userEvent.click(opcao('A'));
+      expect(await screen.findByRole('alert')).toHaveTextContent('Erro interno.');
+      await userEvent.click(opcao('B'));
+      expect(await screen.findByText('Resposta incorreta')).toBeInTheDocument();
+      expect(enviarResposta.mock.calls.map(([, alt]) => alt)).toEqual(['a', 'b', 'a']);
+    });
+
     it('duas falhas de rede seguidas: acha a gravada (a primeira) entre as que ficaram sem retorno', async () => {
       // A foi gravada sem o retorno chegar; B nem saiu; C é recusada; reenvia B (409) e então A (vale).
       const enviarResposta = vi.fn(async (_id, alternativa) => {

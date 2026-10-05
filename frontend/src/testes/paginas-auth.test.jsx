@@ -82,17 +82,20 @@ describe('sessão salva com o servidor fora do ar', () => {
     return renderizarApp('/aulas', { usuario: null, rotas: { 'GET /auth/me': eu, ...rotasLogado } });
   };
 
-  it('503 no /auth/me mostra "Tentar de novo" sem ir para o login; tentar com sucesso entra', async () => {
-    const { servidor } = await abrir(
-      sequencia(erroApi(503, 'INDISPONIVEL', 'Servidor indisponível'), USUARIO),
-    );
-    expect(await screen.findByRole('alert')).toHaveTextContent('Servidor indisponível');
-    expect(window.location.pathname).toBe('/aulas');
-    expect(localStorage.getItem('guardiao.token')).toBe('token-teste');
-    await userEvent.click(screen.getByRole('button', { name: /Tentar de novo/ }));
-    expect(await screen.findByRole('heading', { name: 'Aulas' })).toBeInTheDocument();
-    expect(servidor.enviados('GET /auth/me')).toHaveLength(2);
-  });
+  it.each([503, 500])(
+    '%i no /auth/me mostra "Tentar de novo" sem ir para o login; tentar com sucesso entra',
+    async (status) => {
+      const { servidor } = await abrir(
+        sequencia(erroApi(status, 'INDISPONIVEL', 'Servidor indisponível'), USUARIO),
+      );
+      expect(await screen.findByRole('alert')).toHaveTextContent('Servidor indisponível');
+      expect(window.location.pathname).toBe('/aulas');
+      expect(localStorage.getItem('guardiao.token')).toBe('token-teste');
+      await userEvent.click(screen.getByRole('button', { name: /Tentar de novo/ }));
+      expect(await screen.findByRole('heading', { name: 'Aulas' })).toBeInTheDocument();
+      expect(servidor.enviados('GET /auth/me')).toHaveLength(2);
+    },
+  );
 
   it('sem rede no /auth/me também não desloga; nova falha continua na tela de erro', async () => {
     await abrir(new TypeError('Failed to fetch'));
