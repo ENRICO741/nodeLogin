@@ -371,6 +371,46 @@ describe('POST /api/visitas/:id/respostas', () => {
   });
 });
 
+describe('visita de outro usuário (IDOR)', () => {
+  test('responder e finalizar a visita de A com o token de B dá 404 e não muda nada', async () => {
+    const [a, b] = [await novoUsuario(), await novoUsuario()];
+    const aulaId = (await primeiraAula(a)).id;
+    const aula = (await a.api('get', `/api/aulas/${aulaId}`)).body;
+    const visita = (await a.api('post', `/api/aulas/${aulaId}/visitas`).expect(201)).body;
+    const certas = await gabarito(
+      'questoes_aula',
+      aula.questoes.map((q) => q.id),
+    );
+    const [q1, q2] = aula.questoes;
+    await a
+      .api('post', `/api/visitas/${visita.id}/respostas`)
+      .send({ questao_id: q1.id, alternativa: certas[q1.id] })
+      .expect(200);
+    const estado = async () =>
+      (
+        await pool.query(
+          `SELECT v.finalizada_em, v.concluida, (SELECT count(*)::int FROM aula_respostas r WHERE r.visita_id = v.id) AS respostas,
+             (SELECT pontuacao_total FROM usuarios WHERE id = $2) AS pontos_a, (SELECT pontuacao_total FROM usuarios WHERE id = $3) AS pontos_b
+           FROM aula_visitas v WHERE v.id = $1`,
+          [visita.id, a.usuario.id, b.usuario.id],
+        )
+      ).rows[0];
+    const antes = await estado();
+
+    for (const questao of [q1, q2]) {
+      const res = await b
+        .api('post', `/api/visitas/${visita.id}/respostas`)
+        .send({ questao_id: questao.id, alternativa: certas[questao.id] })
+        .expect(404);
+      assert.equal(res.body.erro.mensagem, 'Visita não encontrada');
+    }
+    await b.api('post', `/api/visitas/${visita.id}/finalizar`).expect(404);
+    assert.deepEqual(await estado(), antes);
+    assert.equal(antes.respostas, 1);
+    assert.equal(antes.pontos_b, 0);
+  });
+});
+
 describe('POST /api/visitas/:id/finalizar', () => {
   test('primeira conclusão paga bônus, concede badge e marca a aula como concluída', async () => {
     const u = await novoUsuario();

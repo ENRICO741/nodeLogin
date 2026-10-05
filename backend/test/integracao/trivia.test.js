@@ -337,6 +337,41 @@ describe('POST /api/trivia/rodadas/:id/finalizar', () => {
   });
 });
 
+describe('rodada de outro usuário (IDOR)', () => {
+  test('ver, responder e finalizar a rodada de A com o token de B dá 404 e não muda nada', async () => {
+    const [a, b] = [await novoJogador(), await novoJogador()];
+    const rodada = (await novaRodada(a).expect(201)).body;
+    const certas = await gabarito(
+      'questoes_trivia',
+      rodada.questoes.map((q) => q.id),
+    );
+    const [q1, q2] = rodada.questoes;
+    await responder(a, rodada.id, q1.id, certas[q1.id]).expect(200);
+    const estado = async () =>
+      (
+        await pool.query(
+          `SELECT r.finalizada_em, r.pontos_ganhos,
+             (SELECT count(*)::int FROM trivia_respostas tr WHERE tr.rodada_id = r.id) AS respostas,
+             (SELECT pontuacao_total FROM usuarios WHERE id = $2) AS pontos_b,
+             (SELECT count(*)::int FROM usuario_badges WHERE usuario_id = $2) AS badges_b
+           FROM trivia_rodadas r WHERE r.id = $1`,
+          [rodada.id, b.usuario.id],
+        )
+      ).rows[0];
+    const antes = await estado();
+
+    await b.api('get', `/api/trivia/rodadas/${rodada.id}`).expect(404);
+    for (const q of [q1, q2]) {
+      const res = await responder(b, rodada.id, q.id, certas[q.id]).expect(404);
+      assert.equal(res.body.erro.mensagem, 'Rodada não encontrada');
+    }
+    await b.api('post', `/api/trivia/rodadas/${rodada.id}/finalizar`).expect(404);
+    assert.deepEqual(await estado(), antes);
+    assert.equal(antes.finalizada_em, null);
+    assert.equal(antes.respostas, 1);
+  });
+});
+
 describe('conquistas da trivia', () => {
   // Joga uma rodada inteira; `acertar(i, questaoId)` decide se a i-ésima é respondida certa.
   async function jogar(u, dificuldade, acertar = () => true) {
