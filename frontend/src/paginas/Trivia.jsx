@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { ArrowLeft, Gauge, Lock, Signal, SignalLow, SignalMedium } from 'lucide-react';
 import { api } from '../lib/api';
@@ -30,6 +30,8 @@ export function Trivia() {
   const [erro, setErro] = useState(null);
   // Níveis que o servidor disse não ter questões suficientes (409 NIVEL_INDISPONIVEL) nesta visita à tela.
   const [indisponiveis, setIndisponiveis] = useState([]);
+  // Trava síncrona: o disabled só chega no próximo render, e dois toques podem cair no mesmo.
+  const emAndamento = useRef(false);
 
   if (aulas.carregando) return <Carregando />;
   if (aulas.erro) return <ErroCarregamento erro={aulas.erro} onTentarDeNovo={aulas.recarregar} />;
@@ -51,6 +53,8 @@ export function Trivia() {
   }
 
   async function iniciar(dificuldade) {
+    if (emAndamento.current) return; // toque duplo não cria duas rodadas
+    emAndamento.current = true;
     setIniciando(dificuldade);
     setErro(null);
     try {
@@ -61,6 +65,7 @@ export function Trivia() {
       setErro(e);
       if (e.codigo === 'NIVEL_INDISPONIVEL') setIndisponiveis((atual) => [...atual, dificuldade]);
       setIniciando(null);
+      emAndamento.current = false; // no sucesso a tela sai, e a trava fica até lá
     }
   }
 
@@ -97,6 +102,7 @@ function QuizRodada({ rodada, aoFinalizar }) {
   const { atualizarUsuario } = useAuth();
   const [erroFinal, setErroFinal] = useState(null);
   const [finalizando, setFinalizando] = useState(false);
+  const emAndamento = useRef(false); // trava síncrona: o disabled só chega no próximo render
   const pendente = rodada.questoes.findIndex((q) => !q.respondida);
 
   const quiz = useQuiz({
@@ -117,7 +123,8 @@ function QuizRodada({ rodada, aoFinalizar }) {
   });
 
   async function finalizar() {
-    if (finalizando) return; // toque duplo não finaliza duas vezes
+    if (emAndamento.current) return; // toque duplo não finaliza duas vezes
+    emAndamento.current = true;
     setFinalizando(true);
     setErroFinal(null);
     try {
@@ -126,6 +133,7 @@ function QuizRodada({ rodada, aoFinalizar }) {
       setErroFinal(e);
     } finally {
       setFinalizando(false);
+      emAndamento.current = false;
     }
   }
 
@@ -147,6 +155,7 @@ export function TriviaRodada() {
   const { dados: rodada, erro, carregando, recarregar } = useApi(`/trivia/rodadas/${id}`);
   const [resultado, setResultado] = useState(null);
   const [finalizando, setFinalizando] = useState(false);
+  const emAndamento = useRef(false); // trava síncrona: o disabled só chega no próximo render
 
   if (carregando) return <Carregando texto="Carregando rodada…" />;
   if (erro) return <ErroCarregamento erro={erro} onTentarDeNovo={recarregar} />;
@@ -154,7 +163,8 @@ export function TriviaRodada() {
   const todasRespondidas = rodada.questoes.every((q) => q.respondida);
 
   async function verResultado() {
-    if (finalizando) return; // toque duplo não finaliza duas vezes
+    if (emAndamento.current) return; // toque duplo não finaliza duas vezes
+    emAndamento.current = true;
     setFinalizando(true);
     try {
       setResultado(await api(`/trivia/rodadas/${id}/finalizar`, { metodo: 'POST' }));
@@ -162,6 +172,7 @@ export function TriviaRodada() {
       recarregar();
     } finally {
       setFinalizando(false);
+      emAndamento.current = false;
     }
   }
   const acoes = (

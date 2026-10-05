@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { erroApi, PARTICIPANTE, renderizarApp, sequencia, USUARIO } from './utils';
 
@@ -54,6 +54,12 @@ const pendente = (valor) => {
   controle.rota = () => new Promise((r) => (controle.liberar = () => r(valor)));
   return controle;
 };
+// Dois toques no MESMO render: com dois eventos separados o RTL re-renderiza entre eles e só o disabled já barraria.
+const tocarDuasVezes = (botao) =>
+  act(() => {
+    botao.click();
+    botao.click();
+  });
 const alternativa = (texto) => screen.getByRole('button', { name: new RegExp(`^${texto}`) });
 
 describe('Aulas', () => {
@@ -192,7 +198,7 @@ describe('Aula', () => {
       rotas: rotasAula({ 'POST /aulas/a1/visitas': visita.rota }),
     });
     const botao = await screen.findByRole('button', { name: 'Responder 2 perguntas' });
-    await userEvent.dblClick(botao);
+    tocarDuasVezes(botao);
     expect(botao).toBeDisabled();
     visita.liberar();
     expect(await screen.findByText('Pergunta q1?')).toBeInTheDocument();
@@ -217,7 +223,7 @@ describe('Aula', () => {
     });
     await userEvent.click(await screen.findByRole('button', { name: 'Responder 1 pergunta' }));
     await userEvent.click(alternativa('q1-B'));
-    await userEvent.dblClick(await screen.findByRole('button', { name: 'Concluir aula' }));
+    tocarDuasVezes(await screen.findByRole('button', { name: 'Concluir aula' }));
     expect(screen.getByRole('button', { name: 'Concluindo…' })).toBeDisabled();
     fim.liberar();
     expect(await screen.findByRole('heading', { name: 'Aula concluída!' })).toBeInTheDocument();
@@ -316,6 +322,23 @@ describe('Trivia', () => {
     expect(await screen.findByText('Pergunta t1?')).toBeInTheDocument();
     expect(servidor.enviados('POST /trivia/rodadas')).toEqual([{ dificuldade: 'media' }]);
     expect(window.location.pathname).toBe('/trivia/r1');
+  });
+
+  it('toque duplo ao escolher a dificuldade cria uma rodada só e trava todos os níveis', async () => {
+    const criar = pendente({ status: 201, corpo: RODADA });
+    const { servidor } = await renderizarApp('/trivia', {
+      rotas: {
+        'GET /aulas': AULAS_CONCLUIDAS,
+        'POST /trivia/rodadas': criar.rota,
+        'GET /trivia/rodadas/r1': RODADA,
+      },
+    });
+    tocarDuasVezes(await screen.findByRole('button', { name: /Média/ }));
+    for (const nivel of [/Fácil/, /Média/, /Difícil/])
+      expect(screen.getByRole('button', { name: nivel })).toBeDisabled();
+    criar.liberar();
+    expect(await screen.findByText('Pergunta t1?')).toBeInTheDocument();
+    expect(servidor.enviados('POST /trivia/rodadas')).toHaveLength(1);
   });
 
   it('nível sem questões suficientes mostra a mensagem e fica desabilitado; os outros seguem', async () => {
@@ -465,7 +488,7 @@ describe('TriviaRodada', () => {
       rotas: { 'GET /trivia/rodadas/r1': respondida, 'POST /trivia/rodadas/r1/finalizar': fim.rota },
     });
     const botao = await screen.findByRole('button', { name: 'Ver resultado' });
-    await userEvent.dblClick(botao);
+    tocarDuasVezes(botao);
     expect(botao).toBeDisabled();
     fim.liberar();
     expect(await screen.findByRole('heading', { name: 'Rodada finalizada!' })).toBeInTheDocument();
@@ -488,7 +511,7 @@ describe('TriviaRodada', () => {
       },
     });
     await userEvent.click(await screen.findByRole('button', { name: /^t1-A/ }));
-    await userEvent.dblClick(await screen.findByRole('button', { name: 'Ver resultado' }));
+    tocarDuasVezes(await screen.findByRole('button', { name: 'Ver resultado' }));
     expect(screen.getByRole('button', { name: 'Finalizando…' })).toBeDisabled();
     fim.liberar();
     expect(await screen.findByRole('heading', { name: 'Rodada finalizada!' })).toBeInTheDocument();
