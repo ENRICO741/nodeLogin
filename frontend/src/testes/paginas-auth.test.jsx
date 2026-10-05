@@ -85,6 +85,23 @@ describe('sessão salva com o servidor fora do ar', () => {
     expect(screen.queryByRole('heading', { name: 'Entrar' })).not.toBeInTheDocument();
   });
 
+  it('falha antiga do /auth/me some depois de entrar pela tela de login', async () => {
+    localStorage.setItem('guardiao.token', 'token-teste');
+    await renderizarApp('/entrar', {
+      usuario: null,
+      rotas: {
+        'GET /auth/me': erroApi(503, 'INDISPONIVEL', 'Servidor indisponível'),
+        'POST /auth/login': SESSAO,
+        ...rotasLogado,
+      },
+    });
+    await userEvent.type(await screen.findByLabelText('E-mail ou apelido'), 'maria');
+    await userEvent.type(screen.getByLabelText('Senha'), 'senha-forte');
+    await userEvent.click(screen.getByRole('button', { name: 'Entrar' }));
+    expect(await screen.findByRole('heading', { name: 'Aulas' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Tentar de novo/ })).not.toBeInTheDocument();
+  });
+
   it('401 no /auth/me continua levando ao login', async () => {
     await abrir(erroApi(401, 'NAO_AUTENTICADO', 'x'));
     expect(await screen.findByRole('heading', { name: 'Entrar' })).toBeInTheDocument();

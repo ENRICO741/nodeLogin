@@ -45,6 +45,7 @@ export function AuthProvider({ children }) {
 
   const iniciar = useCallback(({ token, usuario }) => {
     tokenSalvo.definir(token);
+    setErro(null); // falha antiga do /auth/me não vale mais: senão a RotaProtegida mostraria o erro logado
     setUsuario(usuario);
   }, []);
 
