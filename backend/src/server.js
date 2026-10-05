@@ -5,6 +5,7 @@ const { pool } = require('./db/pool');
 const { migrar } = require('./db/migrar');
 const { semear } = require('./db/seed');
 const { importarConteudo } = require('./scripts/importar-aulas');
+const { agendarEmailsPos, encerrarEmailsPos } = require('./modulos/questionarios/emails');
 
 async function iniciar() {
   await migrar();
@@ -19,10 +20,12 @@ async function iniciar() {
   }
   await semear();
   const servidor = app.listen(config.PORT, () => logger.info('API no ar', { porta: config.PORT }));
+  agendarEmailsPos();
 
   const desligar = () => {
     logger.info('desligando');
-    servidor.close(() => pool.end().then(() => process.exit(0)));
+    const emails = encerrarEmailsPos();
+    servidor.close(() => emails.then(() => pool.end()).then(() => process.exit(0)));
   };
   process.on('SIGTERM', desligar);
   process.on('SIGINT', desligar);

@@ -443,3 +443,35 @@ describe('janela do pós (executor falso)', () => {
     assert.equal(temCmp(await pos(undefined)), false);
   });
 });
+
+describe('e-mails do pós (texto)', () => {
+  const { mensagem } = require('../../src/modulos/questionarios/emails');
+  const config = require('../../src/config');
+
+  test('convite e lembrete: assunto, link do app, prazo e participação voluntária', () => {
+    const fecha = new Date('2026-11-08T17:30:00Z'); // fecha 08/11 às 14h30 de SP: 07/11 é o último dia inteiro
+    const convite = mensagem('convite_pos', fecha);
+    assert.equal(convite.assunto, 'Questionário final da pesquisa');
+    assert.match(convite.texto, /já está disponível/);
+    const lembrete = mensagem('lembrete_pos', fecha);
+    assert.equal(lembrete.assunto, 'Lembrete: questionário final da pesquisa');
+    assert.match(lembrete.texto, /^Olá\.\n\nLembrete:/);
+    for (const { texto } of [convite, lembrete]) {
+      assert.ok(texto.includes(`${config.APP_URL}/questionario\n`));
+      assert.ok(texto.includes('até 07/11/2026'));
+      assert.match(texto, /A participação é voluntária/);
+      assert.doesNotMatch(texto, /satisfeit|necessári/i);
+    }
+  });
+
+  test('prazo em SP: o último dia inteiro aceito, o anterior ao fechamento', () => {
+    const prazo = (iso) => mensagem('convite_pos', new Date(iso)).texto.match(/até (\d{2}\/\d{2}\/\d{4})/)[1];
+    assert.equal(prazo('2026-11-09T03:00:00.000Z'), '08/11/2026'); // 00:00 de 09/11 em SP (fim da pesquisa)
+    assert.equal(prazo('2026-11-09T02:59:59.000Z'), '07/11/2026'); // 23:59 de 08/11 em SP: 08/11 não é inteiro
+    assert.equal(prazo('2026-11-09T03:00:00.001Z'), '08/11/2026');
+  });
+
+  test('o pós também evita "satisfeito" e "necessário para o trabalho"', () => {
+    assert.doesNotMatch(JSON.stringify(DEFINICOES.pos), /satisfeit|necessário para o trabalho/i);
+  });
+});

@@ -20,6 +20,7 @@ const HASHES = {
   '009_pesquisa_rodadas_finalizadas.sql': 'd0c1c818bcd7f27a393a31983972a634c4a2dd1052a4bb3a91e9ae86c8f0673f',
   '010_pesquisa_respostas_chave.sql': 'd06bd960fdf7c4a26b6ec52ddf4833debec0c91bf702c5ae953fdd937575e3cb',
   '011_questionarios.sql': '29c6dc62ab6920f86450ca76167214ccd5dafc0a5c30090588ee9125087630a8',
+  '012_questionario_emails.sql': 'd6798ef104a028f2f3d58811ec77d43d218c9bb6d90465bae4de54b2e20af5b6',
 };
 
 describe('migrations', () => {
