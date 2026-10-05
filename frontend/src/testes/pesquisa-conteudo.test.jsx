@@ -55,6 +55,30 @@ describe('sessões de telemetria', () => {
     expect(servidor.enviados('POST /sessoes')).toHaveLength(1);
   });
 
+  it('logout com o retomar em andamento: a resposta atrasada não vira a sessão do próximo login', async () => {
+    let liberarRetomar;
+    const servidor = servidorFalso({
+      'POST /sessoes': sequencia(
+        { status: 201, corpo: { id: 'sessao-1' } },
+        { status: 201, corpo: { id: 'sessao-b' } },
+      ),
+      'POST /sessoes/sessao-1/finalizar': { status: 204 },
+      'POST /sessoes/sessao-1/retomar': () => new Promise((r) => (liberarRetomar = () => r({ status: 204 }))),
+    });
+    await telemetria.iniciarSessao();
+    mudarVisibilidade('hidden');
+    mudarVisibilidade('visible');
+    await waitFor(() => expect(liberarRetomar).toBeDefined());
+    telemetria.finalizarSessao(); // logout de A
+    localStorage.setItem('guardiao.token', 'token-b');
+    await telemetria.iniciarSessao(); // login de B
+    liberarRetomar();
+    await new Promise((r) => setTimeout(r, 10));
+    telemetria.registrarEvento({ tipo_evento: 'de_b' });
+    await waitFor(() => expect(eventos(servidor, 'de_b')).toHaveLength(1));
+    expect(eventos(servidor, 'de_b')[0].sessao_id).toBe('sessao-b');
+  });
+
   it('se a sessão expirou (404 ao retomar), abre uma nova', async () => {
     const servidor = servidorFalso({
       'POST /sessoes': sequencia(
