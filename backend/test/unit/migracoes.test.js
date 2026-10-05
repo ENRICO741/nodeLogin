@@ -17,6 +17,7 @@ const HASHES = {
   '006_respostas_alternativa.sql': 'b3ec797144460435a1dd961b639c9d42e4ec3e3e6311b4d5ff89a14c1ab57582',
   '007_badges_nome_unico.sql': 'bf78a40d0da90e127b125b15da57853ca36dbf2d57074a2cb1dc9c782ae2374a',
   '008_trivia_aula_referencia.sql': '57393a4cbee17c6e3e57980c9f7f33e59bdd3f178074deba1f87c3b9a8fb8697',
+  '009_pesquisa_rodadas_finalizadas.sql': 'd0c1c818bcd7f27a393a31983972a634c4a2dd1052a4bb3a91e9ae86c8f0673f',
 };
 
 describe('migrations', () => {

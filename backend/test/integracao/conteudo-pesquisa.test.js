@@ -664,3 +664,39 @@ describe('paraCsv', () => {
     );
   });
 });
+
+describe('visão pesquisa_engajamento_usuario (migration 009)', () => {
+  // Lê a linha de um usuário direto da visão (o pseudônimo depende do segredo da transação).
+  const engajamento = async (usuarioId) => {
+    const c = await pool.connect();
+    try {
+      await c.query('BEGIN');
+      await c.query("SELECT set_config('app.pesquisa_segredo', 'segredo-do-teste', true)");
+      const { rows } = await c.query(
+        `SELECT e.rodadas_trivia, e.respostas_trivia FROM pesquisa_engajamento_usuario e
+         JOIN pesquisa_participantes p ON p.participante = e.participante WHERE p.id = $1`,
+        [usuarioId],
+      );
+      return rows[0];
+    } finally {
+      await c.query('ROLLBACK');
+      c.release();
+    }
+  };
+
+  test('rodadas_trivia conta só as finalizadas: aberta ou abandonada fica de fora', async () => {
+    const { completarRodada } = require('../ajuda');
+    const u = await novoJogador();
+    assert.deepEqual(await engajamento(u.usuario.id), { rodadas_trivia: 0, respostas_trivia: 0 });
+    const nova = async () => (await u.api('post', '/api/trivia/rodadas').send({ dificuldade: 'facil' })).body;
+
+    const terminada = await nova();
+    await completarRodada(u, terminada);
+    await u.api('post', `/api/trivia/rodadas/${terminada.id}/finalizar`).expect(200);
+    await nova(); // abandonada sem resposta
+    const pelaMetade = await nova();
+    await completarRodada(u, { ...pelaMetade, questoes: pelaMetade.questoes.slice(0, 1) });
+
+    assert.deepEqual(await engajamento(u.usuario.id), { rodadas_trivia: 1, respostas_trivia: 4 });
+  });
+});

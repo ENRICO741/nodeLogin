@@ -9,6 +9,7 @@ const {
   concluirAulas,
   gabarito,
   errada,
+  completarRodada,
 } = require('../ajuda');
 
 before(prepararBanco);
@@ -417,6 +418,7 @@ describe('POST /api/trivia/rodadas/:id/finalizar', () => {
       rodada.questoes.map((q) => q.id),
     );
     await responder(u, rodada.id, rodada.questoes[0].id, certas[rodada.questoes[0].id]);
+    await completarRodada(u, rodada);
     const fim = (await u.api('post', `/api/trivia/rodadas/${rodada.id}/finalizar`).expect(200)).body;
     assert.equal(fim.acertos, 1);
     assert.equal(fim.total_questoes, 3);
@@ -431,8 +433,19 @@ describe('POST /api/trivia/rodadas/:id/finalizar', () => {
     const { finalizada_em } = (await u.api('get', `/api/trivia/rodadas/${rodada.id}`)).body;
     const de_novo = (await u.api('post', `/api/trivia/rodadas/${rodada.id}/finalizar`).expect(200)).body;
     assert.deepEqual(de_novo, { ...fim, novos_badges: [] });
-    // Questão não respondida antes do fim continua recusada.
-    const res = await responder(u, rodada.id, rodada.questoes[1].id, 'a').expect(409);
+    // Trocar a resposta de uma questão depois do fim: 409.
+    const q1 = rodada.questoes[1];
+    const trocada = await responder(u, rodada.id, q1.id, certas[q1.id]).expect(409);
+    assert.equal(trocada.body.erro.codigo, 'JA_RESPONDIDA');
+    // Questão que entrou na rodada depois do fim (só por SQL) é recusada.
+    const { rows: outra } = await pool.query(
+      "SELECT id FROM questoes_trivia WHERE dificuldade = 'media' LIMIT 1",
+    );
+    await pool.query(
+      'INSERT INTO trivia_rodada_questoes (rodada_id, questao_id, ordem) VALUES ($1, $2, 99)',
+      [rodada.id, outra[0].id],
+    );
+    const res = await responder(u, rodada.id, outra[0].id, 'a').expect(409);
     assert.equal(res.body.erro.codigo, 'RODADA_FINALIZADA');
     // A já respondida, reenviada igual, devolve o resultado gravado.
     const q = rodada.questoes[0];
@@ -442,31 +455,34 @@ describe('POST /api/trivia/rodadas/:id/finalizar', () => {
     assert.equal((await u.api('get', '/api/auth/me')).body.pontuacao_total, 5);
   });
 
-  test('pode finalizar sem responder nada, mas rodada vazia não dá conquista; badge só vem uma vez', async () => {
+  test('com questão pendente dá 409 QUESTOES_PENDENTES e a rodada segue aberta', async () => {
     const u = await novoJogador();
-    const r1 = (await novaRodada(u)).body;
-    const f1 = (await u.api('post', `/api/trivia/rodadas/${r1.id}/finalizar`).expect(200)).body;
-    assert.equal(f1.acertos, 0);
-    assert.deepEqual(f1.novos_badges, []);
-    // Uma resposta (mesmo errada) já conta como rodada jogada.
-    const r2 = (await novaRodada(u)).body;
-    const certas = await gabarito('questoes_trivia', [r2.questoes[0].id]);
-    await responder(u, r2.id, r2.questoes[0].id, errada(certas[r2.questoes[0].id])).expect(200);
-    const f2 = (await u.api('post', `/api/trivia/rodadas/${r2.id}/finalizar`).expect(200)).body;
+    const rodada = (await novaRodada(u)).body;
+    const finalizar = () => u.api('post', `/api/trivia/rodadas/${rodada.id}/finalizar`);
+    // Sem nenhuma resposta e com todas menos uma.
+    assert.equal((await finalizar().expect(409)).body.erro.codigo, 'QUESTOES_PENDENTES');
+    const [ultima, ...outras] = rodada.questoes;
+    await completarRodada(u, { ...rodada, questoes: outras });
+    assert.equal((await finalizar().expect(409)).body.erro.codigo, 'QUESTOES_PENDENTES');
+    const aberta = (await u.api('get', `/api/trivia/rodadas/${rodada.id}`)).body;
+    assert.equal(aberta.finalizada_em, null);
+    // Respondida a última (mesmo errada), termina; o badge vem uma vez só.
+    await completarRodada(u, { ...rodada, questoes: [ultima] });
+    const fim = (await finalizar().expect(200)).body;
     assert.deepEqual(
-      f2.novos_badges.map((b) => b.nome),
+      fim.novos_badges.map((b) => b.nome),
       ['Curioso da Trivia'],
     );
-    const r3 = (await novaRodada(u)).body;
-    await responder(u, r3.id, r3.questoes[0].id, 'a').expect(200);
-    const f3 = (await u.api('post', `/api/trivia/rodadas/${r3.id}/finalizar`).expect(200)).body;
-    assert.deepEqual(f3.novos_badges, []);
+    const r2 = (await novaRodada(u)).body;
+    await completarRodada(u, r2);
+    const f2 = (await u.api('post', `/api/trivia/rodadas/${r2.id}/finalizar`).expect(200)).body;
+    assert.deepEqual(f2.novos_badges, []);
   });
 
   test('finalizações paralelas: as duas recebem o resumo, o badge vem uma vez', async () => {
     const u = await novoJogador();
     const rodada = (await novaRodada(u)).body;
-    await responder(u, rodada.id, rodada.questoes[0].id, 'a').expect(200);
+    await completarRodada(u, rodada);
     const r = await Promise.all(
       [1, 2].map(() => u.api('post', `/api/trivia/rodadas/${rodada.id}/finalizar`)),
     );
@@ -559,11 +575,10 @@ describe('conquistas da trivia', () => {
     );
   });
 
-  test('rodada pela metade não completa o nível', async () => {
+  test('rodada com só um acerto não completa o nível', async () => {
     const u = await novoJogador();
     const rodada = (await novaRodada(u)).body;
-    const certas = await gabarito('questoes_trivia', [rodada.questoes[0].id]);
-    await responder(u, rodada.id, rodada.questoes[0].id, certas[rodada.questoes[0].id]);
+    await completarRodada(u, rodada, (id) => id === rodada.questoes[0].id);
     const fim = (await u.api('post', `/api/trivia/rodadas/${rodada.id}/finalizar`)).body;
     assert.deepEqual(
       fim.novos_badges.map((b) => b.nome),
@@ -577,7 +592,7 @@ describe('conquistas da trivia', () => {
       "INSERT INTO questoes_trivia (dificuldade, enunciado, alternativa_a, alternativa_b, alternativa_c, alternativa_d, resposta_correta, aula_referencia_id) VALUES ('dificil', 'Nova', 'a', 'b', 'c', 'd', 'a', (SELECT id FROM aulas WHERE ordem = 1)) RETURNING id",
     );
     try {
-      // A rodada sorteia todas as 5 difíceis; responde todas menos a nova.
+      // A rodada sorteia todas as 5 difíceis; acerta todas menos a nova.
       const rodada = (await novaRodada(u, { dificuldade: 'dificil' })).body;
       assert.equal(rodada.questoes.length, 5);
       const certas = await gabarito(
@@ -587,12 +602,14 @@ describe('conquistas da trivia', () => {
       for (const q of rodada.questoes.filter((q) => q.id !== rows[0].id)) {
         await responder(u, rodada.id, q.id, certas[q.id]).expect(200);
       }
+      await completarRodada(u, rodada); // erra a nova
       const fim = (await u.api('post', `/api/trivia/rodadas/${rodada.id}/finalizar`)).body;
       assert.ok(!fim.novos_badges.some((b) => b.nome === 'Elite da Trivia'));
 
       // Questão desativada (remoção do admin) deixa de contar: a conquista sai na próxima rodada.
       await pool.query('UPDATE questoes_trivia SET ativo = false WHERE id = $1', [rows[0].id]);
       const r2 = (await novaRodada(u, { dificuldade: 'dificil' })).body;
+      await completarRodada(u, r2);
       const fim2 = (await u.api('post', `/api/trivia/rodadas/${r2.id}/finalizar`)).body;
       assert.ok(fim2.novos_badges.some((b) => b.nome === 'Elite da Trivia'));
     } finally {
@@ -600,13 +617,13 @@ describe('conquistas da trivia', () => {
     }
   });
 
-  test('10 rodadas terminadas (com resposta) dão o Frequentador da Trivia', async () => {
+  test('10 rodadas terminadas dão o Frequentador da Trivia', async () => {
     const u = await novoJogador();
     let nomes = [];
     for (let i = 0; i < 10; i++) {
       assert.ok(!nomes.includes('Frequentador da Trivia'), `antes da rodada ${i + 1}`);
       const rodada = (await novaRodada(u)).body;
-      await responder(u, rodada.id, rodada.questoes[0].id, 'a').expect(200);
+      await completarRodada(u, rodada);
       nomes = (await u.api('post', `/api/trivia/rodadas/${rodada.id}/finalizar`)).body.novos_badges.map(
         (b) => b.nome,
       );
@@ -614,12 +631,11 @@ describe('conquistas da trivia', () => {
     assert.ok(nomes.includes('Frequentador da Trivia'));
   });
 
-  test('10 rodadas vazias (finalizadas sem responder) não dão Curioso nem Frequentador', async () => {
+  test('10 rodadas abandonadas (finalizar vazia dá 409) não dão Curioso nem Frequentador', async () => {
     const u = await novoJogador();
     for (let i = 0; i < 10; i++) {
       const rodada = (await novaRodada(u)).body;
-      const fim = (await u.api('post', `/api/trivia/rodadas/${rodada.id}/finalizar`).expect(200)).body;
-      assert.deepEqual(fim.novos_badges, [], `rodada ${i + 1}`);
+      await u.api('post', `/api/trivia/rodadas/${rodada.id}/finalizar`).expect(409);
     }
     const { rows } = await pool.query(
       `SELECT b.nome FROM usuario_badges ub JOIN badges b ON b.id = ub.badge_id
@@ -627,9 +643,9 @@ describe('conquistas da trivia', () => {
       [u.usuario.id],
     );
     assert.deepEqual(rows, []);
-    // A 11ª, jogada de verdade, dá só o Curioso: as vazias não contam para o Frequentador.
+    // A 11ª, jogada até o fim, dá só o Curioso: as abandonadas não contam para o Frequentador.
     const rodada = (await novaRodada(u)).body;
-    await responder(u, rodada.id, rodada.questoes[0].id, 'a').expect(200);
+    await completarRodada(u, rodada);
     const fim = (await u.api('post', `/api/trivia/rodadas/${rodada.id}/finalizar`)).body;
     assert.ok(fim.novos_badges.some((b) => b.nome === 'Curioso da Trivia'));
     assert.ok(!fim.novos_badges.some((b) => b.nome === 'Frequentador da Trivia'));

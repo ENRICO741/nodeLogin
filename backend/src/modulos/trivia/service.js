@@ -153,19 +153,24 @@ async function responder(rodadaId, usuarioId, { questao_id, alternativa }) {
 async function finalizar(rodadaId, usuarioId) {
   return transacao(async (c) => {
     const rodada = await travarRodada(c, rodadaId, usuarioId);
-    // Reenvio (o retorno da primeira finalização se perdeu): devolve o mesmo resumo, sem mudar a data de fim.
-    if (!rodada.finalizada_em) {
-      await c.query('UPDATE trivia_rodadas SET finalizada_em = now() WHERE id = $1', [rodadaId]);
-    }
     const {
-      rows: [resumo],
+      rows: [{ respondidas, ...resumo }],
     } = await c.query(
       `SELECT r.pontos_ganhos,
          (SELECT count(*)::int FROM trivia_rodada_questoes WHERE rodada_id = $1) AS total_questoes,
-         (SELECT count(*) FILTER (WHERE correta)::int FROM trivia_respostas WHERE rodada_id = $1) AS acertos
+         (SELECT count(*) FILTER (WHERE correta)::int FROM trivia_respostas WHERE rodada_id = $1) AS acertos,
+         (SELECT count(*)::int FROM trivia_respostas WHERE rodada_id = $1) AS respondidas
        FROM trivia_rodadas r WHERE r.id = $1`,
       [rodadaId],
     );
+    // Reenvio (o retorno da primeira finalização se perdeu): devolve o mesmo resumo, sem mudar a data de fim.
+    if (!rodada.finalizada_em) {
+      // A rodada termina quando todas as questões dela forem respondidas, certas ou erradas.
+      if (respondidas < resumo.total_questoes) {
+        throw conflito('QUESTOES_PENDENTES', 'Responda todas as questões antes de ver o resultado');
+      }
+      await c.query('UPDATE trivia_rodadas SET finalizada_em = now() WHERE id = $1', [rodadaId]);
+    }
     return {
       ...resumo,
       pontuacao_total: await pontuacaoAtual(c, usuarioId),

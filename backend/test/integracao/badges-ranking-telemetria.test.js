@@ -6,6 +6,7 @@ const {
   novoUsuario,
   novoJogador,
   concluirAulas,
+  completarRodada,
   novoAdmin,
   request,
   app,
@@ -29,10 +30,8 @@ describe('GET /api/badges', () => {
     await concluirAulas(u.usuario.id);
 
     const rodada = (await u.api('post', '/api/trivia/rodadas').send({ dificuldade: 'facil' })).body;
-    await u
-      .api('post', `/api/trivia/rodadas/${rodada.id}/respostas`)
-      .send({ questao_id: rodada.questoes[0].id, alternativa: 'a' });
-    await u.api('post', `/api/trivia/rodadas/${rodada.id}/finalizar`);
+    await completarRodada(u, rodada);
+    await u.api('post', `/api/trivia/rodadas/${rodada.id}/finalizar`).expect(200);
     const depois = (await u.api('get', '/api/badges')).body;
     assert.ok(depois.find((b) => b.tipo_criterio === 'primeira_trivia').obtida_em);
     assert.ok((await outro.api('get', '/api/badges')).body.every((b) => b.obtida_em === null));
@@ -44,9 +43,7 @@ describe('GET /api/badges', () => {
     try {
       assert.equal((await u.api('get', '/api/badges')).body.length, 13);
       const rodada = (await u.api('post', '/api/trivia/rodadas').send({ dificuldade: 'facil' })).body;
-      await u
-        .api('post', `/api/trivia/rodadas/${rodada.id}/respostas`)
-        .send({ questao_id: rodada.questoes[0].id, alternativa: 'a' });
+      await completarRodada(u, rodada);
       const fim = (await u.api('post', `/api/trivia/rodadas/${rodada.id}/finalizar`)).body;
       assert.deepEqual(fim.novos_badges, []);
     } finally {

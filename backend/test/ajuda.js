@@ -80,6 +80,24 @@ async function gabarito(tabela, ids) {
 
 const errada = (certa) => ({ a: 'b', b: 'c', c: 'd', d: 'a' })[certa];
 
+// Responde as questões ainda pendentes da rodada (ela só termina completa). Erra, salvo `acertar(id)`.
+async function completarRodada(u, rodada, acertar = () => false) {
+  const certas = await gabarito(
+    'questoes_trivia',
+    rodada.questoes.map((q) => q.id),
+  );
+  const { rows } = await pool.query('SELECT questao_id FROM trivia_respostas WHERE rodada_id = $1', [
+    rodada.id,
+  ]);
+  const respondidas = new Set(rows.map((r) => r.questao_id));
+  for (const q of rodada.questoes.filter((q) => !respondidas.has(q.id))) {
+    await u
+      .api('post', `/api/trivia/rodadas/${rodada.id}/respostas`)
+      .send({ questao_id: q.id, alternativa: acertar(q.id) ? certas[q.id] : errada(certas[q.id]) })
+      .expect(200);
+  }
+}
+
 // Captura o próximo e-mail "enviado" e devolve o token do link de redefinição.
 function capturarEmail() {
   let resolver;
@@ -125,6 +143,7 @@ module.exports = {
   autenticado,
   gabarito,
   errada,
+  completarRodada,
   capturarEmail,
   rodarNode,
   RAIZ_BACKEND,
