@@ -291,14 +291,24 @@ describe('consentimento para a pesquisa', () => {
     assert.equal(rows.length, 0);
   });
 
-  test('perfil permite dar e retirar o consentimento', async () => {
+  test('perfil não altera o consentimento: o campo é descartado (sem 400, sem mudar a data)', async () => {
     const u = await novoUsuario();
-    const dado = (await u.api('patch', '/api/perfil').send({ consentiu_pesquisa: true }).expect(200)).body;
-    assert.ok(dado.consentiu_pesquisa_em);
-    const retirado = (await u.api('patch', '/api/perfil').send({ consentiu_pesquisa: false }).expect(200))
-      .body;
-    assert.equal(retirado.consentiu_pesquisa_em, null);
-    await u.api('patch', '/api/perfil').send({ consentiu_pesquisa: 'x' }).expect(400);
+    const antes = u.usuario.consentiu_pesquisa_em;
+    for (const consentiu_pesquisa of [false, true, null, 'x']) {
+      const res = (await u.api('patch', '/api/perfil').send({ consentiu_pesquisa }).expect(200)).body;
+      assert.equal(res.consentiu_pesquisa_em, antes, String(consentiu_pesquisa));
+    }
+    // Junto com outro campo: o outro é salvo, o consentimento não.
+    const res = (
+      await u
+        .api('patch', '/api/perfil')
+        .send({ bio: 'Oi', consentiu_pesquisa: false, consentiu_pesquisa_em: null })
+    ).body;
+    assert.deepEqual([res.bio, res.consentiu_pesquisa_em], ['Oi', antes]);
+    const { rows } = await pool.query('SELECT consentiu_pesquisa_em FROM usuarios WHERE id = $1', [
+      u.usuario.id,
+    ]);
+    assert.ok(rows[0].consentiu_pesquisa_em);
   });
 });
 
@@ -360,8 +370,10 @@ describe('exportação da pesquisa', () => {
     admin = await novoAdmin();
     participante = await novoUsuario();
     naoConsentiu = await novoUsuario();
-    // Retirou o consentimento no perfil depois do cadastro.
-    await naoConsentiu.api('patch', '/api/perfil').send({ consentiu_pesquisa: false }).expect(200);
+    // Sem consentimento (só por SQL: dado anterior à regra atual).
+    await pool.query('UPDATE usuarios SET consentiu_pesquisa_em = NULL WHERE id = $1', [
+      naoConsentiu.usuario.id,
+    ]);
     for (const u of [participante, naoConsentiu]) {
       const s = (await u.api('post', '/api/sessoes').send({ standalone: true, largura_tela: 390 })).body;
       await u
@@ -533,7 +545,9 @@ describe('pesquisa: fim estimado das sessões e datas das conquistas', () => {
     participante = await novoUsuario();
     outro = await novoUsuario();
     const naoConsentiu = await novoUsuario();
-    await naoConsentiu.api('patch', '/api/perfil').send({ consentiu_pesquisa: false }).expect(200);
+    await pool.query('UPDATE usuarios SET consentiu_pesquisa_em = NULL WHERE id = $1', [
+      naoConsentiu.usuario.id,
+    ]);
 
     // 10/01 em São Paulo, 09h às 11h: fim real (600 s), sem fim com eventos (300 s), sem fim e sem eventos (0 s).
     const real = await sessao(participante, '2026-01-10T12:00:00Z', '2026-01-10T12:10:00Z');

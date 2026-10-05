@@ -255,7 +255,8 @@ describe('telemetria', () => {
     };
     const sessao = (await u.api('post', '/api/sessoes').expect(201)).body;
 
-    await u.api('patch', '/api/perfil').send({ consentiu_pesquisa: false }).expect(200);
+    // O app não retira mais o consentimento: simula um dado antigo, sem ele.
+    await pool.query('UPDATE usuarios SET consentiu_pesquisa_em = NULL WHERE id = $1', [u.usuario.id]);
     const nova = await u.api('post', '/api/sessoes').send({ standalone: true }).expect(204);
     assert.deepEqual(nova.body, {});
     await u.api('post', '/api/eventos').send({ tipo_evento: 'tela_visualizada' }).expect(204);
@@ -263,7 +264,7 @@ describe('telemetria', () => {
     await u.api('post', '/api/eventos').send({ tipo_evento: 'x', sessao_id: sessao.id }).expect(204);
     assert.deepEqual(await contar(), { sessoes: 1, eventos: 0 });
 
-    await u.api('patch', '/api/perfil').send({ consentiu_pesquisa: true }).expect(200);
+    await pool.query('UPDATE usuarios SET consentiu_pesquisa_em = now() WHERE id = $1', [u.usuario.id]);
     await u.api('post', '/api/sessoes').expect(201);
     await u.api('post', '/api/eventos').send({ tipo_evento: 'tela_visualizada' }).expect(204);
     assert.deepEqual(await contar(), { sessoes: 2, eventos: 1 });

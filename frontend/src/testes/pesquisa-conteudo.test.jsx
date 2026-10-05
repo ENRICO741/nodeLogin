@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import * as telemetria from '../lib/telemetria';
 import { baixarArquivo } from '../lib/api';
-import { ADMIN, erroApi, PARTICIPANTE, renderizarApp, sequencia, servidorFalso, USUARIO } from './utils';
+import { ADMIN, erroApi, PARTICIPANTE, renderizarApp, sequencia, servidorFalso } from './utils';
 
 let visibilidade = 'visible';
 Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => visibilidade });
@@ -199,34 +199,23 @@ describe('eventos de navegação, leitura e resultado', () => {
 });
 
 describe('consentimento no perfil', () => {
-  it('marcar e desmarcar chama a API e mostra o estado', async () => {
-    const { servidor } = await renderizarApp('/perfil', {
-      rotas: {
-        'PATCH /perfil': ({ corpo }) => ({
-          ...USUARIO,
-          consentiu_pesquisa_em: corpo.consentiu_pesquisa ? '2026-05-10T12:00:00Z' : null,
-        }),
-      },
-    });
-    const caixa = screen.getByRole('checkbox', { name: /Autorizo o uso anônimo/ });
-    expect(caixa).not.toBeChecked();
-    expect(screen.getByText('Não autorizado: seus dados ficam fora da pesquisa.')).toBeInTheDocument();
-    await userEvent.click(caixa);
-    expect(await screen.findByText(/Autorizado em \d{2}\/\d{2}\/2026/)).toBeInTheDocument();
-    expect(caixa).toBeChecked();
-    await userEvent.click(caixa);
-    expect(await screen.findByText(/Não autorizado/)).toBeInTheDocument();
-    expect(servidor.enviados('PATCH /perfil')).toEqual([
-      { consentiu_pesquisa: true },
-      { consentiu_pesquisa: false },
-    ]);
+  it('o perfil não tem opção de retirar o consentimento nem fala em autorização', async () => {
+    const { servidor } = await renderizarApp('/perfil', { usuario: PARTICIPANTE });
+    expect(await screen.findByRole('button', { name: /Editar perfil/ })).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(screen.queryByText(/Autorizo|autorizado|Pesquisa acadêmica/i)).toBeNull();
+    expect(servidor.enviados('PATCH /perfil')).toEqual([]);
   });
 
-  it('erro ao salvar aparece e a caixa não muda', async () => {
-    await renderizarApp('/perfil', { rotas: { 'PATCH /perfil': erroApi(500, 'E', 'Falhou') } });
-    await userEvent.click(screen.getByRole('checkbox', { name: /Autorizo o uso anônimo/ }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Falhou');
-    expect(screen.getByRole('checkbox', { name: /Autorizo o uso anônimo/ })).not.toBeChecked();
+  it('salvar o perfil não envia consentimento', async () => {
+    const { servidor } = await renderizarApp('/perfil', {
+      usuario: PARTICIPANTE,
+      rotas: { 'PATCH /perfil': ({ corpo }) => ({ ...PARTICIPANTE, ...corpo }) },
+    });
+    await userEvent.click(await screen.findByRole('button', { name: /Editar perfil/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    expect(await screen.findByText('Perfil atualizado.')).toBeInTheDocument();
+    expect(servidor.enviados('PATCH /perfil')[0]).not.toHaveProperty('consentiu_pesquisa');
   });
 });
 

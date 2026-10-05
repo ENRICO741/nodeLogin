@@ -136,7 +136,8 @@ describe('Cadastro', () => {
     await userEvent.type(screen.getByLabelText('E-mail'), 'maria@empresa.com');
     await userEvent.type(screen.getByLabelText('Senha'), senha);
     await userEvent.type(screen.getByLabelText('Confirme a senha'), confirmacao);
-    if (consentir) await userEvent.click(screen.getByRole('checkbox', { name: /Concordo/ }));
+    if (consentir)
+      await userEvent.click(screen.getByRole('checkbox', { name: /participa de forma anônima da pesquisa/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Criar conta' }));
   };
 
@@ -179,7 +180,10 @@ describe('Cadastro', () => {
     const { servidor } = await renderizarApp('/cadastro', { usuario: null, rotas: {} });
     await preencher(undefined, undefined, false);
     expect(await screen.findByText('É preciso aceitar para criar a conta')).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: /Concordo/ })).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('checkbox', { name: /participa de forma anônima da pesquisa/ })).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
     expect(servidor.enviados('POST /auth/cadastro')).toEqual([]);
   });
 

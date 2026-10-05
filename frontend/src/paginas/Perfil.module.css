@@ -60,20 +60,3 @@
   grid-template-columns: 1fr 1fr;
   gap: var(--esp-2);
 }
-/* Rótulo de seção do site: pequeno, caixa alta, espaçado, no azul da marca. */
-.tituloSecao {
-  margin: 0;
-  font-size: var(--texto-sm);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: var(--espaco-letras-largo);
-  color: var(--cor-primaria);
-}
-/* Filete azul ao lado do bloco informativo, como na página de contato do site. */
-.estadoConsentimento {
-  margin: 0;
-  padding-left: var(--esp-3);
-  border-left: 3px solid var(--cor-primaria);
-  font-size: var(--texto-sm);
-  color: var(--cor-texto-suave);
-}

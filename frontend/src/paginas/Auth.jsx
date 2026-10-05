@@ -126,10 +126,7 @@ export function Cadastro() {
             aria-invalid={erroConsentimento || porCampo.consentiu_pesquisa ? true : undefined}
             aria-describedby="consentimento-erro"
           />
-          <span>
-            Concordo que meus dados de uso do app sejam coletados para telemetria e métricas da pesquisa
-            acadêmica do TCC, sempre de forma anônima. Obrigatório para criar a conta.
-          </span>
+          <span>Ao criar a conta, você participa de forma anônima da pesquisa do TCC.</span>
         </label>
         <span id="consentimento-erro" className="campo__erro" aria-live="polite">
           {erroConsentimento || porCampo.consentiu_pesquisa}
