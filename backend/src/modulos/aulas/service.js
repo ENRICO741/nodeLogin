@@ -73,10 +73,12 @@ async function iniciarVisita(aulaId, usuarioId) {
 
 // Trava a visita (FOR UPDATE): respostas e finalização da mesma visita não correm em paralelo.
 // Não recusa a visita finalizada: o reenvio de uma resposta ou da finalização ainda é atendido.
+// Aula desativada pelo admin com a visita aberta: 404, como em toda rota de aula (não pontua nem paga bônus).
 async function travarVisita(c, visitaId, usuarioId) {
   const { rows } = await c.query(
-    `SELECT id, aula_id, finalizada_em, pontos_conclusao_ganhos FROM aula_visitas
-     WHERE id = $1 AND usuario_id = $2 FOR UPDATE`,
+    `SELECT v.id, v.aula_id, v.finalizada_em, v.pontos_conclusao_ganhos
+     FROM aula_visitas v JOIN aulas a ON a.id = v.aula_id AND a.ativo
+     WHERE v.id = $1 AND v.usuario_id = $2 FOR UPDATE OF v`,
     [visitaId, usuarioId],
   );
   if (!rows[0]) throw naoEncontrado('Visita não encontrada');

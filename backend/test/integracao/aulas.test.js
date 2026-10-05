@@ -371,6 +371,51 @@ describe('POST /api/visitas/:id/respostas', () => {
   });
 });
 
+describe('aula desativada com a visita aberta', () => {
+  test('responder e finalizar dão 404, sem pontos nem bônus; reativada, a visita segue', async () => {
+    const u = await novoJogador();
+    const { rows } = await pool.query(
+      "INSERT INTO aulas (titulo, ordem, conteudo_html, pontos_conclusao) VALUES ('Some no meio', 952, '<p>x</p>', 7) RETURNING id",
+    );
+    const aulaId = rows[0].id;
+    try {
+      const { rows: q } = await pool.query(
+        `INSERT INTO questoes_aula (aula_id, enunciado, alternativa_a, alternativa_b, alternativa_c, alternativa_d,
+           resposta_correta, pontos) VALUES ($1, 'P?', 'a', 'b', 'c', 'd', 'a', 10) RETURNING id`,
+        [aulaId],
+      );
+      const visita = (await u.api('post', `/api/aulas/${aulaId}/visitas`).expect(201)).body;
+      await pool.query('UPDATE aulas SET ativo = false WHERE id = $1', [aulaId]);
+
+      const resposta = await u
+        .api('post', `/api/visitas/${visita.id}/respostas`)
+        .send({ questao_id: q[0].id, alternativa: 'a' })
+        .expect(404);
+      assert.equal(resposta.body.erro.mensagem, 'Visita não encontrada');
+      await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(404);
+      const { rows: estado } = await pool.query(
+        `SELECT v.finalizada_em, (SELECT count(*)::int FROM aula_respostas WHERE visita_id = v.id) AS respostas
+         FROM aula_visitas v WHERE v.id = $1`,
+        [visita.id],
+      );
+      assert.deepEqual(estado[0], { finalizada_em: null, respostas: 0 });
+      assert.equal((await u.api('get', '/api/auth/me')).body.pontuacao_total, 0);
+
+      await pool.query('UPDATE aulas SET ativo = true WHERE id = $1', [aulaId]);
+      await u
+        .api('post', `/api/visitas/${visita.id}/respostas`)
+        .send({ questao_id: q[0].id, alternativa: 'a' })
+        .expect(200);
+      assert.equal(
+        (await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200)).body.bonus_conclusao,
+        7,
+      );
+    } finally {
+      await pool.query('DELETE FROM aulas WHERE id = $1', [aulaId]);
+    }
+  });
+});
+
 describe('visita de outro usuário (IDOR)', () => {
   test('responder e finalizar a visita de A com o token de B dá 404 e não muda nada', async () => {
     const [a, b] = [await novoUsuario(), await novoUsuario()];
