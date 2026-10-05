@@ -313,6 +313,27 @@ describe('rate limit (desligado em teste, ligado aqui com NODE_ENV=development)'
     assert.deepEqual(resultado(saida), { sessoes: esperado(201), aulas: esperado(201) });
   });
 
+  test('rotas autenticadas: 300 por minuto por usuário; a 301ª dá 429 e outro usuário segue liberado', async () => {
+    const [a, b] = [await novoUsuario(), await novoUsuario()];
+    const { saida } = await rodarComLimite(`
+      const get = (token) => request(app).get('/api/perfil').set('X-Forwarded-For', '10.0.7.1')
+        .set('Authorization', 'Bearer ' + token);
+      const status = new Set();
+      for (let i = 0; i < 300; i++) status.add((await get('${a.token}')).status);
+      const bloqueada = await get('${a.token}');
+      console.log('RESULTADO', JSON.stringify({
+        antes: [...status],
+        bloqueada: [bloqueada.status, bloqueada.body.erro?.codigo],
+        outroUsuario: (await get('${b.token}')).status,
+      }));
+    `);
+    assert.deepEqual(resultado(saida), {
+      antes: [200],
+      bloqueada: [429, 'MUITAS_REQUISICOES'],
+      outroUsuario: 200,
+    });
+  });
+
   test('rotas autenticadas contam por usuário', async () => {
     const u = await novoUsuario();
     const { saida } = await rodarComLimite(`

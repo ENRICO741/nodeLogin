@@ -36,6 +36,20 @@ describe('POST /api/auth/cadastro', () => {
     assert.match(rows[0].senha_hash, /^\$2b\$/);
   });
 
+  test('token do cadastro e do login valem 7 dias (JWT_EXPIRA_EM padrão)', async () => {
+    const SETE_DIAS = 7 * 24 * 60 * 60;
+    const dados = { apelido: `exp_${Math.random().toString(36).slice(2, 10)}` };
+    const cadastrado = (await cadastro(dados).expect(201)).body;
+    const login = (
+      await post('/api/auth/login', { identificador: dados.apelido, senha: 'Senha-forte-123' }).expect(200)
+    ).body;
+    for (const { token, usuario } of [cadastrado, login]) {
+      const { exp, iat, sub } = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
+      assert.equal(exp - iat, SETE_DIAS);
+      assert.equal(sub, usuario.id);
+    }
+  });
+
   test('recusa nome com quebra de linha ou caractere invisível (phishing no e-mail), sem criar a conta', async () => {
     const email = `phish_${Math.random().toString(36).slice(2, 10)}@exemplo.com`;
     const nomes = [
