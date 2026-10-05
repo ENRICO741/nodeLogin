@@ -96,6 +96,39 @@ describe('quiz', () => {
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
 
+    it('duas falhas de rede seguidas: acha a gravada (a primeira) entre as que ficaram sem retorno', async () => {
+      // A foi gravada sem o retorno chegar; B nem saiu; C é recusada; reenvia B (409) e então A (vale).
+      const enviarResposta = vi.fn(async (_id, alternativa) => {
+        if (enviarResposta.mock.calls.length <= 2) throw semConexao();
+        if (alternativa !== 'a') throw jaRespondida();
+        return { correta: true, resposta_correta: 'a', pontos_ganhos: 10 };
+      });
+      render(<Quiz enviarResposta={enviarResposta} />);
+      await userEvent.click(opcao('A'));
+      await screen.findByRole('alert');
+      await userEvent.click(opcao('B'));
+      await screen.findByRole('alert');
+      await userEvent.click(opcao('C'));
+      expect(await screen.findByText('Resposta correta!')).toBeInTheDocument();
+      expect(enviarResposta.mock.calls.map(([, a]) => a)).toEqual(['a', 'b', 'c', 'a']);
+      expect(opcao('A')).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('nenhuma das sem retorno foi a gravada: mostra o 409 e continua tentando depois', async () => {
+      const enviarResposta = vi
+        .fn()
+        .mockRejectedValueOnce(semConexao()) // A: não chegou
+        .mockRejectedValueOnce(jaRespondida()) // B: recusada (a gravada é outra)
+        .mockRejectedValueOnce(jaRespondida()); // reenvio de A
+      render(<Quiz enviarResposta={enviarResposta} />);
+      await userEvent.click(opcao('A'));
+      await screen.findByRole('alert');
+      await userEvent.click(opcao('B'));
+      expect(await screen.findByRole('alert')).toHaveTextContent('Você já respondeu esta pergunta');
+      expect(opcao('B')).toBeEnabled();
+      expect(enviarResposta).toHaveBeenCalledTimes(3);
+    });
+
     it('JA_RESPONDIDA sem nada perdido (ou depois de erro que não é de rede) continua mostrando o erro', async () => {
       const enviarResposta = vi
         .fn()
