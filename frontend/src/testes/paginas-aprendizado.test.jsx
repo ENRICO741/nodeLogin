@@ -182,14 +182,23 @@ describe('Aula', () => {
     expect(screen.queryByRole('button', { name: /Responder/ })).not.toBeInTheDocument();
   });
 
-  it('falha ao iniciar mostra erro e mantém o conteúdo', async () => {
-    await renderizarApp('/aulas/a1', {
-      rotas: rotasAula({ 'POST /aulas/a1/visitas': new TypeError('Failed to fetch') }),
+  it('falha ao iniciar mostra erro, mantém o conteúdo e deixa tentar de novo', async () => {
+    const { servidor } = await renderizarApp('/aulas/a1', {
+      rotas: rotasAula({
+        'POST /aulas/a1/visitas': sequencia(new TypeError('Failed to fetch'), {
+          status: 201,
+          corpo: { id: 'v1' },
+        }),
+      }),
     });
     await userEvent.click(await screen.findByRole('button', { name: 'Responder 2 perguntas' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Sem conexão');
     expect(screen.getByRole('heading', { name: 'Phishing' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Responder 2 perguntas' })).toBeEnabled();
+    // o segundo toque tem de sair de verdade: a trava não pode ficar presa depois do erro
+    await userEvent.click(screen.getByRole('button', { name: 'Responder 2 perguntas' }));
+    expect(await screen.findByText('Pergunta q1?')).toBeInTheDocument();
+    expect(servidor.enviados('POST /aulas/a1/visitas')).toHaveLength(2);
   });
 
   it('toque duplo em iniciar abre uma visita só', async () => {
@@ -269,19 +278,33 @@ describe('Aula', () => {
     expect(await screen.findByRole('link', { name: 'Testar na trivia' })).toHaveAttribute('href', '/trivia');
   });
 
-  it('falha ao concluir mostra erro e mantém a última pergunta', async () => {
-    await renderizarApp('/aulas/a1', {
+  it('falha ao concluir mostra erro, mantém a última pergunta e deixa tentar de novo', async () => {
+    const { servidor } = await renderizarApp('/aulas/a1', {
       rotas: rotasAula({
         'GET /aulas/a1': { ...AULA, questoes: [questao('q1')] },
         'POST /visitas/v1/respostas': feedback(true),
-        'POST /visitas/v1/finalizar': erroApi(409, 'QUESTOES_PENDENTES', 'Responda todas as questões'),
+        'POST /visitas/v1/finalizar': sequencia(
+          erroApi(409, 'QUESTOES_PENDENTES', 'Responda todas as questões'),
+          {
+            acertos: 1,
+            total_questoes: 1,
+            pontos_questoes: 10,
+            bonus_conclusao: 20,
+            pontuacao_total: 80,
+            novos_badges: [],
+          },
+        ),
       }),
     });
     await userEvent.click(await screen.findByRole('button', { name: 'Responder 1 pergunta' }));
     await userEvent.click(alternativa('q1-B'));
     await userEvent.click(await screen.findByRole('button', { name: 'Concluir aula' }));
     expect(await screen.findByText('Responda todas as questões')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Concluir aula' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Concluir aula' })).toBeEnabled();
+    // o segundo toque tem de sair de verdade: a trava não pode ficar presa depois do erro
+    await userEvent.click(screen.getByRole('button', { name: 'Concluir aula' }));
+    expect(await screen.findByRole('heading', { name: 'Aula concluída!' })).toBeInTheDocument();
+    expect(servidor.enviados('POST /visitas/v1/finalizar')).toHaveLength(2);
   });
 
   it('aula bloqueada (403) mostra o aviso e o caminho de volta', async () => {
@@ -358,7 +381,14 @@ describe('Trivia', () => {
     );
     expect(screen.getByRole('button', { name: /Difícil/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: /Fácil/ })).toBeEnabled();
-    expect(servidor.enviados('POST /trivia/rodadas')).toEqual([{ dificuldade: 'dificil' }]);
+    // o outro nível tem de criar a rodada de verdade: a trava não pode ficar presa depois do erro
+    await userEvent.click(screen.getByRole('button', { name: /Fácil/ }));
+    await waitFor(() =>
+      expect(servidor.enviados('POST /trivia/rodadas')).toEqual([
+        { dificuldade: 'dificil' },
+        { dificuldade: 'facil' },
+      ]),
+    );
   });
 
   it('outro erro ao criar a rodada (rede) mostra a mensagem e não desabilita o nível', async () => {
