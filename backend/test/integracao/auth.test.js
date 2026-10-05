@@ -36,6 +36,15 @@ describe('POST /api/auth/cadastro', () => {
     assert.match(rows[0].senha_hash, /^\$2b\$/);
   });
 
+  test('login com identificador fora do ASCII dá 400 sem consultar a conta ("İ" viraria "i" só no banco)', async () => {
+    const u = await novoUsuario();
+    const variante = `İ${u.apelido}`;
+    const res = await post('/api/auth/login', { identificador: variante, senha: u.senha }).expect(400);
+    assert.deepEqual(camposComErro(res), ['identificador']);
+    // ASCII com maiúsculas continua valendo.
+    await post('/api/auth/login', { identificador: u.apelido.toUpperCase(), senha: u.senha }).expect(200);
+  });
+
   test('token do cadastro e do login valem 7 dias (JWT_EXPIRA_EM padrão)', async () => {
     const SETE_DIAS = 7 * 24 * 60 * 60;
     const dados = { apelido: `exp_${Math.random().toString(36).slice(2, 10)}` };
@@ -203,7 +212,8 @@ describe('POST /api/auth/login', () => {
   });
 
   test('tentativa de injeção SQL no identificador só falha o login', async () => {
-    await post('/api/auth/login', { identificador: "' OR '1'='1", senha: "' OR '1'='1" }).expect(401);
+    // Sem espaço: passa pela validação (só ASCII visível) e chega à consulta parametrizada.
+    await post('/api/auth/login', { identificador: "'OR'1'='1'--", senha: "' OR '1'='1" }).expect(401);
   });
 });
 

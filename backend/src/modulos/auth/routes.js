@@ -23,7 +23,12 @@ const esquemaCadastro = z.object({
   // Consentimento obrigatório para uso anônimo dos dados de uso (telemetria e pesquisa, LGPD).
   consentiu_pesquisa: z.literal(true, 'É preciso aceitar o uso anônimo dos dados para criar a conta'),
 });
-const esquemaLogin = z.object({ identificador: texto(1, 254), senha: z.string().min(1).max(72) });
+// E-mail e apelido são só ASCII (z.email e a regex do apelido). Fora do ASCII, o lower() do Postgres e o
+// toLowerCase() do limite de login divergem ("İ" vira "i" só no banco) e cada variante ganharia 10 tentativas.
+const esquemaLogin = z.object({
+  identificador: texto(1, 254).regex(/^[\x21-\x7e]+$/, 'Use seu e-mail ou apelido'),
+  senha: z.string().min(1).max(72),
+});
 const esquemaRedefinicao = z.object({ token: z.string().min(20).max(100), senha });
 
 const router = Router();
