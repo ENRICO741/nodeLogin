@@ -2,7 +2,7 @@ const { Router } = require('express');
 const { z } = require('zod');
 const { pool, query, atualizarLinha } = require('../../db/pool');
 const { CAMPOS_USUARIO } = require('../../middleware/autenticacao');
-const { nome, textoOpcional } = require('../../lib/validacao');
+const { nome, apelido, textoOpcional } = require('../../lib/validacao');
 
 // ponytail: foto em data URL no banco (máx. ~200 KB, o front redimensiona para 256 px).
 // Migrar para storage de objetos (Azure Blob) se o número de usuários crescer.
@@ -15,10 +15,7 @@ const fotoDataUrl = z
 const esquemaPerfil = z
   .object({
     nome,
-    apelido: z
-      .string()
-      .trim()
-      .regex(/^[\w.-]{3,30}$/, 'Use de 3 a 30 letras, números, ponto, hífen ou sublinhado'),
+    apelido,
     bio: textoOpcional(500),
     profissao: textoOpcional(80),
     empresa: textoOpcional(80),

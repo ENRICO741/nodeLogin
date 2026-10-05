@@ -219,6 +219,31 @@ describe('rate limit (desligado em teste, ligado aqui com NODE_ENV=development)'
     assert.deepEqual(resultado(saida), { mesmaConta: 429, maiusculas: 429, outraConta: 401, outroIp: 401 });
   });
 
+  test('conta bloqueada: variantes "marİa" ou NFD não dão tentativas extras de senha', async () => {
+    const u = await novoUsuario({ apelido: `maria${process.pid}` });
+    const { saida } = await rodarComLimite(`
+      const login = (identificador, senha = 'errada') => request(app).post('/api/auth/login')
+        .set('X-Forwarded-For', '10.0.8.1').send({ identificador, senha });
+      for (let i = 0; i < 10; i++) await login('${u.apelido}');
+      const apelido = '${u.apelido}';
+      const pontoAcima = String.fromCharCode(0x307);
+      const r = {
+        bloqueada: (await login(apelido, '${u.senha}')).status,
+        comIPontuado: (await login(apelido.replace('i', String.fromCharCode(0x130)), '${u.senha}')).status,
+        comCombinante: (await login(apelido.replace('i', 'i' + pontoAcima), '${u.senha}')).status,
+        maiusculas: (await login(apelido.toUpperCase(), '${u.senha}')).status,
+      };
+      console.log('RESULTADO', JSON.stringify(r));
+    `);
+    // As variantes nunca chegam a conferir a senha (400 na validação); a forma normal segue bloqueada.
+    assert.deepEqual(resultado(saida), {
+      bloqueada: 429,
+      comIPontuado: 400,
+      comCombinante: 400,
+      maiusculas: 429,
+    });
+  });
+
   test('teto de 100 por IP soma cadastro, login e redefinição; outro IP segue liberado', async () => {
     const { saida } = await rodarComLimite(`
       const post = (rota, corpo, ip = '10.0.4.1') =>

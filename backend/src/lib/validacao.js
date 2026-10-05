@@ -16,6 +16,30 @@ const nome = texto(2, 120).regex(
   /^[^\p{C}\p{Zl}\p{Zp}]+$/u,
   'O nome não pode ter quebra de linha nem caracteres invisíveis',
 );
+// Letras latinas com acento num conjunto fechado (À-Ö, Ø-ö, ø-ÿ: sem × e ÷) que o toLowerCase() do JS e
+// o lower() do Postgres convertem igual. Fora dele (ex.: "İ"), JS e banco divergem, e o limite de login
+// contaria a mesma conta em chaves diferentes.
+const LETRAS_ACENTUADAS = 'À-ÖØ-öø-ÿ';
+
+// NFC: "joão" digitado com o til separado (NFD) vira o mesmo apelido de "joão".
+const apelido = z
+  .string()
+  .trim()
+  .normalize('NFC')
+  .regex(
+    new RegExp(`^[A-Za-z0-9${LETRAS_ACENTUADAS}_.-]{3,30}$`),
+    'Use de 3 a 30 letras (acentos permitidos), números, ponto, hífen ou _',
+  );
+
+// E-mail (ASCII) ou apelido: ASCII visível mais as mesmas letras acentuadas.
+const identificadorLogin = z
+  .string()
+  .trim()
+  .normalize('NFC')
+  .min(1)
+  .max(254)
+  .regex(new RegExp(`^[\\x21-\\x7e${LETRAS_ACENTUADAS}]+$`), 'Use seu e-mail ou apelido');
+
 const urlHttps = z.url({ protocol: /^https$/, error: 'Use uma URL https://' }).max(2000);
 
 const esquemaQuestao = z.object({
@@ -66,6 +90,8 @@ module.exports = {
   texto,
   textoOpcional,
   nome,
+  apelido,
+  identificadorLogin,
   urlHttps,
   esquemaQuestao,
   esquemaResposta,

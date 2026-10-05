@@ -110,6 +110,26 @@ describe('sessão salva com o servidor fora do ar', () => {
 });
 
 describe('Cadastro', () => {
+  it('apelido aceita acento: a ajuda avisa e o apelido vai como digitado', async () => {
+    const { servidor } = await renderizarApp('/cadastro', {
+      usuario: null,
+      rotas: { 'POST /auth/cadastro': erroApi(409, 'CONFLITO', 'Este apelido já está em uso') },
+    });
+    const campo = await screen.findByLabelText('Apelido');
+    expect(campo).toHaveAccessibleDescription(
+      'Aparece no ranking. Use de 3 a 30 letras (acentos permitidos), números, ponto, hífen ou _.',
+    );
+    await userEvent.type(screen.getByLabelText('Nome'), 'João Silva');
+    await userEvent.type(campo, 'joão.silva');
+    await userEvent.type(screen.getByLabelText('E-mail'), 'joao@empresa.com');
+    await userEvent.type(screen.getByLabelText('Senha'), 'Senha-forte-123');
+    await userEvent.type(screen.getByLabelText('Confirme a senha'), 'Senha-forte-123');
+    await userEvent.click(screen.getByRole('checkbox'));
+    await userEvent.click(screen.getByRole('button', { name: 'Criar conta' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Este apelido já está em uso');
+    expect(servidor.enviados('POST /auth/cadastro')[0].apelido).toBe('joão.silva');
+  });
+
   const preencher = async (confirmacao = 'Senha-forte-123', senha = 'Senha-forte-123', consentir = true) => {
     await userEvent.type(await screen.findByLabelText('Nome'), 'Maria Silva');
     await userEvent.type(screen.getByLabelText('Apelido'), 'maria');

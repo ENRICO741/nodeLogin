@@ -111,6 +111,17 @@ describe('PATCH /api/perfil', () => {
       .send({ bio: 'x'.repeat(501) })
       .expect(400);
     await u.api('patch', '/api/perfil').send({ nome: 'A' }).expect(400);
+    // Apelido com acento (mesma regra do cadastro); × é recusado.
+    const comAcento = `joão_${Date.now()}`;
+    const salvo = (await u.api('patch', '/api/perfil').send({ apelido: comAcento }).expect(200)).body;
+    assert.equal(salvo.apelido, comAcento);
+    await u.api('patch', '/api/perfil').send({ apelido: 'a×b' }).expect(400);
+    const outro = await novoUsuario();
+    const res = await outro
+      .api('patch', '/api/perfil')
+      .send({ apelido: comAcento.toUpperCase() })
+      .expect(409);
+    assert.equal(res.body.erro.mensagem, 'Este apelido já está em uso');
     // Mesma regra do cadastro: nada de quebra de linha ou caractere invisível no nome.
     for (const nome of ['Ana\nBia', 'Ana\u202Eetla']) {
       await u.api('patch', '/api/perfil').send({ nome }).expect(400);

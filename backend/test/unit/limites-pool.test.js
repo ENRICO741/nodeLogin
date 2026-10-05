@@ -25,6 +25,15 @@ describe('chaveLogin', () => {
     assert.notEqual(chaveLogin(req('10.0.0.1', { identificador: 'vi tima' })), base);
   });
 
+  test('apelido acentuado em NFD e em NFC é a mesma chave', () => {
+    const nfd = `JOA${String.fromCharCode(0x303)}O`;
+    assert.equal(chaveLogin(req('10.0.0.1', { identificador: nfd })), '10.0.0.1|joão');
+    assert.equal(
+      chaveLogin(req('10.0.0.1', { identificador: ' João ' })),
+      chaveLogin(req('10.0.0.1', { identificador: nfd })),
+    );
+  });
+
   test('outra conta ou outro IP é outra chave', () => {
     const base = chaveLogin(req('10.0.0.1', { identificador: 'ana' }));
     assert.notEqual(chaveLogin(req('10.0.0.1', { identificador: 'bia' })), base);

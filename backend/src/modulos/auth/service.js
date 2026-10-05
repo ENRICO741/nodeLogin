@@ -28,11 +28,13 @@ async function cadastrar({ nome, apelido, email, senha }) {
   return sessao(rows[0]);
 }
 
+// O identificador vai já em minúsculas pelo JS (como a chave do limite de login): uma variante que o
+// lower() do Postgres trate diferente simplesmente não acha a conta, em vez de ganhar um contador novo.
 async function entrar({ identificador, senha }) {
   const { rows } = await query(
     `SELECT ${CAMPOS_USUARIO}, senha_alterada_em, senha_hash FROM usuarios
-     WHERE ativo AND (lower(email) = lower($1) OR lower(apelido) = lower($1))`,
-    [identificador],
+     WHERE ativo AND (lower(email) = $1 OR lower(apelido) = $1)`,
+    [identificador.toLowerCase()],
   );
   const { senha_hash: senhaHash, ...usuario } = rows[0] ?? {};
   const senhaConfere = await bcrypt.compare(senha, senhaHash ?? HASH_FALSO);

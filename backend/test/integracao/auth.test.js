@@ -36,9 +36,43 @@ describe('POST /api/auth/cadastro', () => {
     assert.match(rows[0].senha_hash, /^\$2b\$/);
   });
 
-  test('login com identificador fora do ASCII dá 400 sem consultar a conta ("İ" viraria "i" só no banco)', async () => {
-    const u = await novoUsuario();
-    const variante = `İ${u.apelido}`;
+  // "joão" com o til como caractere separado (NFD), sem deixar caractere combinante solto no código.
+  const TIL = String.fromCharCode(0x303);
+  const comAcento = (base) => `${base}_${Math.random().toString(36).slice(2, 7)}`;
+
+  test('apelido com acento: cadastro e login com "joão.silva" e "JOÃO.SILVA"', async () => {
+    const apelido = comAcento('joão.silva');
+    const res = await cadastro({ apelido }).expect(201);
+    assert.equal(res.body.usuario.apelido, apelido);
+    for (const identificador of [apelido, apelido.toUpperCase(), `  ${apelido}  `]) {
+      await post('/api/auth/login', { identificador, senha: 'Senha-forte-123' }).expect(200);
+    }
+  });
+
+  test('apelido em NFD é gravado em NFC e o login aceita as duas formas', async () => {
+    const apelido = comAcento('joão');
+    const nfd = apelido.replace('ã', `a${TIL}`);
+    assert.notEqual(nfd, apelido);
+    const res = await cadastro({ apelido: nfd }).expect(201);
+    assert.equal(res.body.usuario.apelido, apelido);
+    await post('/api/auth/login', { identificador: nfd, senha: 'Senha-forte-123' }).expect(200);
+    await post('/api/auth/login', { identificador: apelido, senha: 'Senha-forte-123' }).expect(200);
+  });
+
+  test('"joão" e "João" (e a forma NFD) são o mesmo apelido: 409', async () => {
+    const apelido = comAcento('joão');
+    await cadastro({ apelido }).expect(201);
+    const maiuscula = apelido.replace('j', 'J');
+    for (const repetido of [maiuscula, maiuscula.toUpperCase(), apelido.replace('ã', `a${TIL}`)]) {
+      const res = await cadastro({ apelido: repetido }).expect(409);
+      assert.equal(res.body.erro.mensagem, 'Este apelido já está em uso');
+    }
+  });
+
+  test('"marİa" não encontra "maria": 400 na validação, sem checar a senha', async () => {
+    const u = await novoUsuario({ apelido: `maria${Date.now()}` });
+    const variante = u.apelido.replace('i', 'İ');
+    assert.notEqual(variante, u.apelido);
     const res = await post('/api/auth/login', { identificador: variante, senha: u.senha }).expect(400);
     assert.deepEqual(camposComErro(res), ['identificador']);
     // ASCII com maiúsculas continua valendo.
@@ -81,8 +115,18 @@ describe('POST /api/auth/cadastro', () => {
     await cadastro({ apelido: 'x'.repeat(28) + '-_' }).expect(201);
   });
 
-  test('recusa apelidos fora do padrão', async () => {
-    for (const apelido of ['ab', 'x'.repeat(31), 'com espaço', 'acentuação', 'emoji🙂', 'a/b']) {
+  test('recusa apelidos fora do padrão (inclusive × ÷ e letras fora do conjunto latino)', async () => {
+    for (const apelido of [
+      'ab',
+      'x'.repeat(31),
+      'com espaço',
+      'emoji🙂',
+      'a/b',
+      'a×b',
+      'a÷b',
+      'İsa',
+      'ŵalter',
+    ]) {
       const res = await cadastro({ apelido }).expect(400);
       assert.deepEqual(camposComErro(res), ['apelido'], apelido);
     }

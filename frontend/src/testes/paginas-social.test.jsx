@@ -138,6 +138,9 @@ describe('Perfil', () => {
       rotas: { 'PATCH /perfil': ({ corpo }) => ({ ...COMPLETO, ...corpo }) },
     });
     await userEvent.click(screen.getByRole('button', { name: /Editar perfil/ }));
+    expect(screen.getByLabelText('Apelido')).toHaveAccessibleDescription(
+      'Aparece no ranking. Use de 3 a 30 letras (acentos permitidos), números, ponto, hífen ou _.',
+    );
     const nome = screen.getByLabelText('Nome');
     await userEvent.clear(nome);
     await userEvent.type(nome, 'Maria Souza');

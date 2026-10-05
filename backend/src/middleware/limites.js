@@ -17,9 +17,11 @@ const limitar = (janelaMs, limite, opcoes = {}) =>
   });
 
 // Mesma conta e mesmo IP. Com o IP na chave, ninguém trava a conta de outra pessoa errando a senha dela.
-// trim como o zod faz depois: senão " ana" e "ana " ganhariam 10 tentativas novas cada.
+// Mesma normalização que o zod e o login fazem depois (NFC, trim, minúsculas): senão " ana", "ana " ou
+// "joão" com o til separado ganhariam 10 tentativas novas cada.
 const chaveLogin = (req) =>
   `${ipKeyGenerator(req.ip)}|${String(req.body?.identificador ?? '')
+    .normalize('NFC')
     .trim()
     .toLowerCase()}`;
 

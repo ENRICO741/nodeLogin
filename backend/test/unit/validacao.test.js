@@ -5,6 +5,8 @@ const {
   texto,
   textoOpcional,
   nome,
+  apelido,
+  identificadorLogin,
   urlHttps,
   esquemaQuestao,
   esquemaResposta,
@@ -70,6 +72,39 @@ describe('nome', () => {
     assert.equal(nome.parse('Ab'), 'Ab');
     assert.equal(nome.parse('a'.repeat(120)).length, 120);
     assert.throws(() => nome.parse('a'.repeat(121)));
+  });
+});
+
+describe('apelido', () => {
+  const TIL = String.fromCharCode(0x303);
+  test('aceita letras latinas com acento, números, ponto, hífen e _', () => {
+    for (const valor of ['joão.silva', 'JOÃO_2', 'çé-ü', 'ÀÖØöøÿ', 'abc'])
+      assert.equal(apelido.parse(valor), valor);
+  });
+  test('normaliza para NFC e faz trim', () => {
+    assert.equal(apelido.parse(`  joa${TIL}o  `), 'joão');
+  });
+  test('recusa × ÷, letras fora do conjunto, espaço e limites', () => {
+    for (const valor of ['a×b', 'a÷b', 'İsa', 'ŵal', 'a b', 'ab', 'a'.repeat(31), 'a🙂b']) {
+      const r = apelido.safeParse(valor);
+      assert.equal(r.success, false, valor);
+      assert.equal(
+        r.error.issues[0].message,
+        'Use de 3 a 30 letras (acentos permitidos), números, ponto, hífen ou _',
+      );
+    }
+  });
+});
+
+describe('identificadorLogin', () => {
+  test('aceita e-mail e apelido acentuado; normaliza NFC', () => {
+    assert.equal(identificadorLogin.parse(' ana@x.com '), 'ana@x.com');
+    assert.equal(identificadorLogin.parse(`JOA${String.fromCharCode(0x303)}O`), 'JOÃO');
+  });
+  test('recusa "İ", espaço interno, vazio e acima de 254', () => {
+    for (const valor of ['marİa', 'a b', '', ' ', 'a'.repeat(255)]) {
+      assert.equal(identificadorLogin.safeParse(valor).success, false, valor);
+    }
   });
 });
 

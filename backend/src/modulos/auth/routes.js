@@ -8,27 +8,19 @@ const {
   limiteRecuperacaoIp,
   limiteRecuperacaoEmail,
 } = require('../../middleware/limites');
-const { texto, nome, senha } = require('../../lib/validacao');
+const { nome, apelido, identificadorLogin, senha } = require('../../lib/validacao');
 
 const email = z.email('E-mail inválido').max(254);
 
 const esquemaCadastro = z.object({
   nome,
-  apelido: z
-    .string()
-    .trim()
-    .regex(/^[\w.-]{3,30}$/, 'Use de 3 a 30 letras, números, ponto, hífen ou sublinhado'),
+  apelido,
   email,
   senha,
   // Consentimento obrigatório para uso anônimo dos dados de uso (telemetria e pesquisa, LGPD).
   consentiu_pesquisa: z.literal(true, 'É preciso aceitar o uso anônimo dos dados para criar a conta'),
 });
-// E-mail e apelido são só ASCII (z.email e a regex do apelido). Fora do ASCII, o lower() do Postgres e o
-// toLowerCase() do limite de login divergem ("İ" vira "i" só no banco) e cada variante ganharia 10 tentativas.
-const esquemaLogin = z.object({
-  identificador: texto(1, 254).regex(/^[\x21-\x7e]+$/, 'Use seu e-mail ou apelido'),
-  senha: z.string().min(1).max(72),
-});
+const esquemaLogin = z.object({ identificador: identificadorLogin, senha: z.string().min(1).max(72) });
 const esquemaRedefinicao = z.object({ token: z.string().min(20).max(100), senha });
 
 const router = Router();

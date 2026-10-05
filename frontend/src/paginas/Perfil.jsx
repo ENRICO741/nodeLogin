@@ -96,7 +96,7 @@ function FormPerfil({ usuario, aoSalvar, aoCancelar }) {
         name="apelido"
         defaultValue={usuario.apelido}
         autoComplete="nickname"
-        ajuda="Aparece no ranking."
+        ajuda="Aparece no ranking. Use de 3 a 30 letras (acentos permitidos), números, ponto, hífen ou _."
         erro={porCampo.apelido}
       />
       <Campo

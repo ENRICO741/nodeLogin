@@ -105,7 +105,7 @@ export function Cadastro() {
           name="apelido"
           autoComplete="nickname"
           required
-          ajuda="Aparece no ranking. Use de 3 a 30 letras, números, ponto, hífen ou _."
+          ajuda="Aparece no ranking. Use de 3 a 30 letras (acentos permitidos), números, ponto, hífen ou _."
           erro={porCampo.apelido}
         />
         <Campo label="E-mail" name="email" type="email" autoComplete="email" required erro={porCampo.email} />
