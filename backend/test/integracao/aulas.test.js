@@ -34,6 +34,32 @@ async function responderAula(u, aulaId, acertar = () => true) {
   return { aula, visita, respostas, certas };
 }
 
+// Corrida forçada: segura o usuário (FOR UPDATE) numa conexão à parte, dispara os pedidos e só solta
+// quando os dois estão esperando lock no banco. Assim eles se cruzam sempre, não por sorte.
+async function emCorrida(usuarioId, disparar) {
+  const c = await pool.connect();
+  let pendentes;
+  try {
+    await c.query('BEGIN');
+    await c.query('SELECT 1 FROM usuarios WHERE id = $1 FOR UPDATE', [usuarioId]);
+    pendentes = Promise.all(disparar()); // o supertest só envia no .then
+    for (let i = 0; ; i++) {
+      // Pelo pool, fora da transação: dentro dela o pg_stat_activity fica no retrato da primeira leitura.
+      const { rows } = await pool.query(
+        `SELECT count(*)::int AS n FROM pg_stat_activity
+         WHERE datname = current_database() AND wait_event_type = 'Lock'`,
+      );
+      if (rows[0].n >= 2) break;
+      if (i === 250) throw new Error('os pedidos não chegaram a esperar o lock');
+      await new Promise((r) => setTimeout(r, 20));
+    }
+  } finally {
+    await c.query('COMMIT');
+    c.release();
+  }
+  return pendentes;
+}
+
 describe('GET /api/aulas', () => {
   test('lista aulas ativas em ordem, com total de questões e status de conclusão', async () => {
     const u = await novoUsuario();
@@ -767,7 +793,7 @@ describe('POST /api/visitas/:id/finalizar', () => {
       (await u.api('post', `/api/aulas/${aula.id}/visitas`)).body,
       (await u.api('post', `/api/aulas/${aula.id}/visitas`)).body,
     ];
-    const r = await Promise.all(
+    const r = await emCorrida(u.usuario.id, () =>
       visitas.map((v) =>
         u.api('post', `/api/visitas/${v.id}/respostas`).send({ questao_id: q.id, alternativa: certas[q.id] }),
       ),

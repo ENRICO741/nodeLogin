@@ -21,6 +21,32 @@ const novaRodada = (u, corpo = { dificuldade: 'facil' }) => u.api('post', '/api/
 const responder = (u, rodadaId, questao_id, alternativa) =>
   u.api('post', `/api/trivia/rodadas/${rodadaId}/respostas`).send({ questao_id, alternativa });
 
+// Corrida forçada: segura o usuário (FOR UPDATE) numa conexão à parte, dispara os pedidos e só solta
+// quando os dois estão esperando lock no banco. Assim eles se cruzam sempre, não por sorte.
+async function emCorrida(usuarioId, disparar) {
+  const c = await pool.connect();
+  let pendentes;
+  try {
+    await c.query('BEGIN');
+    await c.query('SELECT 1 FROM usuarios WHERE id = $1 FOR UPDATE', [usuarioId]);
+    pendentes = Promise.all(disparar()); // o supertest só envia no .then
+    for (let i = 0; ; i++) {
+      // Pelo pool, fora da transação: dentro dela o pg_stat_activity fica no retrato da primeira leitura.
+      const { rows } = await pool.query(
+        `SELECT count(*)::int AS n FROM pg_stat_activity
+         WHERE datname = current_database() AND wait_event_type = 'Lock'`,
+      );
+      if (rows[0].n >= 2) break;
+      if (i === 250) throw new Error('os pedidos não chegaram a esperar o lock');
+      await new Promise((r) => setTimeout(r, 20));
+    }
+  } finally {
+    await c.query('COMMIT');
+    c.release();
+  }
+  return pendentes;
+}
+
 describe('POST /api/trivia/rodadas', () => {
   test('bloqueada até concluir todas as aulas: 403 e nenhuma rodada criada', async () => {
     const u = await novoUsuario();
@@ -410,7 +436,9 @@ describe('POST /api/trivia/rodadas/:id/respostas', () => {
     const [r1, r2] = [(await novaRodada(u)).body, (await novaRodada(u)).body];
     const q = r1.questoes[0];
     const certas = await gabarito('questoes_trivia', [q.id]);
-    const r = await Promise.all([r1, r2].map((rodada) => responder(u, rodada.id, q.id, certas[q.id])));
+    const r = await emCorrida(u.usuario.id, () =>
+      [r1, r2].map((rodada) => responder(u, rodada.id, q.id, certas[q.id])),
+    );
     assert.deepEqual(
       r.map((x) => x.status),
       [200, 200],
