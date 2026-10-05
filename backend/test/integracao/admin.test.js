@@ -689,6 +689,32 @@ describe('GET /api/admin/estatisticas', () => {
     assert.deepEqual([doAluno.total_respostas, doAluno.total_acertos], [0, 0]);
   });
 
+  test('questão criada pelo admin (chave NULL) entra nas questões e nos totais', async () => {
+    const u = await novoJogador();
+    // Aula manual (última da trilha, liberada para o jogador); apagada no fim: as aulas do app são fixas.
+    const aula = (await novaAula().expect(201)).body;
+    try {
+      const q = (await admin.api('post', `/api/admin/aulas/${aula.id}/questoes`).send(questao()).expect(201))
+        .body;
+      assert.equal(q.chave, null);
+      const visita = (await u.api('post', `/api/aulas/${aula.id}/visitas`).expect(201)).body;
+      await u
+        .api('post', `/api/visitas/${visita.id}/respostas`)
+        .send({ questao_id: q.id, alternativa: 'b' })
+        .expect(200);
+
+      const s = (await admin.api('get', '/api/admin/estatisticas').expect(200)).body;
+      const porAula = s.aulas.find((x) => x.aula_id === aula.id);
+      assert.deepEqual([porAula.total_respostas, porAula.total_acertos], [1, 1]);
+      const daQuestao = s.questoesAula.find((x) => x.questao_id === q.id);
+      assert.deepEqual([daQuestao?.total_respostas, daQuestao?.total_acertos], [1, 1]);
+      const doAluno = s.usuariosAula.find((x) => x.apelido === u.apelido && x.aula_titulo === aula.titulo);
+      assert.deepEqual([doAluno.total_respostas, doAluno.total_acertos], [1, 1]);
+    } finally {
+      await pool.query('DELETE FROM aulas WHERE id = $1', [aula.id]);
+    }
+  });
+
   test('números batem com a atividade real, e usuários aparecem só pelo apelido', async () => {
     await prepararBanco();
     admin = await novoAdmin();
