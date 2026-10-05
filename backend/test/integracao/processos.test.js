@@ -220,7 +220,8 @@ describe('rate limit (desligado em teste, ligado aqui com NODE_ENV=development)'
   });
 
   test('conta bloqueada: variantes "marİa" ou NFD não dão tentativas extras de senha', async () => {
-    const u = await novoUsuario({ apelido: `maria${process.pid}` });
+    // Acento (para a NFD mudar algo) e um "i" (para as variantes com İ e ponto combinante).
+    const u = await novoUsuario({ apelido: `joãomaria${process.pid}` });
     const { saida } = await rodarComLimite(`
       const login = (identificador, senha = 'errada') => request(app).post('/api/auth/login')
         .set('X-Forwarded-For', '10.0.8.1').send({ identificador, senha });
@@ -232,15 +233,20 @@ describe('rate limit (desligado em teste, ligado aqui com NODE_ENV=development)'
         comIPontuado: (await login(apelido.replace('i', String.fromCharCode(0x130)), '${u.senha}')).status,
         comCombinante: (await login(apelido.replace('i', 'i' + pontoAcima), '${u.senha}')).status,
         maiusculas: (await login(apelido.toUpperCase(), '${u.senha}')).status,
+        nfd: (await login(apelido.normalize('NFD'), '${u.senha}')).status,
+        espacos: (await login('  ' + apelido + ' ', '${u.senha}')).status,
       };
       console.log('RESULTADO', JSON.stringify(r));
     `);
-    // As variantes nunca chegam a conferir a senha (400 na validação); a forma normal segue bloqueada.
+    // İ e ponto combinante nunca chegam a conferir a senha (400 na validação); maiúsculas, NFD e
+    // espaços nas pontas caem na mesma chave do limite e seguem bloqueadas.
     assert.deepEqual(resultado(saida), {
       bloqueada: 429,
       comIPontuado: 400,
       comCombinante: 400,
       maiusculas: 429,
+      nfd: 429,
+      espacos: 429,
     });
   });
 
