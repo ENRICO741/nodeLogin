@@ -17,8 +17,11 @@ const limitar = (janelaMs, limite, opcoes = {}) =>
   });
 
 // Mesma conta e mesmo IP. Com o IP na chave, ninguém trava a conta de outra pessoa errando a senha dela.
+// trim como o zod faz depois: senão " ana" e "ana " ganhariam 10 tentativas novas cada.
 const chaveLogin = (req) =>
-  `${ipKeyGenerator(req.ip)}|${String(req.body?.identificador ?? '').toLowerCase()}`;
+  `${ipKeyGenerator(req.ip)}|${String(req.body?.identificador ?? '')
+    .trim()
+    .toLowerCase()}`;
 
 module.exports = {
   chaveLogin,
@@ -27,9 +30,19 @@ module.exports = {
   limiteAuthIp: limitar(15 * MINUTO, 100),
   // Força bruta contra uma conta: 10 tentativas de login em 15 min.
   limiteLogin: limitar(15 * MINUTO, 10, { keyGenerator: chaveLogin }),
-  limiteRecuperacaoIp: limitar(60 * MINUTO, 3),
+  // Por IP com folga para a turma atrás do mesmo NAT; quem segura o spam é o limite por e-mail.
+  limiteRecuperacaoIp: limitar(60 * MINUTO, 30),
+  // 3 e-mails por hora para o mesmo endereço. Estourado, a rota responde o mesmo 200 sem enviar: um 429
+  // deixaria um terceiro travar a vítima (e cada pedido invalida o link anterior).
   limiteRecuperacaoEmail: limitar(60 * MINUTO, 3, {
-    keyGenerator: (req) => String(req.body?.email ?? '').toLowerCase(),
+    keyGenerator: (req) =>
+      String(req.body?.email ?? '')
+        .trim()
+        .toLowerCase(),
+    handler: (req, _res, next) => {
+      req.limiteEmailEstourado = true;
+      next();
+    },
   }),
   // Rotas autenticadas: chave pelo usuário, não pelo IP (vários funcionários atrás do mesmo NAT).
   limiteGeral: limitar(MINUTO, 300, { keyGenerator: (req) => req.usuario.id }),

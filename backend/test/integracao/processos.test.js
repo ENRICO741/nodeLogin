@@ -237,24 +237,56 @@ describe('rate limit (desligado em teste, ligado aqui com NODE_ENV=development)'
     assert.deepEqual(resultado(saida), { antes: [400], redefinir: 429, cadastro: 429, outroIp: 400 });
   });
 
-  test('esqueci-senha limita por IP e também por e-mail (mesmo trocando de IP)', async () => {
+  test('esqueci-senha: 30 por IP (turma atrás do NAT); 31º recebe 429', async () => {
     const { saida } = await rodarComLimite(`
-      const porIp = [];
-      for (let i = 0; i < 4; i++) {
-        porIp.push((await request(app).post('/api/auth/esqueci-senha').send({ email: 'ip' + i + '@x.com' })).status);
+      const status = [];
+      for (let i = 0; i < 31; i++) {
+        status.push((await request(app).post('/api/auth/esqueci-senha').set('X-Forwarded-For', '10.0.6.1')
+          .send({ email: 'ip' + i + '@x.com' })).status);
       }
-      const porEmail = [];
+      const outroIp = (await request(app).post('/api/auth/esqueci-senha').set('X-Forwarded-For', '10.0.6.2')
+        .send({ email: 'ip0@x.com' })).status;
+      console.log('RESULTADO', JSON.stringify({ status, outroIp }));
+    `);
+    const { status, outroIp } = resultado(saida);
+    assert.deepEqual(status.slice(0, 30), Array(30).fill(200), 'o 4º pedido do mesmo IP passa');
+    assert.equal(status[30], 429);
+    assert.equal(outroIp, 200);
+  });
+
+  test('esqueci-senha: estourado o limite do e-mail, responde o mesmo 200 sem enviar (terceiro não trava a vítima)', async () => {
+    const u = await novoUsuario();
+    const { saida } = await rodarComLimite(`
+      const mailer = require('./src/lib/mailer');
+      let enviados = 0;
+      mailer.enviarEmail = async () => { enviados++; };
+      const respostas = [];
       for (let i = 0; i < 4; i++) {
-        porEmail.push((await request(app).post('/api/auth/esqueci-senha')
-          .set('X-Forwarded-For', '10.0.0.' + (i + 10)).send({ email: 'Mesmo@X.com' })).status);
+        const res = await request(app).post('/api/auth/esqueci-senha')
+          .set('X-Forwarded-For', '10.0.0.' + (i + 10)).send({ email: '${u.email.toUpperCase()}' });
+        respostas.push([res.status, res.body.mensagem]);
       }
+      // Espaços nas pontas não abrem cota nova: o zod recusa (400), e nada é enviado.
+      const comEspaco = (await request(app).post('/api/auth/esqueci-senha')
+        .set('X-Forwarded-For', '10.0.0.20').send({ email: ' ${u.email} ' })).status;
       const semEmail = (await request(app).post('/api/auth/esqueci-senha')
         .set('X-Forwarded-For', '10.0.1.1').send({})).status;
-      console.log('RESULTADO', JSON.stringify({ porIp, porEmail, semEmail }));
+      await new Promise((r) => setTimeout(r, 100));
+      console.log('RESULTADO', JSON.stringify({ respostas, enviados, comEspaco, semEmail }));
     `);
-    const { porIp, porEmail, semEmail } = resultado(saida);
-    assert.deepEqual(porIp, [200, 200, 200, 429]);
-    assert.deepEqual(porEmail, [200, 200, 200, 429]);
+    const { respostas, enviados, comEspaco, semEmail } = resultado(saida);
+    assert.deepEqual(
+      respostas.map(([status]) => status),
+      [200, 200, 200, 200],
+    );
+    assert.equal(new Set(respostas.map(([, mensagem]) => mensagem)).size, 1, 'mesma mensagem genérica');
+    assert.equal(enviados, 3);
+    const { rows } = await pool.query(
+      'SELECT count(*)::int AS n FROM tokens_recuperacao_senha WHERE usuario_id = $1 AND NOT usado',
+      [u.usuario.id],
+    );
+    assert.equal(rows[0].n, 1, 'o 4º pedido não invalidou o último link enviado');
+    assert.equal(comEspaco, 400);
     assert.equal(semEmail, 400, 'corpo sem e-mail passa pelo limite e cai na validação');
   });
 

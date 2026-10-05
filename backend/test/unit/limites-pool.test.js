@@ -17,6 +17,14 @@ describe('chaveLogin', () => {
     );
   });
 
+  test('espaços nas pontas não geram chave nova (o zod faz trim depois do limite)', () => {
+    const base = chaveLogin(req('10.0.0.1', { identificador: 'vitima' }));
+    for (const identificador of [' vitima', 'vitima ', '  VITIMA\t', '\nvitima']) {
+      assert.equal(chaveLogin(req('10.0.0.1', { identificador })), base, JSON.stringify(identificador));
+    }
+    assert.notEqual(chaveLogin(req('10.0.0.1', { identificador: 'vi tima' })), base);
+  });
+
   test('outra conta ou outro IP é outra chave', () => {
     const base = chaveLogin(req('10.0.0.1', { identificador: 'ana' }));
     assert.notEqual(chaveLogin(req('10.0.0.1', { identificador: 'bia' })), base);
