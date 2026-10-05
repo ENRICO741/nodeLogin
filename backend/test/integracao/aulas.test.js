@@ -317,6 +317,17 @@ describe('POST /api/aulas/:id/visitas', () => {
   test('aula inexistente ou desativada dá 404', async () => {
     const u = await novoUsuario();
     await u.api('post', `/api/aulas/${UUID_INEXISTENTE}/visitas`).expect(404);
+    const aula = await primeiraAula(u);
+    await pool.query('UPDATE aulas SET ativo = false WHERE id = $1', [aula.id]);
+    try {
+      await u.api('post', `/api/aulas/${aula.id}/visitas`).expect(404);
+    } finally {
+      await pool.query('UPDATE aulas SET ativo = true WHERE id = $1', [aula.id]);
+    }
+    const { rows } = await pool.query('SELECT count(*)::int AS n FROM aula_visitas WHERE usuario_id = $1', [
+      u.usuario.id,
+    ]);
+    assert.equal(rows[0].n, 0);
   });
 });
 
