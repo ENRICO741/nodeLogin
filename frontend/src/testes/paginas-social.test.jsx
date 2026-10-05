@@ -218,7 +218,14 @@ describe('Perfil', () => {
 
   it('foto: navegador sem WebP (Safari no iPhone devolve PNG) envia JPEG', async () => {
     globalThis.createImageBitmap = vi.fn(async () => ({ width: 300, height: 300 }));
-    const ctx = { drawImage: vi.fn(), fillRect: vi.fn() };
+    // guarda o estado do contexto no momento da pintura, não só o que sobrou no fim
+    const pinturas = [];
+    const ctx = {
+      drawImage: vi.fn(),
+      fillRect: vi.fn((...area) =>
+        pinturas.push({ area, fillStyle: ctx.fillStyle, composicao: ctx.globalCompositeOperation }),
+      ),
+    };
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx);
     const toDataURL = vi
       .spyOn(HTMLCanvasElement.prototype, 'toDataURL')
@@ -240,9 +247,7 @@ describe('Perfil', () => {
       ['image/jpeg', 0.85],
     ]);
     // JPEG não tem alfa: o fundo branco vai atrás do desenho, antes de gerar o JPEG (senão o PNG transparente sai preto).
-    expect(ctx.fillRect).toHaveBeenCalledWith(0, 0, 256, 256);
-    expect(ctx.fillStyle).toBe('#fff');
-    expect(ctx.globalCompositeOperation).toBe('destination-over');
+    expect(pinturas).toEqual([{ area: [0, 0, 256, 256], fillStyle: '#fff', composicao: 'destination-over' }]);
     expect(ctx.fillRect.mock.invocationCallOrder[0]).toBeLessThan(toDataURL.mock.invocationCallOrder[1]);
   });
 
