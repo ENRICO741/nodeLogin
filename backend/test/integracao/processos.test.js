@@ -258,6 +258,29 @@ describe('rate limit (desligado em teste, ligado aqui com NODE_ENV=development)'
     assert.equal(semEmail, 400, 'corpo sem e-mail passa pelo limite e cai na validação');
   });
 
+  test('sessões e visitas de aula: 60 por minuto por usuário; outro usuário no mesmo IP segue liberado', async () => {
+    const [a, b] = [await novoUsuario(), await novoUsuario()];
+    const { rows } = await pool.query('SELECT id FROM aulas WHERE ativo ORDER BY ordem LIMIT 1');
+    const { saida } = await rodarComLimite(`
+      const post = (token, url) => request(app).post(url).set('X-Forwarded-For', '10.0.5.1')
+        .set('Authorization', 'Bearer ' + token);
+      const r = {};
+      for (const url of ['/api/sessoes', '/api/aulas/${rows[0].id}/visitas']) {
+        const status = new Set();
+        for (let i = 0; i < 60; i++) status.add((await post('${a.token}', url)).status);
+        const bloqueada = await post('${a.token}', url);
+        r[url.split('/')[2]] = {
+          antes: [...status],
+          bloqueada: [bloqueada.status, bloqueada.body.erro?.codigo],
+          outroUsuario: (await post('${b.token}', url)).status,
+        };
+      }
+      console.log('RESULTADO', JSON.stringify(r));
+    `);
+    const esperado = (ok) => ({ antes: [ok], bloqueada: [429, 'MUITAS_REQUISICOES'], outroUsuario: ok });
+    assert.deepEqual(resultado(saida), { sessoes: esperado(201), aulas: esperado(201) });
+  });
+
   test('rotas autenticadas contam por usuário', async () => {
     const u = await novoUsuario();
     const { saida } = await rodarComLimite(`

@@ -239,4 +239,30 @@ describe('telemetria', () => {
     const u = await novoUsuario();
     await u.api('post', '/api/sessoes/xyz/finalizar').expect(400);
   });
+
+  test('consentimento retirado: sessões e eventos respondem 204 sem gravar; reconsentir volta a gravar', async () => {
+    const u = await novoUsuario();
+    const contar = async () => {
+      const { rows } = await pool.query(
+        `SELECT (SELECT count(*)::int FROM sessoes_app WHERE usuario_id = $1) AS sessoes,
+                (SELECT count(*)::int FROM eventos WHERE usuario_id = $1) AS eventos`,
+        [u.usuario.id],
+      );
+      return rows[0];
+    };
+    const sessao = (await u.api('post', '/api/sessoes').expect(201)).body;
+
+    await u.api('patch', '/api/perfil').send({ consentiu_pesquisa: false }).expect(200);
+    const nova = await u.api('post', '/api/sessoes').send({ standalone: true }).expect(204);
+    assert.deepEqual(nova.body, {});
+    await u.api('post', '/api/eventos').send({ tipo_evento: 'tela_visualizada' }).expect(204);
+    // Nem com a sessão antiga, nem com corpo inválido (nada é lido nem gravado).
+    await u.api('post', '/api/eventos').send({ tipo_evento: 'x', sessao_id: sessao.id }).expect(204);
+    assert.deepEqual(await contar(), { sessoes: 1, eventos: 0 });
+
+    await u.api('patch', '/api/perfil').send({ consentiu_pesquisa: true }).expect(200);
+    await u.api('post', '/api/sessoes').expect(201);
+    await u.api('post', '/api/eventos').send({ tipo_evento: 'tela_visualizada' }).expect(204);
+    assert.deepEqual(await contar(), { sessoes: 2, eventos: 1 });
+  });
 });

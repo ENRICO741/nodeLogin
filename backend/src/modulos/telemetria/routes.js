@@ -29,7 +29,11 @@ const esquemaSessao = z
   })
   .default({});
 
-router.post('/sessoes', async (req, res) => {
+// Sem consentimento (retirado no Perfil) nada é gravado (LGPD art. 8º §5º). 204 para o app não tratar como erro.
+const semConsentimento = (req) => !req.usuario.consentiu_pesquisa_em;
+
+router.post('/sessoes', limiteEscrita(), async (req, res) => {
+  if (semConsentimento(req)) return res.status(204).end();
   const { standalone, largura_tela } = esquemaSessao.parse(req.body);
   const { rows } = await query(
     'INSERT INTO sessoes_app (usuario_id, standalone, largura_tela) VALUES ($1, $2, $3) RETURNING id, iniciada_em',
@@ -59,7 +63,8 @@ router.post('/sessoes/:id/retomar', async (req, res) => {
   res.status(204).end();
 });
 
-router.post('/eventos', limiteEscrita, async (req, res) => {
+router.post('/eventos', limiteEscrita(), async (req, res) => {
+  if (semConsentimento(req)) return res.status(204).end();
   const e = esquemaEvento.parse(req.body);
   // O evento só entra se a sessão (quando informada) for do próprio usuário.
   const { rowCount } = await query(

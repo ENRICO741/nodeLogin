@@ -12,7 +12,7 @@ const esquemaNovaRodada = z.object({
 
 const router = Router();
 
-router.post('/rodadas', limiteEscrita, async (req, res) => {
+router.post('/rodadas', limiteEscrita(), async (req, res) => {
   res.status(201).json(await service.criarRodada(req.usuario.id, esquemaNovaRodada.parse(req.body)));
 });
 
