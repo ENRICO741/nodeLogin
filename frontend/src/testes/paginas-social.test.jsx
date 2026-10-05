@@ -199,10 +199,36 @@ describe('Perfil', () => {
       expect(servidor.enviados('PATCH /perfil')[0].foto_perfil_url).toBe('data:image/webp;base64,AAAA'),
     );
     expect(servidor.enviados('PATCH /perfil')[0].arquivo_foto).toBeUndefined();
+    // Com WebP disponível não gera JPEG à toa.
+    expect(HTMLCanvasElement.prototype.toDataURL).toHaveBeenCalledTimes(1);
 
     await userEvent.click(screen.getByRole('button', { name: /Editar perfil/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Remover foto' }));
     expect(screen.queryByRole('button', { name: 'Remover foto' })).not.toBeInTheDocument();
+  });
+
+  it('foto: navegador sem WebP (Safari no iPhone devolve PNG) envia JPEG', async () => {
+    globalThis.createImageBitmap = vi.fn(async () => ({ width: 300, height: 300 }));
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage: vi.fn() });
+    const toDataURL = vi
+      .spyOn(HTMLCanvasElement.prototype, 'toDataURL')
+      .mockImplementation((tipo) =>
+        tipo === 'image/jpeg' ? 'data:image/jpeg;base64,JJJJ' : 'data:image/png;base64,PPPP',
+      );
+    const { servidor } = await renderizarApp('/perfil', {
+      rotas: { 'PATCH /perfil': ({ corpo }) => ({ ...USUARIO, ...corpo }) },
+    });
+    await userEvent.click(screen.getByRole('button', { name: /Editar perfil/ }));
+    await userEvent.upload(screen.getByLabelText('Foto'), new File(['x'], 'eu.jpg', { type: 'image/jpeg' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Remover foto' })).toBeInTheDocument());
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    await waitFor(() =>
+      expect(servidor.enviados('PATCH /perfil')[0].foto_perfil_url).toBe('data:image/jpeg;base64,JJJJ'),
+    );
+    expect(toDataURL.mock.calls).toEqual([
+      ['image/webp', 0.85],
+      ['image/jpeg', 0.85],
+    ]);
   });
 
   it('foto ilegível mostra erro no campo; cancelar a seleção não muda nada', async () => {

@@ -11,6 +11,7 @@ import styles from './Perfil.module.css';
 const LADO_FOTO = 256;
 
 // Recorta no centro, reduz para 256 px e converte em WebP: a foto cabe no limite de 200 KB da API.
+// Safari no iPhone não gera WebP e devolve PNG (pesado demais): nesse caso usa JPEG.
 async function prepararFoto(arquivo) {
   const imagem = await createImageBitmap(arquivo);
   const lado = Math.min(imagem.width, imagem.height);
@@ -30,7 +31,8 @@ async function prepararFoto(arquivo) {
       LADO_FOTO,
       LADO_FOTO,
     );
-  return canvas.toDataURL('image/webp', 0.85);
+  const webp = canvas.toDataURL('image/webp', 0.85);
+  return webp.startsWith('data:image/webp') ? webp : canvas.toDataURL('image/jpeg', 0.85);
 }
 
 function FormPerfil({ usuario, aoSalvar, aoCancelar }) {
