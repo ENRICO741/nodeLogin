@@ -414,6 +414,23 @@ describe('useLeitura: tempo de leitura só com a tela visível', () => {
     expect((await lido(servidor)).duracao_ms).toBe(15_000);
   });
 
+  it('vários ciclos somam os trechos visíveis (10 s + fora + 5 s + fora + 3 s = 18 s)', async () => {
+    const servidor = servidorFalso();
+    await telemetria.iniciarSessao();
+    const { result } = renderHook(() => useLeitura('a1', true));
+    vi.setSystemTime(10_000);
+    mudarVisibilidade('hidden');
+    vi.setSystemTime(40_000);
+    mudarVisibilidade('visible');
+    vi.setSystemTime(45_000);
+    mudarVisibilidade('hidden');
+    vi.setSystemTime(80_000);
+    mudarVisibilidade('visible');
+    vi.setSystemTime(83_000);
+    act(() => result.current('iniciou_perguntas'));
+    expect((await lido(servidor)).duracao_ms).toBe(18_000);
+  });
+
   it('sair com a tela em segundo plano conta só até ela sumir; eventos repetidos não somam', async () => {
     const servidor = servidorFalso();
     await telemetria.iniciarSessao();
@@ -437,6 +454,7 @@ describe('useLeitura: tempo de leitura só com a tela visível', () => {
     const { result } = renderHook(() => useLeitura('a1', true));
     vi.setSystemTime(30_000);
     mudarVisibilidade('visible');
+    vi.setSystemTime(32_000);
     mudarVisibilidade('visible'); // repetido: não reinicia a contagem
     vi.setSystemTime(34_000);
     act(() => result.current('iniciou_perguntas'));
