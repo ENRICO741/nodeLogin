@@ -98,11 +98,15 @@ async function completarRodada(u, rodada, acertar = () => false) {
   }
 }
 
-// Captura o próximo e-mail "enviado" e devolve o token do link de redefinição.
-function capturarEmail() {
+// Captura o próximo e-mail "enviado" e devolve o token do link de redefinição. O mock do `t` volta o
+// mailer ao original no fim do teste.
+function capturarEmail(t) {
   let resolver;
   const recebido = new Promise((r) => (resolver = r));
-  mailer.enviarEmail = async (mensagem) => resolver(mensagem);
+  const capturar = async (mensagem) => resolver(mensagem);
+  // Segunda captura no mesmo teste: troca só a implementação. Um mock sobre o mock não seria desfeito.
+  if (mailer.enviarEmail.mock) mailer.enviarEmail.mock.mockImplementation(capturar);
+  else t.mock.method(mailer, 'enviarEmail', capturar);
   return recebido.then((mensagem) => ({
     mensagem,
     token: new URL(mensagem.texto.match(/https?:\S+/)[0]).searchParams.get('token'),

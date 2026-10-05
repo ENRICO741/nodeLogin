@@ -332,9 +332,9 @@ describe('GET /api/auth/me e o middleware autenticar', () => {
 });
 
 describe('recuperação de senha', () => {
-  test('resposta é igual para e-mail cadastrado e não cadastrado', async () => {
+  test('resposta é igual para e-mail cadastrado e não cadastrado', async (t) => {
     const u = await novoUsuario();
-    capturarEmail();
+    capturarEmail(t);
     const inexistente = await post('/api/auth/esqueci-senha', { email: 'nao@existe.com' }).expect(200);
     const real = await post('/api/auth/esqueci-senha', { email: u.email }).expect(200);
     assert.deepEqual(inexistente.body, real.body);
@@ -349,19 +349,19 @@ describe('recuperação de senha', () => {
     await post('/api/auth/esqueci-senha', {}).expect(400);
   });
 
-  test('usuário desativado não recebe e-mail', async () => {
+  test('usuário desativado não recebe e-mail', async (t) => {
     const u = await novoUsuario();
     await pool.query('UPDATE usuarios SET ativo = false WHERE id = $1', [u.usuario.id]);
     let enviado = false;
-    require('../../src/lib/mailer').enviarEmail = async () => (enviado = true);
+    t.mock.method(require('../../src/lib/mailer'), 'enviarEmail', async () => (enviado = true));
     await post('/api/auth/esqueci-senha', { email: u.email }).expect(200);
     await new Promise((r) => setTimeout(r, 50));
     assert.equal(enviado, false);
   });
 
-  test('e-mail tem link com token e só o hash vai para o banco', async () => {
+  test('e-mail tem link com token e só o hash vai para o banco', async (t) => {
     const u = await novoUsuario();
-    const email = capturarEmail();
+    const email = capturarEmail(t);
     await post('/api/auth/esqueci-senha', { email: u.email.toUpperCase() }).expect(200);
     const { mensagem, token } = await email;
     assert.equal(mensagem.para, u.email);
@@ -377,9 +377,9 @@ describe('recuperação de senha', () => {
     assert.equal(rows[0].token_hash.length, 64);
   });
 
-  test('fluxo completo: troca a senha, token é de uso único e JWT antigo cai', async () => {
+  test('fluxo completo: troca a senha, token é de uso único e JWT antigo cai', async (t) => {
     const u = await novoUsuario();
-    const email = capturarEmail();
+    const email = capturarEmail(t);
     await post('/api/auth/esqueci-senha', { email: u.email }).expect(200);
     const { token } = await email;
 
@@ -392,9 +392,9 @@ describe('recuperação de senha', () => {
     await post('/api/auth/login', { identificador: u.email, senha: 'Nova-senha-456' }).expect(200);
   });
 
-  test('senha nova sem maiúscula ou com emoji dá 400 no campo senha sem gastar o token; aspas e barra entram', async () => {
+  test('senha nova sem maiúscula ou com emoji dá 400 no campo senha sem gastar o token; aspas e barra entram', async (t) => {
     const u = await novoUsuario();
-    const email = capturarEmail();
+    const email = capturarEmail(t);
     await post('/api/auth/esqueci-senha', { email: u.email }).expect(200);
     const { token } = await email;
 
@@ -414,12 +414,12 @@ describe('recuperação de senha', () => {
     await post('/api/auth/login', { identificador: u.email, senha: u.senha }).expect(401);
   });
 
-  test('pedir de novo invalida o link anterior', async () => {
+  test('pedir de novo invalida o link anterior', async (t) => {
     const u = await novoUsuario();
-    let email = capturarEmail();
+    let email = capturarEmail(t);
     await post('/api/auth/esqueci-senha', { email: u.email });
     const primeiro = (await email).token;
-    email = capturarEmail();
+    email = capturarEmail(t);
     await post('/api/auth/esqueci-senha', { email: u.email });
     const segundo = (await email).token;
 
@@ -427,9 +427,9 @@ describe('recuperação de senha', () => {
     await post('/api/auth/redefinir-senha', { token: segundo, senha: 'Nova-senha-456' }).expect(204);
   });
 
-  test('token expirado é recusado', async () => {
+  test('token expirado é recusado', async (t) => {
     const u = await novoUsuario();
-    const email = capturarEmail();
+    const email = capturarEmail(t);
     await post('/api/auth/esqueci-senha', { email: u.email });
     const { token } = await email;
     await pool.query(
@@ -453,21 +453,19 @@ describe('recuperação de senha', () => {
     assert.equal(longa.body.erro.codigo, 'VALIDACAO');
   });
 
-  test('falha no envio do e-mail não quebra a resposta', async () => {
+  test('falha no envio do e-mail não quebra a resposta', async (t) => {
     const u = await novoUsuario();
     const mailer = require('../../src/lib/mailer');
-    const { mock } = require('node:test');
-    const erroLog = mock.method(console, 'error', () => {});
+    const erroLog = t.mock.method(console, 'error', () => {});
     let chamado;
     const chamou = new Promise((r) => (chamado = r));
-    mailer.enviarEmail = async () => {
+    t.mock.method(mailer, 'enviarEmail', async () => {
       chamado();
       throw new Error('SMTP fora do ar');
-    };
+    });
     await post('/api/auth/esqueci-senha', { email: u.email }).expect(200);
     await chamou;
     await new Promise((r) => setImmediate(r));
     assert.ok(erroLog.mock.calls.some((c) => c.arguments[0].includes('falha ao enviar e-mail')));
-    erroLog.mock.restore();
   });
 });
