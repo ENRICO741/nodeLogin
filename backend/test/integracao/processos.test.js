@@ -377,7 +377,7 @@ describe('rate limit (desligado em teste, ligado aqui com NODE_ENV=development)'
     });
   });
 
-  test('rotas autenticadas contam por usuário', async () => {
+  test('rotas autenticadas mandam os cabeçalhos RateLimit', async () => {
     const u = await novoUsuario();
     const { saida } = await rodarComLimite(`
       const res = await request(app).get('/api/aulas').set('Authorization', 'Bearer ${u.token}');
