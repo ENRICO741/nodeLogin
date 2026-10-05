@@ -4,6 +4,10 @@ on:
   push:
   pull_request:
 
+# Mínimo para o job verificar (roda npm ci com scripts de terceiros). O deploy declara as suas.
+permissions:
+  contents: read
+
 jobs:
   verificar:
     runs-on: ubuntu-latest
@@ -27,6 +31,12 @@ jobs:
 
       - name: Lint e formatação
         run: npm ci && npx eslint . && npx prettier --check .
+
+      # Erro de sintaxe no Caddyfile derruba o site em produção (o Caddy reinicia em loop). Mesma imagem do web.Dockerfile.
+      - name: Caddyfile (caddy validate)
+        run: >-
+          docker run --rm -e DOMAIN=localhost -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro"
+          caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
 
       - name: Aulas (valida conteudo/aulas)
         working-directory: backend
