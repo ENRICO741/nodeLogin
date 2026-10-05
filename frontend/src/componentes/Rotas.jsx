@@ -1,11 +1,13 @@
 import { Navigate, Outlet, useLocation } from 'react-router';
 import { useAuth } from '../contexto/Auth';
-import { Carregando } from './Estado';
+import { Carregando, ErroCarregamento } from './Estado';
 
 export function RotaProtegida() {
-  const { usuario, carregando } = useAuth();
+  const { usuario, carregando, erro, tentarDeNovo } = useAuth();
   const location = useLocation();
   if (carregando) return <Carregando />;
+  // Falha de rede/servidor ao conferir a sessão: mandar para o login seria deslogar à toa.
+  if (erro) return <ErroCarregamento erro={erro} onTentarDeNovo={tentarDeNovo} />;
   if (!usuario) return <Navigate to="/entrar" replace state={{ de: location.pathname }} />;
   return <Outlet />;
 }

@@ -7,12 +7,31 @@ const AuthContexto = createContext(null);
 export function AuthProvider({ children }) {
   const [usuario, setUsuario] = useState(null);
   const [carregando, setCarregando] = useState(() => Boolean(tokenSalvo.obter()));
+  const [erro, setErro] = useState(null);
 
   const sair = useCallback(() => {
     finalizarSessao();
     tokenSalvo.limpar();
     setUsuario(null);
   }, []);
+
+  // Sem rede ou servidor fora do ar o token pode estar bom: guarda o erro em vez de deslogar.
+  // 401 já passa por aoSessaoExpirar; outros 4xx seguem sem usuário.
+  const buscarEu = useCallback(
+    () =>
+      api('/auth/me')
+        .then(setUsuario, (e) => {
+          if (e.status === 0 || e.status >= 500) setErro(e);
+        })
+        .finally(() => setCarregando(false)),
+    [],
+  );
+
+  const tentarDeNovo = useCallback(() => {
+    setErro(null);
+    setCarregando(true);
+    buscarEu();
+  }, [buscarEu]);
 
   useEffect(() => {
     definirAoSessaoExpirar(() => {
@@ -21,12 +40,8 @@ export function AuthProvider({ children }) {
       tokenSalvo.limpar();
       setUsuario(null);
     });
-    if (!tokenSalvo.obter()) return;
-    api('/auth/me')
-      .then(setUsuario)
-      .catch(() => {})
-      .finally(() => setCarregando(false));
-  }, []);
+    if (tokenSalvo.obter()) buscarEu();
+  }, [buscarEu]);
 
   const iniciar = useCallback(({ token, usuario }) => {
     tokenSalvo.definir(token);
@@ -46,6 +61,8 @@ export function AuthProvider({ children }) {
     () => ({
       usuario,
       carregando,
+      erro,
+      tentarDeNovo,
       entrar: async (credenciais) =>
         iniciar(await api('/auth/login', { metodo: 'POST', corpo: credenciais })),
       cadastrar: async (dados) => iniciar(await api('/auth/cadastro', { metodo: 'POST', corpo: dados })),
@@ -53,7 +70,7 @@ export function AuthProvider({ children }) {
       // Mescla dados novos (ex.: pontuacao_total depois de uma resposta) sem recarregar /auth/me.
       atualizarUsuario: (parcial) => setUsuario((atual) => (atual ? { ...atual, ...parcial } : atual)),
     }),
-    [usuario, carregando, iniciar, sair],
+    [usuario, carregando, erro, tentarDeNovo, iniciar, sair],
   );
 
   return <AuthContexto.Provider value={valor}>{children}</AuthContexto.Provider>;

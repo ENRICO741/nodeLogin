@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { erroApi, renderizarApp, USUARIO } from './utils';
+import { erroApi, renderizarApp, sequencia, USUARIO } from './utils';
 
 const SESSAO = { token: 'novo-token', usuario: USUARIO };
 const rotasLogado = { 'GET /aulas': [] };
@@ -55,6 +55,40 @@ describe('Entrar', () => {
   it('logado não vê a tela de login', async () => {
     await renderizarApp('/entrar', { rotas: rotasLogado });
     expect(await screen.findByRole('heading', { name: 'Aulas' })).toBeInTheDocument();
+  });
+});
+
+describe('sessão salva com o servidor fora do ar', () => {
+  const abrir = (eu) => {
+    localStorage.setItem('guardiao.token', 'token-teste');
+    return renderizarApp('/aulas', { usuario: null, rotas: { 'GET /auth/me': eu, ...rotasLogado } });
+  };
+
+  it('503 no /auth/me mostra "Tentar de novo" sem ir para o login; tentar com sucesso entra', async () => {
+    const { servidor } = await abrir(
+      sequencia(erroApi(503, 'INDISPONIVEL', 'Servidor indisponível'), USUARIO),
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent('Servidor indisponível');
+    expect(window.location.pathname).toBe('/aulas');
+    expect(localStorage.getItem('guardiao.token')).toBe('token-teste');
+    await userEvent.click(screen.getByRole('button', { name: /Tentar de novo/ }));
+    expect(await screen.findByRole('heading', { name: 'Aulas' })).toBeInTheDocument();
+    expect(servidor.enviados('GET /auth/me')).toHaveLength(2);
+  });
+
+  it('sem rede no /auth/me também não desloga; nova falha continua na tela de erro', async () => {
+    await abrir(new TypeError('Failed to fetch'));
+    expect(await screen.findByText('Sem conexão. Verifique sua internet')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Tentar de novo/ }));
+    expect(await screen.findByRole('button', { name: /Tentar de novo/ })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/aulas');
+    expect(screen.queryByRole('heading', { name: 'Entrar' })).not.toBeInTheDocument();
+  });
+
+  it('401 no /auth/me continua levando ao login', async () => {
+    await abrir(erroApi(401, 'NAO_AUTENTICADO', 'x'));
+    expect(await screen.findByRole('heading', { name: 'Entrar' })).toBeInTheDocument();
+    expect(localStorage.getItem('guardiao.token')).toBeNull();
   });
 });
 
