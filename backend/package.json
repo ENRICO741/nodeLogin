@@ -11,7 +11,7 @@
     "migrar": "node --env-file-if-exists=.env src/db/migrar.js",
     "seed": "node --env-file-if-exists=.env src/db/seed.js",
     "promover-admin": "node --env-file-if-exists=.env src/scripts/promover-admin.js",
-    "test": "node --test --test-concurrency=1 \"test/**/*.test.js\"",
+    "test": "node --test --test-concurrency=1 --test-timeout=120000 --test-force-exit \"test/**/*.test.js\"",
     "test:cobertura": "c8 npm test",
     "importar-aulas": "node --env-file-if-exists=.env src/scripts/importar-aulas.js"
   },

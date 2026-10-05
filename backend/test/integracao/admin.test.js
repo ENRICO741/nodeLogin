@@ -673,6 +673,8 @@ describe('GET /api/admin/estatisticas', () => {
     const u = await novoJogador();
     const segunda = (await u.api('get', '/api/aulas')).body[1];
     const detalhe = (await u.api('get', `/api/aulas/${segunda.id}`)).body;
+    // Antes de abrir a requisição: um erro no meio do encadeamento deixaria o servidor do supertest aberto.
+    assert.ok(detalhe.questoes.length, 'aula 2 sem pergunta');
     const visita = (await u.api('post', `/api/aulas/${segunda.id}/visitas`)).body;
     await u
       .api('post', `/api/visitas/${visita.id}/respostas`)
