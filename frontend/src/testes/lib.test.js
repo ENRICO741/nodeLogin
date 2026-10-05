@@ -392,7 +392,7 @@ describe('telemetria', () => {
     expect(servidor.enviados('POST /eventos')[0].sessao_id).toBe('sessao-b');
   });
 
-  it('204 ao criar sessão (consentimento retirado no servidor) não quebra nem envia eventos', async () => {
+  it('204 ao criar sessão (conta sem consentimento no servidor) não quebra nem envia eventos', async () => {
     localStorage.setItem('guardiao.token', 't');
     const servidor = servidorFalso({ 'POST /sessoes': { status: 204 } });
     telemetria.registrarEvento({ tipo_evento: 'x' });
