@@ -52,6 +52,24 @@ describe('Entrar', () => {
     expect(screen.getByRole('button', { name: 'Entrar' })).toBeEnabled();
   });
 
+  it('identificador recusado pela validação mostra a orientação junto do campo, sem aviso geral', async () => {
+    await renderizarApp('/entrar', {
+      usuario: null,
+      rotas: {
+        'POST /auth/login': erroApi(400, 'VALIDACAO', 'Dados inválidos', [
+          { campo: 'identificador', mensagem: 'Use seu e-mail ou apelido' },
+        ]),
+      },
+    });
+    const identificador = await screen.findByLabelText('E-mail ou apelido');
+    await userEvent.type(identificador, 'maria silva');
+    await userEvent.type(screen.getByLabelText('Senha'), 'y');
+    await userEvent.click(screen.getByRole('button', { name: 'Entrar' }));
+    await waitFor(() => expect(identificador).toHaveAccessibleDescription('Use seu e-mail ou apelido'));
+    expect(identificador).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('logado não vê a tela de login', async () => {
     await renderizarApp('/entrar', { rotas: rotasLogado });
     expect(await screen.findByRole('heading', { name: 'Aulas' })).toBeInTheDocument();
