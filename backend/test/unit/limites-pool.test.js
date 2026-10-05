@@ -42,3 +42,62 @@ describe('pool', () => {
     assert.equal(pool.options.connectionTimeoutMillis, 5000);
   });
 });
+
+describe('transacao (cliente falso)', () => {
+  const { EventEmitter } = require('node:events');
+  const { transacao } = require('../../src/db/pool');
+
+  function clienteFalso(falhar) {
+    const cliente = new EventEmitter();
+    cliente.comandos = [];
+    cliente.query = async (sql) => {
+      cliente.comandos.push(sql);
+      if (falhar[sql]) throw falhar[sql];
+      return { rows: [] };
+    };
+    cliente.release = () => {
+      cliente.liberado = true;
+      // Listener removido antes de devolver ao pool (lá o pool põe o dele).
+      cliente.listenersNoRelease = cliente.listenerCount('error');
+    };
+    return cliente;
+  }
+
+  test('ROLLBACK que falha: loga e rejeita com o erro original', async (t) => {
+    const original = new Error('erro original');
+    const cliente = clienteFalso({ ROLLBACK: new Error('Connection terminated') });
+    t.mock.method(pool, 'connect', async () => cliente);
+    const log = t.mock.method(console, 'error', () => {});
+    await assert.rejects(
+      transacao(async () => {
+        throw original;
+      }),
+      (erro) => erro === original,
+    );
+    assert.deepEqual(cliente.comandos, ['BEGIN', 'ROLLBACK']);
+    assert.ok(log.mock.calls.some((c) => String(c.arguments[0]).includes('falha no ROLLBACK')));
+    assert.equal(cliente.liberado, true);
+    assert.equal(cliente.listenersNoRelease, 0);
+  });
+
+  test("'error' emitido durante a transação é logado em vez de derrubar o processo", async (t) => {
+    const cliente = clienteFalso({});
+    t.mock.method(pool, 'connect', async () => cliente);
+    const log = t.mock.method(console, 'error', () => {});
+    const r = await transacao(async (c) => {
+      c.emit('error', new Error('socket caiu'));
+      return 'ok';
+    });
+    assert.equal(r, 'ok');
+    assert.ok(log.mock.calls.some((c) => String(c.arguments[0]).includes('caiu durante uma transação')));
+    assert.deepEqual(cliente.comandos, ['BEGIN', 'COMMIT']);
+    assert.equal(cliente.listenersNoRelease, 0);
+  });
+
+  test('sucesso: BEGIN, COMMIT, sem ROLLBACK', async (t) => {
+    const cliente = clienteFalso({});
+    t.mock.method(pool, 'connect', async () => cliente);
+    assert.equal(await transacao(async () => 42), 42);
+    assert.deepEqual(cliente.comandos, ['BEGIN', 'COMMIT']);
+  });
+});

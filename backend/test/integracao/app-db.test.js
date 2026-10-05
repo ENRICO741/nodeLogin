@@ -171,6 +171,35 @@ describe('banco', () => {
     assert.equal(rows.length, 0);
   });
 
+  test('banco derruba a conexão no meio da transação: rejeita com o erro original e a API segue', async (t) => {
+    const log = t.mock.method(console, 'error', () => {});
+    await assert.rejects(
+      transacao((c) => c.query('SELECT pg_terminate_backend(pg_backend_pid())')),
+      (erro) => erro.code === '57P01',
+    );
+    assert.ok(log.mock.calls.some((c) => String(c.arguments[0]).includes('falha no ROLLBACK')));
+    assert.equal((await pool.query('SELECT 1 AS ok')).rows[0].ok, 1);
+  });
+
+  test('conexão morta enquanto a transação espera: o erro vai para o log, não derruba o processo', async (t) => {
+    const log = t.mock.method(console, 'error', () => {});
+    await assert.rejects(
+      transacao(async (c) => {
+        const { rows } = await c.query('SELECT pg_backend_pid() AS pid');
+        await pool.query('SELECT pg_terminate_backend($1)', [rows[0].pid]);
+        // Dá tempo de o socket fechar e o cliente emitir 'error' sem query ativa.
+        await new Promise((resolver) => setTimeout(resolver, 300));
+        await c.query('SELECT 1');
+      }),
+    );
+    assert.ok(
+      log.mock.calls.some((c) =>
+        String(c.arguments[0]).includes('conexão com o banco caiu durante uma transação'),
+      ),
+    );
+    assert.equal((await transacao((c) => c.query('SELECT 2 AS ok'))).rows[0].ok, 2);
+  });
+
   test('transacao confirma e devolve o resultado', async () => {
     const r = await transacao(async (c) => (await c.query('SELECT 41 + 1 AS n')).rows[0].n);
     assert.equal(r, 42);

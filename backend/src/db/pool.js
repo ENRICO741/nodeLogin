@@ -9,17 +9,28 @@ const pool = new Pool({ connectionString: config.DATABASE_URL, connectionTimeout
 // Banco reiniciou/caiu: o pg avisa pelas conexões ociosas. Sem este listener o Node derruba a API.
 pool.on('error', (erro) => logger.error('conexão ociosa com o banco caiu', { erro }));
 
+// Conexão emprestada não tem o listener do pool: se o banco cair no meio da transação, o 'error'
+// sem listener derrubaria o processo. O erro chega também pela query, que rejeita.
+const aoErroNaTransacao = (erro) => logger.error('conexão com o banco caiu durante uma transação', { erro });
+
 async function transacao(fn) {
   const cliente = await pool.connect();
+  cliente.on('error', aoErroNaTransacao);
   try {
     await cliente.query('BEGIN');
     const resultado = await fn(cliente);
     await cliente.query('COMMIT');
     return resultado;
   } catch (erro) {
-    await cliente.query('ROLLBACK');
+    // Na conexão morta o ROLLBACK também falha: loga e segue com o erro original, que explica a causa.
+    try {
+      await cliente.query('ROLLBACK');
+    } catch (erroRollback) {
+      logger.error('falha no ROLLBACK', { erro: erroRollback });
+    }
     throw erro;
   } finally {
+    cliente.off('error', aoErroNaTransacao);
     cliente.release();
   }
 }
