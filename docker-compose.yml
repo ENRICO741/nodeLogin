@@ -2,6 +2,8 @@
 #   docker compose up --watch
 # App: http://localhost:5173 · API: http://localhost:4000 · E-mails: http://localhost:8025
 # Alterações em backend/src, frontend/src e conteudo/ são aplicadas sozinhas (--watch).
+# Portas só em 127.0.0.1: senha do banco, JWT_SECRET e Mailpit de dev não ficam visíveis na rede Wi-Fi.
+# Para abrir o app no celular, troque a porta do web para '5173:5173' e acesse http://<IP da máquina>:5173.
 name: guardiao-dev
 
 services:
@@ -12,7 +14,7 @@ services:
       POSTGRES_PASSWORD: app
       POSTGRES_DB: security_awareness
     ports:
-      - '5432:5432' # exposto para rodar os testes do backend a partir da máquina
+      - '127.0.0.1:5432:5432' # para rodar os testes do backend a partir da máquina
     volumes:
       - db:/var/lib/postgresql/data
       - ./deploy/dev-init.sql:/docker-entrypoint-initdb.d/dev-init.sql:ro
@@ -25,7 +27,7 @@ services:
   mailpit:
     image: axllent/mailpit:latest
     ports:
-      - '8025:8025'
+      - '127.0.0.1:8025:8025'
 
   api:
     build:
@@ -42,7 +44,7 @@ services:
       SMTP_PORT: 1025
       SMTP_REMETENTE: Guardião Impacta <no-reply@guardiao.local>
     ports:
-      - '4000:4000'
+      - '127.0.0.1:4000:4000'
     depends_on:
       db:
         condition: service_healthy
@@ -66,7 +68,7 @@ services:
     environment:
       VITE_API_PROXY: http://api:4000
     ports:
-      - '5173:5173'
+      - '127.0.0.1:5173:5173'
     depends_on:
       - api
     develop:
