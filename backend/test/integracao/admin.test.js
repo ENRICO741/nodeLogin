@@ -282,11 +282,18 @@ describe('questões de trivia', () => {
   });
 
   test('exige dificuldade válida; inexistente dá 404', async () => {
-    await admin.api('post', '/api/admin/questoes-trivia').send(questao()).expect(400);
-    await admin
-      .api('post', '/api/admin/questoes-trivia')
-      .send(questao({ dificuldade: 'extrema' }))
-      .expect(400);
+    // Com a aula informada, o 400 só pode vir da dificuldade.
+    const aula_referencia_id = (await primeiraAulaAdmin()).id;
+    for (const extra of [{}, { dificuldade: 'extrema' }]) {
+      const res = await admin
+        .api('post', '/api/admin/questoes-trivia')
+        .send(questao({ aula_referencia_id, ...extra }))
+        .expect(400);
+      assert.deepEqual(
+        res.body.erro.detalhes.map((d) => d.campo),
+        ['dificuldade'],
+      );
+    }
     await admin
       .api('patch', `/api/admin/questoes-trivia/${UUID_INEXISTENTE}`)
       .send({ pontos: 1 })
