@@ -461,13 +461,70 @@ describe('Editar aula (admin)', () => {
 });
 
 describe('Questões de trivia (admin)', () => {
+  const AULAS_TRIVIA = [
+    { id: 'a1', ordem: 1, titulo: 'Introdução à LGPD', ativo: true },
+    { id: 'a2', ordem: 2, titulo: 'O que estamos protegendo', ativo: true },
+  ];
   const LISTA = [
-    { ...QUESTAO, id: 't1', dificuldade: 'facil' },
-    { ...QUESTAO, id: 't2', dificuldade: 'dificil', ativo: false, enunciado: 'Desativada?' },
+    { ...QUESTAO, id: 't1', dificuldade: 'facil', aula_referencia_id: 'a1' },
+    {
+      ...QUESTAO,
+      id: 't2',
+      dificuldade: 'dificil',
+      ativo: false,
+      enunciado: 'Desativada?',
+      aula_referencia_id: 'a2',
+    },
   ];
 
+  it('mostra a aula de cada questão e a edição já vem com ela escolhida', async () => {
+    const { servidor } = await comoAdmin('/admin/trivia', {
+      'GET /admin/aulas': AULAS_TRIVIA,
+      'GET /admin/questoes-trivia': LISTA,
+      'PATCH /admin/questoes-trivia/t1': {},
+    });
+    const facil = await screen.findByRole('region', { name: /Fácil/ });
+    expect(within(facil).getByText(/Aula 01\. Introdução à LGPD/)).toBeInTheDocument();
+    await userEvent.click(within(facil).getByRole('button', { name: 'Editar' }));
+    expect(screen.getByLabelText('Aula')).toHaveValue('a1');
+    await userEvent.selectOptions(screen.getByLabelText('Aula'), 'a2');
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar questão' }));
+    await waitFor(() =>
+      expect(servidor.enviados('PATCH /admin/questoes-trivia/t1')[0]).toMatchObject({
+        aula_referencia_id: 'a2',
+      }),
+    );
+  });
+
+  it('criar sem escolher a aula mostra o erro do campo vindo da API', async () => {
+    const { servidor } = await comoAdmin('/admin/trivia', {
+      'GET /admin/aulas': AULAS_TRIVIA,
+      'GET /admin/questoes-trivia': LISTA,
+      'POST /admin/questoes-trivia': erroApi(400, 'VALIDACAO', 'Dados inválidos', [
+        { campo: 'aula_referencia_id', mensagem: 'Escolha a aula da questão' },
+      ]),
+    });
+    await userEvent.click(await screen.findByRole('button', { name: /Nova questão/ }));
+    expect(screen.getByLabelText('Aula')).toHaveValue('');
+    await preencherQuestao();
+    await userEvent.click(screen.getByRole('button', { name: 'Criar questão' }));
+    expect(await screen.findByText('Escolha a aula da questão')).toBeInTheDocument();
+    expect(servidor.enviados('POST /admin/questoes-trivia')[0].aula_referencia_id).toBe('');
+  });
+
+  it('erro ao carregar as aulas mostra "Tentar de novo"', async () => {
+    await comoAdmin('/admin/trivia', {
+      'GET /admin/aulas': erroApi(500, 'ERRO_INTERNO', 'Falhou'),
+      'GET /admin/questoes-trivia': LISTA,
+    });
+    expect(await screen.findByRole('button', { name: /Tentar de novo/ })).toBeInTheDocument();
+  });
+
   it('agrupa por dificuldade com contagem de ativas e nível vazio', async () => {
-    await comoAdmin('/admin/trivia', { 'GET /admin/questoes-trivia': LISTA });
+    await comoAdmin('/admin/trivia', {
+      'GET /admin/aulas': AULAS_TRIVIA,
+      'GET /admin/questoes-trivia': LISTA,
+    });
     const facil = await screen.findByRole('region', { name: /Fácil/ });
     expect(within(facil).getByText('1 ativas')).toBeInTheDocument();
     expect(
@@ -476,18 +533,22 @@ describe('Questões de trivia (admin)', () => {
     expect(within(screen.getByRole('region', { name: /Difícil/ })).getByText(/inativa/)).toBeInTheDocument();
   });
 
-  it('cria questão com dificuldade escolhida', async () => {
+  it('cria questão com dificuldade e aula escolhidas ("NN. título")', async () => {
     const { servidor } = await comoAdmin('/admin/trivia', {
+      'GET /admin/aulas': AULAS_TRIVIA,
       'GET /admin/questoes-trivia': LISTA,
       'POST /admin/questoes-trivia': { status: 201, corpo: {} },
     });
     await userEvent.click(await screen.findByRole('button', { name: /Nova questão/ }));
     await userEvent.selectOptions(screen.getByLabelText('Dificuldade'), 'media');
+    expect(screen.getByRole('option', { name: '02. O que estamos protegendo' })).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText('Aula'), 'a2');
     await preencherQuestao();
     await userEvent.click(screen.getByRole('button', { name: 'Criar questão' }));
     await waitFor(() =>
       expect(servidor.enviados('POST /admin/questoes-trivia')[0]).toMatchObject({
         dificuldade: 'media',
+        aula_referencia_id: 'a2',
         resposta_correta: 'c',
       }),
     );
@@ -497,7 +558,10 @@ describe('Questões de trivia (admin)', () => {
   });
 
   it('cancelar criação fecha o formulário', async () => {
-    await comoAdmin('/admin/trivia', { 'GET /admin/questoes-trivia': LISTA });
+    await comoAdmin('/admin/trivia', {
+      'GET /admin/aulas': AULAS_TRIVIA,
+      'GET /admin/questoes-trivia': LISTA,
+    });
     await userEvent.click(await screen.findByRole('button', { name: /Nova questão/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
     expect(screen.getByRole('button', { name: /Nova questão/ })).toBeInTheDocument();
@@ -505,6 +569,7 @@ describe('Questões de trivia (admin)', () => {
 
   it('edita, desativa e reativa', async () => {
     const { servidor } = await comoAdmin('/admin/trivia', {
+      'GET /admin/aulas': AULAS_TRIVIA,
       'GET /admin/questoes-trivia': LISTA,
       'PATCH /admin/questoes-trivia/t1': {},
       'DELETE /admin/questoes-trivia/t1': { status: 204 },
@@ -536,6 +601,7 @@ describe('Questões de trivia (admin)', () => {
   it('erro ao reativar aparece no item; o botão fica desabilitado durante a chamada', async () => {
     const reativar = pendente();
     await comoAdmin('/admin/trivia', {
+      'GET /admin/aulas': AULAS_TRIVIA,
       'GET /admin/questoes-trivia': LISTA,
       'PATCH /admin/questoes-trivia/t2': reativar.rota,
     });
@@ -550,6 +616,7 @@ describe('Questões de trivia (admin)', () => {
 
   it('pontos vazio em questão de trivia envia null', async () => {
     const { servidor } = await comoAdmin('/admin/trivia', {
+      'GET /admin/aulas': AULAS_TRIVIA,
       'GET /admin/questoes-trivia': LISTA,
       'PATCH /admin/questoes-trivia/t1': erroApi(400, 'VALIDACAO', 'Dados inválidos', [
         { campo: 'pontos', mensagem: 'Informe os pontos' },
@@ -564,7 +631,10 @@ describe('Questões de trivia (admin)', () => {
   });
 
   it('cancelar edição e erro de carregamento', async () => {
-    await comoAdmin('/admin/trivia', { 'GET /admin/questoes-trivia': LISTA });
+    await comoAdmin('/admin/trivia', {
+      'GET /admin/aulas': AULAS_TRIVIA,
+      'GET /admin/questoes-trivia': LISTA,
+    });
     const facil = await screen.findByRole('region', { name: /Fácil/ });
     await userEvent.click(within(facil).getByRole('button', { name: 'Editar' }));
     await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
@@ -574,7 +644,10 @@ describe('Questões de trivia (admin)', () => {
   });
 
   it('erro de carregamento', async () => {
-    await comoAdmin('/admin/trivia', { 'GET /admin/questoes-trivia': erroApi(500, 'E', 'Falhou') });
+    await comoAdmin('/admin/trivia', {
+      'GET /admin/aulas': AULAS_TRIVIA,
+      'GET /admin/questoes-trivia': erroApi(500, 'E', 'Falhou'),
+    });
     expect(await screen.findByRole('alert')).toHaveTextContent('Falhou');
   });
 });

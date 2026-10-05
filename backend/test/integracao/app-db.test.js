@@ -208,6 +208,46 @@ describe('banco', () => {
     assert.deepEqual(rows[0], { trivia: 10, badges: 14, nomes: 14 });
   });
 
+  test('seed em banco sem trivia liga cada questão à aula 01 (LGPD)', async () => {
+    await pool.query('DELETE FROM questoes_trivia');
+    await semear();
+    const { rows } = await pool.query(
+      `SELECT count(*)::int AS total, count(*) FILTER (WHERE a.slug = 'introducao-lgpd')::int AS lgpd
+       FROM questoes_trivia q LEFT JOIN aulas a ON a.id = q.aula_referencia_id`,
+    );
+    assert.deepEqual(rows[0], { total: 10, lgpd: 10 });
+  });
+
+  test('migration 008 liga à aula 01 as questões sem aula, sem mexer nas já ligadas', async () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const sql = fs.readFileSync(
+      path.join(__dirname, '../../src/db/migrations/008_trivia_aula_referencia.sql'),
+      'utf8',
+    );
+    const c = await pool.connect();
+    try {
+      await c.query('BEGIN');
+      const { rows: q } = await c.query('SELECT id FROM questoes_trivia ORDER BY id');
+      const outraAula = (await c.query('SELECT id FROM aulas WHERE ordem = 2')).rows[0].id;
+      // Antes da 008: questões sem aula, menos uma que o admin já tinha ligado à aula 02.
+      await c.query('UPDATE questoes_trivia SET aula_referencia_id = NULL');
+      await c.query('UPDATE questoes_trivia SET aula_referencia_id = $2 WHERE id = $1', [q[0].id, outraAula]);
+      await c.query(sql);
+      const { rows } = await c.query(
+        `SELECT a.slug, count(*)::int AS n FROM questoes_trivia q JOIN aulas a ON a.id = q.aula_referencia_id
+         GROUP BY a.slug ORDER BY a.slug`,
+      );
+      assert.deepEqual(rows, [
+        { slug: 'introducao-lgpd', n: q.length - 1 },
+        { slug: 'o-que-estamos-protegendo', n: 1 },
+      ]);
+    } finally {
+      await c.query('ROLLBACK');
+      c.release();
+    }
+  });
+
   test('banco recusa conquista com nome repetido (badges_nome_uk)', async () => {
     await assert.rejects(
       pool.query(

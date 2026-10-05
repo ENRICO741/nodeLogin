@@ -46,12 +46,18 @@ async function criarRodada(usuarioId, { dificuldade, limite }) {
       usuarioId,
       dificuldade,
     ]);
+    // Só questões de aulas que o aluno concluiu: a trivia não cobra conteúdo de aula não dada.
+    // Hoje ela só abre com as 15 concluídas, então o filtro é uma garantia (admin entra liberado).
     const { rowCount } = await c.query(
       `INSERT INTO trivia_rodada_questoes (rodada_id, questao_id, ordem)
        SELECT $1, id, row_number() OVER () FROM (
-         SELECT id FROM questoes_trivia WHERE dificuldade = $2 AND ativo ORDER BY random() LIMIT $3
+         SELECT q.id FROM questoes_trivia q
+         WHERE q.dificuldade = $2 AND q.ativo AND (${ehAdmin('$4')} OR EXISTS (
+           SELECT 1 FROM aula_visitas v
+           WHERE v.aula_id = q.aula_referencia_id AND v.usuario_id = $4 AND v.concluida))
+         ORDER BY random() LIMIT $3
        ) sorteadas`,
-      [rodada.id, dificuldade, limite],
+      [rodada.id, dificuldade, limite, usuarioId],
     );
     if (rowCount === 0) throw conflito('SEM_QUESTOES', 'Ainda não há questões para esta dificuldade');
     return obterRodada(c, rodada.id, usuarioId);
@@ -74,19 +80,24 @@ async function responder(rodadaId, usuarioId, { questao_id, alternativa }) {
     const rodada = await travarRodada(c, rodadaId, usuarioId);
 
     const { rows: questoes } = await c.query(
-      `SELECT q.resposta_correta, q.explicacao, q.pontos
+      `SELECT q.resposta_correta, q.explicacao, q.pontos,
+         CASE WHEN a.id IS NOT NULL THEN json_build_object('id', a.id, 'ordem', a.ordem, 'titulo', a.titulo)
+         END AS aula_referencia
        FROM trivia_rodada_questoes rq JOIN questoes_trivia q ON q.id = rq.questao_id
+       LEFT JOIN aulas a ON a.id = q.aula_referencia_id
        WHERE rq.rodada_id = $1 AND rq.questao_id = $2`,
       [rodadaId, questao_id],
     );
     const questao = questoes[0];
     if (!questao) throw naoEncontrado('Questão não pertence a esta rodada');
+    // aula_referencia: de onde veio a questão (o feedback do erro aponta a aula para rever).
     const resultado = (correta, pontuou, pontuacao_total) => ({
       correta,
       resposta_correta: questao.resposta_correta,
       explicacao: questao.explicacao,
       pontos_ganhos: pontuou ? questao.pontos : 0,
       pontuacao_total,
+      aula_referencia: questao.aula_referencia,
     });
 
     // Reenvio (a resposta foi gravada mas o retorno se perdeu): a mesma alternativa devolve o resultado

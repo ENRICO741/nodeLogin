@@ -200,15 +200,18 @@ describe('questões de aula', () => {
 });
 
 describe('questões de trivia', () => {
+  const primeiraAulaAdmin = async () => (await admin.api('get', '/api/admin/aulas')).body[0];
+
   test('CRUD completo e listagem ordenada por dificuldade', async () => {
+    const aula = await primeiraAulaAdmin();
     const criada = (
       await admin
         .api('post', '/api/admin/questoes-trivia')
-        .send(questao({ dificuldade: 'dificil', explicacao: 'Sempre reporte.' }))
+        .send(questao({ dificuldade: 'dificil', explicacao: 'Sempre reporte.', aula_referencia_id: aula.id }))
         .expect(201)
     ).body;
     assert.equal(criada.dificuldade, 'dificil');
-    assert.equal(criada.aula_referencia_id, null);
+    assert.equal(criada.aula_referencia_id, aula.id);
 
     const lista = (await admin.api('get', '/api/admin/questoes-trivia').expect(200)).body;
     const ordem = lista.map((q) => q.dificuldade);
@@ -235,8 +238,38 @@ describe('questões de trivia', () => {
     );
   });
 
+  test('aula de referência é obrigatória: sem ela, nula ou inválida dá 400 no campo', async () => {
+    for (const extra of [{}, { aula_referencia_id: null }, { aula_referencia_id: 'x' }]) {
+      const res = await admin
+        .api('post', '/api/admin/questoes-trivia')
+        .send(questao({ dificuldade: 'media', ...extra }))
+        .expect(400);
+      assert.deepEqual(
+        res.body.erro.detalhes.map((d) => d.campo),
+        ['aula_referencia_id'],
+      );
+    }
+    const { rows } = await pool.query(
+      'SELECT count(*)::int AS n FROM questoes_trivia WHERE aula_referencia_id IS NULL',
+    );
+    assert.equal(rows[0].n, 0);
+    // Na edição pode ficar de fora (mantém a atual), mas não pode virar nula.
+    const aula = await primeiraAulaAdmin();
+    const criada = (
+      await admin
+        .api('post', '/api/admin/questoes-trivia')
+        .send(questao({ dificuldade: 'media', aula_referencia_id: aula.id }))
+        .expect(201)
+    ).body;
+    await admin.api('patch', `/api/admin/questoes-trivia/${criada.id}`).send({ pontos: 3 }).expect(200);
+    await admin
+      .api('patch', `/api/admin/questoes-trivia/${criada.id}`)
+      .send({ aula_referencia_id: null })
+      .expect(400);
+  });
+
   test('pode referenciar uma aula existente; aula inexistente dá 400', async () => {
-    const [aula] = (await admin.api('get', '/api/admin/aulas')).body;
+    const aula = await primeiraAulaAdmin();
     const ok = await admin
       .api('post', '/api/admin/questoes-trivia')
       .send(questao({ dificuldade: 'media', aula_referencia_id: aula.id }))

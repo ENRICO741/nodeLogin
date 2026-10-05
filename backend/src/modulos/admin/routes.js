@@ -15,7 +15,8 @@ const esquemaAula = z.object({
 });
 const esquemaQuestaoTrivia = esquemaQuestao.extend({
   dificuldade: z.enum(['facil', 'media', 'dificil']),
-  aula_referencia_id: z.uuid().nullable().optional(),
+  // Obrigatória: o sorteio só usa questões de aulas concluídas e o erro aponta a aula para rever.
+  aula_referencia_id: z.uuid('Escolha a aula da questão'),
 });
 
 const COLUNAS_AULA =

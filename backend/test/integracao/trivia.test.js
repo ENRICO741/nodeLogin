@@ -73,6 +73,55 @@ describe('POST /api/trivia/rodadas', () => {
     await novaRodada(u).expect(403);
   });
 
+  test('sorteio ignora questões de aula que o aluno não concluiu (sem referência também não entra)', async () => {
+    const u = await novoJogador();
+    // Aula inativa: não segura a liberação da trivia, mas o aluno não a concluiu.
+    const { rows } = await pool.query(
+      "INSERT INTO aulas (titulo, ordem, conteudo_html, ativo) VALUES ('Não dada', 960, '<p>x</p>', false) RETURNING id",
+    );
+    // Duas difíceis a mais (6 no total): 4 elegíveis para o aluno depois de tirar as duas abaixo.
+    const { rows: extras } = await pool.query(
+      `INSERT INTO questoes_trivia (dificuldade, enunciado, alternativa_a, alternativa_b, alternativa_c,
+         alternativa_d, resposta_correta, aula_referencia_id)
+       SELECT 'dificil', 'Extra ' || n, 'a', 'b', 'c', 'd', 'a', (SELECT id FROM aulas WHERE ordem = 1)
+       FROM generate_series(1, 2) n RETURNING id`,
+    );
+    const { rows: dificeis } = await pool.query(
+      "SELECT id FROM questoes_trivia WHERE dificuldade = 'dificil' AND ativo ORDER BY criado_em",
+    );
+    const [deAulaNaoDada, semReferencia] = dificeis.map((q) => q.id);
+    await pool.query('UPDATE questoes_trivia SET aula_referencia_id = $2 WHERE id = $1', [
+      deAulaNaoDada,
+      rows[0].id,
+    ]);
+    await pool.query('UPDATE questoes_trivia SET aula_referencia_id = NULL WHERE id = $1', [semReferencia]);
+    try {
+      for (let i = 0; i < 3; i++) {
+        const ids = (await novaRodada(u, { dificuldade: 'dificil' }).expect(201)).body.questoes.map(
+          (q) => q.id,
+        );
+        assert.ok(!ids.includes(deAulaNaoDada) && !ids.includes(semReferencia), 'sorteou questão proibida');
+        assert.equal(ids.length, dificeis.length - 2);
+      }
+      // Admin confere o conteúdo: sorteia entre todas, inclusive as duas.
+      const admin = await novoAdmin();
+      const vistas = new Set();
+      for (let i = 0; i < 20 && !(vistas.has(deAulaNaoDada) && vistas.has(semReferencia)); i++) {
+        for (const q of (await novaRodada(admin, { dificuldade: 'dificil' }).expect(201)).body.questoes) {
+          vistas.add(q.id);
+        }
+      }
+      assert.ok(vistas.has(deAulaNaoDada) && vistas.has(semReferencia));
+    } finally {
+      await pool.query(
+        'UPDATE questoes_trivia SET aula_referencia_id = (SELECT id FROM aulas WHERE ordem = 1) WHERE id = ANY($1)',
+        [[deAulaNaoDada, semReferencia]],
+      );
+      await pool.query('DELETE FROM questoes_trivia WHERE id = ANY($1)', [extras.map((q) => q.id)]);
+      await pool.query('DELETE FROM aulas WHERE id = $1', [rows[0].id]);
+    }
+  });
+
   test('sorteia questões só da dificuldade pedida, sem gabarito', async () => {
     const u = await novoJogador();
     for (const [dificuldade, total] of [
@@ -105,7 +154,7 @@ describe('POST /api/trivia/rodadas', () => {
     const u = await novoJogador();
     for (let i = 0; i < 5; i++) {
       await pool.query(
-        "INSERT INTO questoes_trivia (dificuldade, enunciado, alternativa_a, alternativa_b, alternativa_c, alternativa_d, resposta_correta) VALUES ('media', $1, 'a', 'b', 'c', 'd', 'a')",
+        "INSERT INTO questoes_trivia (dificuldade, enunciado, alternativa_a, alternativa_b, alternativa_c, alternativa_d, resposta_correta, aula_referencia_id) VALUES ('media', $1, 'a', 'b', 'c', 'd', 'a', (SELECT id FROM aulas WHERE ordem = 1))",
         [`Extra ${i}`],
       );
     }
@@ -195,6 +244,30 @@ describe('POST /api/trivia/rodadas/:id/respostas', () => {
     assert.deepEqual([erro.correta, erro.pontos_ganhos, erro.pontuacao_total], [false, 0, 5]);
     assert.equal(erro.resposta_correta, certas[q2.id]);
     assert.ok(erro.explicacao);
+    // Todas as questões do seed são de LGPD: o feedback aponta a aula 01 para rever.
+    const { rows } = await pool.query("SELECT id, ordem, titulo FROM aulas WHERE slug = 'introducao-lgpd'");
+    assert.deepEqual(erro.aula_referencia, rows[0]);
+    assert.deepEqual(certo.aula_referencia, rows[0]);
+    // O reenvio idempotente também traz a aula.
+    const reenvio = (await responder(u, rodada.id, q2.id, errada(certas[q2.id])).expect(200)).body;
+    assert.deepEqual(reenvio.aula_referencia, rows[0]);
+  });
+
+  test('questão sem aula de referência (dado antigo) responde com aula_referencia null', async () => {
+    const admin = await novoAdmin(); // admin sorteia qualquer questão ativa do nível
+    const { rows } = await pool.query(
+      "UPDATE questoes_trivia SET aula_referencia_id = NULL WHERE dificuldade = 'facil' RETURNING id",
+    );
+    try {
+      const rodada = (await novaRodada(admin).expect(201)).body;
+      const res = (await responder(admin, rodada.id, rodada.questoes[0].id, 'a').expect(200)).body;
+      assert.equal(res.aula_referencia, null);
+    } finally {
+      await pool.query(
+        'UPDATE questoes_trivia SET aula_referencia_id = (SELECT id FROM aulas WHERE ordem = 1) WHERE id = ANY($1)',
+        [rows.map((r) => r.id)],
+      );
+    }
   });
 
   test('questão fora da rodada (outra dificuldade ou inexistente) dá 404', async () => {
@@ -461,7 +534,7 @@ describe('conquistas da trivia', () => {
   test('nova questão ativa no nível tira a chance de quem ainda não a respondeu', async () => {
     const u = await novoJogador();
     const { rows } = await pool.query(
-      "INSERT INTO questoes_trivia (dificuldade, enunciado, alternativa_a, alternativa_b, alternativa_c, alternativa_d, resposta_correta) VALUES ('dificil', 'Nova', 'a', 'b', 'c', 'd', 'a') RETURNING id",
+      "INSERT INTO questoes_trivia (dificuldade, enunciado, alternativa_a, alternativa_b, alternativa_c, alternativa_d, resposta_correta, aula_referencia_id) VALUES ('dificil', 'Nova', 'a', 'b', 'c', 'd', 'a', (SELECT id FROM aulas WHERE ordem = 1)) RETURNING id",
     );
     try {
       // A rodada sorteia todas as 5 difíceis; responde todas menos a nova.

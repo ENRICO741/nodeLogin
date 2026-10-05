@@ -380,6 +380,28 @@ describe('TriviaRodada', () => {
     expect(screen.getByRole('link', { name: 'Jogar outra rodada' })).toHaveAttribute('href', '/trivia');
   });
 
+  it('erro na trivia mostra o link "Rever na aula N — título"; acerto não mostra', async () => {
+    const aulaReferencia = { id: 'a7', ordem: 7, titulo: 'Senhas' };
+    await renderizarApp('/trivia/r1', {
+      rotas: {
+        'GET /trivia/rodadas/r1': RODADA,
+        'POST /trivia/rodadas/r1/respostas': sequencia(
+          feedback(false, { aula_referencia: aulaReferencia }),
+          feedback(true, { pontos_ganhos: 5, aula_referencia: aulaReferencia }),
+        ),
+      },
+    });
+    await userEvent.click(await screen.findByRole('button', { name: /^t1-A/ }));
+    expect(await screen.findByRole('link', { name: 'Rever na aula 7 — Senhas' })).toHaveAttribute(
+      'href',
+      '/aulas/a7',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Próxima pergunta' }));
+    await userEvent.click(alternativa('t2-A'));
+    expect(await screen.findByText('Resposta correta!')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Rever na aula/ })).toBeNull();
+  });
+
   it('ao recarregar, retoma da primeira pergunta não respondida', async () => {
     const meio = { ...RODADA, questoes: [{ ...RODADA.questoes[0], respondida: true }, RODADA.questoes[1]] };
     await renderizarApp('/trivia/r1', { rotas: { 'GET /trivia/rodadas/r1': meio } });

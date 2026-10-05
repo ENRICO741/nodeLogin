@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { Link } from 'react-router';
 import { Check, X } from 'lucide-react';
 import { Aviso } from './Estado';
 import styles from './QuestaoCard.module.css';
@@ -78,6 +79,14 @@ export function QuestaoCard({ quiz, textoFinal = 'Ver resultado', onFinal, final
               )}
             </p>
             {feedback.explicacao && <p className={styles.explicacao}>{feedback.explicacao}</p>}
+            {/* Trivia: errou, aponta a aula de onde veio a questão para rever o conteúdo. */}
+            {!feedback.correta && feedback.aula_referencia && (
+              <p className={styles.explicacao}>
+                <Link to={`/aulas/${feedback.aula_referencia.id}`}>
+                  Rever na aula {feedback.aula_referencia.ordem} — {feedback.aula_referencia.titulo}
+                </Link>
+              </p>
+            )}
           </div>
         )}
       </div>

@@ -170,8 +170,9 @@ async function semear() {
     if (!rows[0].tem_conteudo) {
       for (const questao of TRIVIA_QUESTOES) {
         await c.query(
-          `INSERT INTO questoes_trivia (dificuldade, ${COLUNAS_QUESTAO.join(', ')})
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          // Todas de LGPD: ligadas à aula 01 (o seed roda depois da importação das aulas).
+          `INSERT INTO questoes_trivia (dificuldade, ${COLUNAS_QUESTAO.join(', ')}, aula_referencia_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, (SELECT id FROM aulas WHERE slug = 'introducao-lgpd'))`,
           [questao.dificuldade, ...valoresQuestao(questao)],
         );
       }
