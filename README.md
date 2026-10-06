@@ -78,7 +78,7 @@ As aulas são arquivos HTML em [`conteudo/aulas/`](conteudo/), uma pasta por aul
   - `questionario_iniciado` e `questionario_concluido`, com o `momento` (ver Questionários).
 - **No banco, com data e hora:** respostas, conclusões, badges e o **histórico de pontos** (`pontuacao_historico`).
 
-**Consentimento:** ter conta é participar da pesquisa de forma anônima. O aceite é obrigatório no cadastro (sem ele, a conta não é criada) e não pode ser retirado pelo app: o perfil não tem essa opção e a API ignora o campo. Admins ficam fora da pesquisa.
+**Consentimento:** ter conta é participar da pesquisa, sem identificação pelo nome (os dados exportados são pseudonimizados). O aceite é obrigatório no cadastro (sem ele, a conta não é criada) e não pode ser retirado pelo app: o perfil não tem essa opção e a API ignora o campo. Admins ficam fora da pesquisa.
 
 **Exportação:** Admin → Estatísticas → **Dados da pesquisa** gera CSVs das visões `pesquisa_*` (migration `002`):
 

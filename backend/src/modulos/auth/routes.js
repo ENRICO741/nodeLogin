@@ -18,8 +18,8 @@ const esquemaCadastro = z.object({
   apelido,
   email,
   senha,
-  // Consentimento obrigatório para uso anônimo dos dados de uso (telemetria e pesquisa, LGPD).
-  consentiu_pesquisa: z.literal(true, 'É preciso aceitar o uso anônimo dos dados para criar a conta'),
+  // Consentimento obrigatório para uso pseudonimizado dos dados de uso (telemetria e pesquisa, LGPD).
+  consentiu_pesquisa: z.literal(true, 'É preciso aceitar o uso dos dados na pesquisa para criar a conta'),
 });
 const esquemaLogin = z.object({ identificador: identificadorLogin, senha: z.string().min(1).max(72) });
 const esquemaRedefinicao = z.object({ token: z.string().min(20).max(100), senha });

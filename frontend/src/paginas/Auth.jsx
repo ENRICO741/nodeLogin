@@ -139,7 +139,7 @@ export function Cadastro() {
             aria-invalid={erroConsentimento || porCampo.consentiu_pesquisa ? true : undefined}
             aria-describedby="consentimento-erro"
           />
-          <span>Ao criar a conta, você participa de forma anônima da pesquisa do TCC.</span>
+          <span>Ao criar a conta, você participa da pesquisa do TCC, sem identificação pelo seu nome.</span>
         </label>
         <span id="consentimento-erro" className="campo__erro" aria-live="polite">
           {erroConsentimento || porCampo.consentiu_pesquisa}

@@ -161,7 +161,7 @@ describe('Cadastro', () => {
     await userEvent.type(screen.getByLabelText('Senha'), senha);
     await userEvent.type(screen.getByLabelText('Confirme a senha'), confirmacao);
     if (consentir)
-      await userEvent.click(screen.getByRole('checkbox', { name: /participa de forma anônima da pesquisa/ }));
+      await userEvent.click(screen.getByRole('checkbox', { name: /participa da pesquisa do TCC/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Criar conta' }));
   };
 
@@ -208,7 +208,7 @@ describe('Cadastro', () => {
     const { servidor } = await renderizarApp('/cadastro', { usuario: null, rotas: {} });
     await preencher(undefined, undefined, false);
     expect(await screen.findByText('É preciso aceitar para criar a conta')).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: /participa de forma anônima da pesquisa/ })).toHaveAttribute(
+    expect(screen.getByRole('checkbox', { name: /participa da pesquisa do TCC/ })).toHaveAttribute(
       'aria-invalid',
       'true',
     );
@@ -220,12 +220,12 @@ describe('Cadastro', () => {
       usuario: null,
       rotas: {
         'POST /auth/cadastro': erroApi(400, 'VALIDACAO', 'Dados inválidos', [
-          { campo: 'consentiu_pesquisa', mensagem: 'É preciso aceitar o uso anônimo' },
+          { campo: 'consentiu_pesquisa', mensagem: 'É preciso aceitar o uso dos dados' },
         ]),
       },
     });
     await preencher();
-    expect(await screen.findByText('É preciso aceitar o uso anônimo')).toBeInTheDocument();
+    expect(await screen.findByText('É preciso aceitar o uso dos dados')).toBeInTheDocument();
   });
 
   it('erros de validação aparecem junto de cada campo, sem aviso geral', async () => {
