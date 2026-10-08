@@ -25,21 +25,21 @@ async function prepararBanco() {
   await semear();
 }
 
-// As aulas reais só têm a pergunta provisória "Terminou?" (fora das estatísticas). Para testar pontuação,
-// acertos e estatísticas, a aula 01 troca a dela por duas questões de 10 pontos (gabarito "b").
+// Quantidade e pontos das perguntas reais mudam com o conteúdo. Para os testes de pontuação, acertos e
+// estatísticas não dependerem disso, a aula 01 troca as dela por duas questões de 10 pontos (gabarito "b").
 async function questoesDeTeste() {
   const { rows } = await pool.query(
     `UPDATE questoes_aula q SET ativo = false FROM aulas a
-     WHERE a.id = q.aula_id AND a.slug = 'introducao-lgpd' AND q.chave = 'confirmacao-leitura'
+     WHERE a.id = q.aula_id AND a.slug = 'introducao-lgpd' AND q.ativo
      RETURNING q.aula_id`,
   );
-  if (!rows.length) throw new Error('aula 01 sem a pergunta confirmacao-leitura');
+  if (!rows.length) throw new Error('aula 01 sem perguntas');
   await pool.query(
     `INSERT INTO questoes_aula (aula_id, chave, ordem, enunciado, alternativa_a, alternativa_b,
        alternativa_c, alternativa_d, resposta_correta, explicacao, pontos)
-     VALUES ($1, 'teste-a', 2, 'Quem é responsável pela segurança da informação?', 'Só a TI',
+     VALUES ($1, 'teste-a', 101, 'Quem é responsável pela segurança da informação?', 'Só a TI',
        'Todos os colaboradores', 'Só o antivírus', 'Só os gestores', 'b', 'Segurança é de todos.', 10),
-            ($1, 'teste-b', 3, 'O que fazer com um e-mail urgente e inesperado?', 'Clicar logo no link',
+            ($1, 'teste-b', 102, 'O que fazer com um e-mail urgente e inesperado?', 'Clicar logo no link',
        'Verificar o remetente antes de agir', 'Encaminhar para colegas', 'Responder com a senha', 'b',
        'Pressa favorece o golpe: verifique antes.', 10)`,
     [rows[0].aula_id],

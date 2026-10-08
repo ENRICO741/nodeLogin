@@ -5,7 +5,8 @@ const duracaoMs = (inicio, fim) => `round(avg(extract(epoch FROM ${fim} - ${inic
 const ORDEM_DIFICULDADE = `array_position(ARRAY['facil', 'media', 'dificil']::varchar[], dificuldade)`;
 // Atividade de admins (testes da equipe) fica fora das métricas, como no ranking e na pesquisa.
 const deUsuario = (t) => `${t}.usuario_id IN (SELECT id FROM usuarios WHERE papel = 'usuario')`;
-// Pergunta provisória "Terminou?" das aulas 02 a 15: sempre "Sim", inflaria o % de acerto.
+// Pergunta provisória "Terminou?" que as aulas tiveram antes das perguntas reais: sempre "Sim". Saiu do
+// conteúdo, mas as respostas antigas continuam no banco e inflariam o % de acerto.
 const naoProvisoria = (q) => `${q}.chave IS DISTINCT FROM 'confirmacao-leitura'`;
 const respostasReais = `aula_respostas r JOIN questoes_aula q ON q.id = r.questao_id AND ${naoProvisoria('q')}`;
 

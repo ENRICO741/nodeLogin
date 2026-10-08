@@ -79,7 +79,7 @@ describe('GET /api/aulas', () => {
     // a2 = primeira aula (a que tem questões); a1 = a segunda.
     const [a2, a1] = (await u.api('get', '/api/aulas')).body;
     await pool.query('UPDATE aulas SET ativo = false WHERE id = $1', [a1.id]);
-    // Só uma das ativas: a provisória da aula 01 já está desativada (ver questoesDeTeste) e deve continuar.
+    // Só uma das ativas: as perguntas reais da aula 01 já estão desativadas (ver questoesDeTeste) e devem continuar.
     const { rows } = await pool.query(
       'UPDATE questoes_aula SET ativo = false WHERE id = (SELECT id FROM questoes_aula WHERE aula_id = $1 AND ativo LIMIT 1) RETURNING id',
       [a2.id],
@@ -225,18 +225,19 @@ describe('trilha em sequência', () => {
     await u.api('post', '/api/trivia/rodadas').send({ dificuldade: 'facil' }).expect(201);
   });
 
-  test('pergunta provisória das aulas 02 a 15: uma só, chave confirmacao-leitura, "Sim" correta', async () => {
+  test('aulas 02 a 15 têm perguntas próprias (chave aulaNN-…, pontos positivos), sem a provisória', async () => {
     const { rows } = await pool.query(
-      `SELECT a.ordem, q.chave, q.resposta_correta, q.alternativa_a, q.pontos
-       FROM aulas a JOIN questoes_aula q ON q.aula_id = a.id AND q.ativo WHERE a.ordem > 1 ORDER BY a.ordem`,
+      `SELECT a.ordem, count(*)::int AS n,
+         bool_and(q.chave LIKE 'aula' || lpad(a.ordem::text, 2, '0') || '-%') AS chaves_da_aula,
+         bool_and(q.pontos > 0) AS pontuam
+       FROM aulas a JOIN questoes_aula q ON q.aula_id = a.id AND q.ativo
+       WHERE a.ordem BETWEEN 2 AND 15 GROUP BY a.ordem ORDER BY a.ordem`,
     );
-    assert.equal(rows.length, 14);
-    for (const q of rows) {
-      assert.deepEqual(
-        [q.chave, q.resposta_correta, q.alternativa_a, q.pontos],
-        ['confirmacao-leitura', 'a', 'Sim', 10],
-      );
-    }
+    assert.deepEqual(
+      rows.map((r) => r.ordem),
+      Array.from({ length: 14 }, (_, i) => i + 2),
+    );
+    for (const r of rows) assert.ok(r.n > 0 && r.chaves_da_aula && r.pontuam, `aula ${r.ordem}`);
   });
 });
 
@@ -887,7 +888,7 @@ describe('POST /api/visitas/:id/finalizar', () => {
     );
   });
 
-  // Acerta a pergunta das aulas 02 a 15 (trilha liberada): para o Aluno Nota 10 só falta a aula 01.
+  // Acerta as perguntas das aulas 02 a 15 (trilha liberada): para o Aluno Nota 10 só falta a aula 01.
   async function acertarOutrasAulas(u) {
     const [, ...outras] = (await u.api('get', '/api/aulas')).body;
     for (const a of outras) await responderAula(u, a.id);
@@ -911,7 +912,7 @@ describe('POST /api/visitas/:id/finalizar', () => {
 
   test('Aluno Nota 10 exige as perguntas das outras aulas também', async () => {
     const u = await novoJogador();
-    // Sem a pergunta das aulas 02 a 15, gabaritar a aula 01 não basta.
+    // Sem as perguntas das aulas 02 a 15, gabaritar a aula 01 não basta.
     const { visita: primeira } = await responderAula(u, (await primeiraAula(u)).id);
     const fimSem = (await u.api('post', `/api/visitas/${primeira.id}/finalizar`)).body;
     assert.ok(!fimSem.novos_badges.some((b) => b.nome === 'Aluno Nota 10'));

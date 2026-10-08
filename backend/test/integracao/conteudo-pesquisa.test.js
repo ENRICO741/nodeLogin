@@ -164,7 +164,7 @@ describe('admin com aula vinda de arquivo', () => {
     const aula = await aulaPorSlug('introducao-lgpd');
     const detalhe = (await admin.api('get', `/api/admin/aulas/${aula.id}`).expect(200)).body;
     assert.equal(detalhe.slug, 'introducao-lgpd');
-    assert.equal(detalhe.questoes[0].chave, 'confirmacao-leitura');
+    assert.equal(detalhe.questoes[0].chave, 'aula01-facil-01');
     const lista = (await admin.api('get', '/api/admin/aulas')).body;
     assert.equal(lista.find((a) => a.id === aula.id).slug, 'introducao-lgpd');
 
@@ -729,7 +729,7 @@ describe('visão pesquisa_engajamento_usuario (migration 009)', () => {
 });
 
 describe('visão pesquisa_respostas (migration 010)', () => {
-  test('traz a chave da questão no fim: a provisória com confirmacao-leitura, trivia com NULL', async () => {
+  test('traz a chave da questão no fim: a de aula vem do data-pergunta, trivia com NULL', async () => {
     const { completarRodada } = require('../ajuda');
     const u = await novoJogador();
     const [, segunda] = (await u.api('get', '/api/aulas')).body;
@@ -761,7 +761,7 @@ describe('visão pesquisa_respostas (migration 010)', () => {
       assert.deepEqual(
         rows.map((r) => [r.tipo, r.chave]),
         [
-          ['aula', 'confirmacao-leitura'],
+          ['aula', 'aula02-facil-01'],
           ['trivia', null],
         ],
       );

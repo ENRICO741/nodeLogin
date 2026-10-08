@@ -671,24 +671,34 @@ describe('GET /api/admin/estatisticas', () => {
     await prepararBanco();
     admin = await novoAdmin();
     const u = await novoJogador();
-    const segunda = (await u.api('get', '/api/aulas')).body[1];
-    const detalhe = (await u.api('get', `/api/aulas/${segunda.id}`)).body;
-    // Antes de abrir a requisição: um erro no meio do encadeamento deixaria o servidor do supertest aberto.
-    assert.ok(detalhe.questoes.length, 'aula 2 sem pergunta');
-    const visita = (await u.api('post', `/api/aulas/${segunda.id}/visitas`)).body;
-    await u
-      .api('post', `/api/visitas/${visita.id}/respostas`)
-      .send({ questao_id: detalhe.questoes[0].id, alternativa: 'a' })
-      .expect(200);
-    await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200);
+    // O conteúdo já não tem a provisória, mas as respostas antigas a ela continuam no banco. Aula manual
+    // (última da trilha, liberada para o jogador) com a provisória; apagada no fim.
+    const aula = (await novaAula().expect(201)).body;
+    try {
+      const { rows: q } = await pool.query(
+        `INSERT INTO questoes_aula (aula_id, chave, enunciado, alternativa_a, alternativa_b, alternativa_c,
+           alternativa_d, resposta_correta)
+         VALUES ($1, 'confirmacao-leitura', 'Terminou?', 'Sim', 'Não', 'Ainda estou lendo', 'Vou reler depois', 'a')
+         RETURNING id`,
+        [aula.id],
+      );
+      const visita = (await u.api('post', `/api/aulas/${aula.id}/visitas`).expect(201)).body;
+      await u
+        .api('post', `/api/visitas/${visita.id}/respostas`)
+        .send({ questao_id: q[0].id, alternativa: 'a' })
+        .expect(200);
+      await u.api('post', `/api/visitas/${visita.id}/finalizar`).expect(200);
 
-    const s = (await admin.api('get', '/api/admin/estatisticas').expect(200)).body;
-    const porAula = s.aulas.find((x) => x.aula_id === segunda.id);
-    // A visita conta (mais a do novoJogador); a resposta 'Sim' não.
-    assert.deepEqual([porAula.total_concluidas, porAula.total_respostas, porAula.total_acertos], [2, 0, 0]);
-    assert.ok(!s.questoesAula.some((q) => q.questao_id === detalhe.questoes[0].id));
-    const doAluno = s.usuariosAula.find((x) => x.apelido === u.apelido && x.aula_titulo === segunda.titulo);
-    assert.deepEqual([doAluno.total_respostas, doAluno.total_acertos], [0, 0]);
+      const s = (await admin.api('get', '/api/admin/estatisticas').expect(200)).body;
+      const porAula = s.aulas.find((x) => x.aula_id === aula.id);
+      // A visita conta; a resposta 'Sim' não.
+      assert.deepEqual([porAula.total_concluidas, porAula.total_respostas, porAula.total_acertos], [1, 0, 0]);
+      assert.ok(!s.questoesAula.some((x) => x.questao_id === q[0].id));
+      const doAluno = s.usuariosAula.find((x) => x.apelido === u.apelido && x.aula_titulo === aula.titulo);
+      assert.deepEqual([doAluno.total_respostas, doAluno.total_acertos], [0, 0]);
+    } finally {
+      await pool.query('DELETE FROM aulas WHERE id = $1', [aula.id]);
+    }
   });
 
   test('questão criada pelo admin (chave NULL) entra nas questões e nos totais', async () => {
@@ -779,8 +789,9 @@ describe('GET /api/admin/estatisticas', () => {
       [0, 0, null],
     );
 
-    // Só as duas da aula 01: a provisória "Terminou?" das aulas 02 a 15 fica fora das estatísticas.
-    assert.equal(s.questoesAula.length, 2);
+    // Todas as questões cadastradas (as do conteúdo e as de teste da aula 01; nenhuma provisória).
+    const { rows: questoes } = await pool.query('SELECT count(*)::int AS n FROM questoes_aula');
+    assert.equal(s.questoesAula.length, questoes[0].n);
     assert.equal(s.questoesAula.find((q) => q.questao_id === detalhe.questoes[0].id).total_acertos, 1);
 
     assert.deepEqual(Object.keys(s.usuariosAula[0]).sort(), [
