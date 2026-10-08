@@ -105,7 +105,7 @@ Os textos ficam só em `backend/src/modulos/questionarios/definicao.js` (base: `
 
 **Codificação:**
 
-- `item`: código do .txt (`FA1`, `K3_R`, `A6`, `ABR1`…).
+- `item`: código do .txt (`FA1`, `KS3`, `A6`, `ABR1`…).
 - `valor`: escalas de concordância = 1..5 ou 1..7 (1 = Discordo totalmente); "Não vi / não usei esse recurso" (só GAM1, GAM2, GAM3 e GAM5) = 0, tratar como ausente; escolha = índice a partir de 0 na ordem do .txt (C1: 0 = Sim, 1 = Não, 2 = Não lembro); aberta = o texto; múltipla escolha (A6) = uma linha por opção marcada.
 - Item escondido por desvio não tem linha. `respondido_em` é a hora do envio, igual em todas as linhas dele.
 - Itens com final `_R` são invertidos só na análise: nota = (máximo da escala + 1) − valor. O ATN deve ser 1; quem errar sai da análise.

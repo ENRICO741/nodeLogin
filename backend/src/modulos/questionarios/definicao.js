@@ -4,7 +4,7 @@
 //
 // Codificação gravada (questionario_respostas.valor): escala = 1..N (posição do rótulo); "Não vi / não usei" = 0;
 // `opcoes` = 0..N-1 na ordem listada; aberta = o texto; múltipla escolha = uma linha por opção marcada.
-// Final _R = item invertido (só na análise). Mudar a ordem de `opcoes` muda o significado dos dados já gravados.
+// Final _R = item invertido (só na análise). KS = situação com gabarito (ver CONHECIMENTO). Mudar a ordem de `opcoes` muda o significado dos dados já gravados.
 // `se`: o bloco/item só aparece quando a resposta de `item` é `igual`. `sePre` (só no pós): a condição
 // olha a resposta do pré; o servidor resolve antes de enviar a definição.
 
@@ -36,36 +36,92 @@ const ATN = {
 };
 
 // Mesmos itens no pré e no pós: a mudança entre os dois momentos é a medida.
+// Situações (uma por área do HAIS-Q): 1 correta, 2 erradas que parecem responsáveis e "Não sei" por último.
+// Gabarito só aqui (não vai ao front): acerto = 1, erro ou "Não sei" = 0, nota = soma 0..7.
+const NAO_SEI = 'Não sei o que faria.';
 const CONHECIMENTO = [
-  { codigo: 'K1_R', texto: 'Posso informar minha senha ao suporte de TI se ele pedir por telefone.' },
   {
-    codigo: 'K2_R',
-    texto: 'Se um e-mail vem do endereço de um colega conhecido, posso clicar no link sem verificar.',
-  },
-  { codigo: 'K3_R', texto: 'Se aparece um cadeado ao lado do endereço do site, o site é confiável.' },
-  {
-    codigo: 'K4_R',
-    texto: 'Não há problema em postar nas redes sociais uma foto em que aparece meu crachá da empresa.',
-  },
-  {
-    codigo: 'K5_R',
+    codigo: 'KS1', // Senhas, aula 07. Correta: 2
     texto:
-      'Uma rede Wi-Fi pública que pede senha (por exemplo, de um café) é segura para acessar o e-mail do trabalho.',
+      'Alguém liga dizendo ser do suporte de TI. A pessoa sabe seu nome e seu setor, diz que sua conta foi bloqueada e pede sua senha para liberar. O que você faria?',
+    opcoes: [
+      'Passo a senha, já que a pessoa tem meus dados e parece ser do suporte.',
+      'Passo a senha e troco por uma nova logo depois da ligação.',
+      'Desligo e procuro o suporte pelo canal oficial da empresa.',
+      NAO_SEI,
+    ],
   },
   {
-    codigo: 'K6',
-    texto: 'Um pen drive achado em lugar público pode instalar vírus se for conectado a um computador.',
-  },
-  {
-    codigo: 'K7',
+    codigo: 'KS2', // E-mail, aulas 04-06. Correta: 1
     texto:
-      'Se eu clicar sem querer em um link suspeito, devo avisar a TI mesmo que nada pareça ter acontecido.',
+      'Chega um e-mail do endereço de um colega: "Segue o documento que você pediu", com um link. Você não lembra de ter pedido nada. O que você faria?',
+    opcoes: [
+      'Abro o link, porque o endereço é de um colega conhecido.',
+      'Confirmo com o colega por outro meio (telefone, chat da empresa) antes de abrir.',
+      'Respondo o próprio e-mail perguntando se foi ele que mandou.',
+      NAO_SEI,
+    ],
+  },
+  {
+    codigo: 'KS3', // Internet, aulas 08-09. Correta: 2
+    texto:
+      'Você recebe por mensagem uma promoção de uma loja conhecida. O site tem cadeado ao lado do endereço e pede login e cartão. O que você faria?',
+    opcoes: [
+      'Compro, porque o cadeado mostra que o site é seguro.',
+      'Compro se o site tiver o logotipo e as cores da loja.',
+      'Confiro o endereço ou entro digitando o endereço da loja antes de informar qualquer dado.',
+      NAO_SEI,
+    ],
+  },
+  {
+    codigo: 'KS4', // Redes sociais, aulas 06 e 11. Correta: 0
+    texto:
+      'No primeiro dia no emprego novo, você quer postar uma foto. Nela aparecem seu crachá e a tela do computador. O que você faria?',
+    opcoes: [
+      'Tiro outra foto (ou corto) sem o crachá e sem a tela.',
+      'Posto só para amigos, com o perfil fechado.',
+      'Posto assim, porque é só uma foto de comemoração.',
+      NAO_SEI,
+    ],
+  },
+  {
+    codigo: 'KS5', // Celular e Wi-Fi, aulas 09-10. Correta: 2
+    texto:
+      'Você está num café e precisa mandar um arquivo do trabalho com urgência. O Wi-Fi pede uma senha que está escrita no balcão. O que você faria?',
+    opcoes: [
+      'Uso o Wi-Fi do café, porque com senha a rede é protegida.',
+      'Uso o Wi-Fi do café, mas no modo anônimo do navegador.',
+      'Uso os dados móveis do celular ou a VPN da empresa.',
+      NAO_SEI,
+    ],
+  },
+  {
+    codigo: 'KS6', // Manuseio de informação, aulas 01-02 e 12. Correta: 1
+    texto:
+      'Você acha um pen drive no estacionamento da empresa com a etiqueta "Salários 2026". O que você faria?',
+    opcoes: [
+      'Conecto no meu computador para descobrir de quem é e devolver.',
+      'Entrego à TI ou à segurança sem conectar em computador nenhum.',
+      'Conecto num computador pessoal, para não arriscar a rede da empresa.',
+      NAO_SEI,
+    ],
+  },
+  {
+    codigo: 'KS7', // Incidentes, aulas 13-14. Correta: 0
+    texto:
+      'Você clicou num link de e-mail e depois percebeu que era suspeito. Aparentemente nada aconteceu. O que você faria?',
+    opcoes: [
+      'Aviso a TI logo, mesmo que nada pareça ter acontecido.',
+      'Apago o e-mail e passo um antivírus por conta própria.',
+      'Não faço nada, já que nada aconteceu.',
+      NAO_SEI,
+    ],
   },
 ];
 
 const pre = {
   tipo: 'pre',
-  versao: 1,
+  versao: 2,
   titulo: 'Boas-vindas à pesquisa',
   // Sem falar de gamificação, pontos ou ranking: o pré não pode sugerir o que se espera do app.
   abertura: [
@@ -213,8 +269,8 @@ const pre = {
     {
       id: 'conhecimento',
       titulo: 'Segurança no dia a dia',
-      intro: 'Indique o quanto você concorda com cada frase.',
-      escala: E5,
+      intro:
+        'Isto não é uma prova. Escolha o que você faria de verdade, num dia corrido, mesmo que não seja o ideal. Muita gente age diferente, e é isso que queremos entender.',
       aleatorio: true,
       itens: CONHECIMENTO,
     },
@@ -244,7 +300,7 @@ const pre = {
 
 const pos = {
   tipo: 'pos',
-  versao: 1,
+  versao: 2,
   titulo: 'Questionário final',
   // Aviso de resposta única, mostrado em destaque na abertura (antes de começar).
   aviso:
@@ -331,9 +387,7 @@ const pos = {
     {
       id: 'conhecimento',
       titulo: 'Segurança no dia a dia',
-      intro:
-        'Estas frases são as mesmas do início, de propósito: queremos ver se algo mudou. Responda pelo que você pensa hoje.',
-      escala: E5,
+      intro: 'Estas situações são as mesmas do início, de propósito. Responda pelo que você faria hoje.',
       aleatorio: true,
       itens: CONHECIMENTO,
     },

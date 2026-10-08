@@ -139,7 +139,7 @@ describe('questionário pré', () => {
     const def = (await u.api('get', '/api/questionarios/pre')).body;
     await u
       .api('post', '/api/questionarios/pre')
-      .send({ respostas: respostasCompletas(def, { A6: [1, 0], K1_R: 2 }), ordem: ['A1'], duracao_s: 600 })
+      .send({ respostas: respostasCompletas(def, { A6: [1, 0], KS1: 2 }), ordem: ['A1'], duracao_s: 600 })
       .expect(201);
 
     const linhas = await linhasDo(u.usuario.id);
@@ -148,7 +148,7 @@ describe('questionário pré', () => {
       linhas.filter((l) => l.item === 'A6').map((l) => l.valor),
       ['0', '1'],
     );
-    assert.equal(linhas.find((l) => l.item === 'K1_R').valor, '2');
+    assert.equal(linhas.find((l) => l.item === 'KS1').valor, '2');
 
     const denovo = await u.api('get', '/api/questionarios/pre').expect(409);
     assert.equal(denovo.body.erro.codigo, 'QUESTIONARIO_RESPONDIDO');
@@ -167,11 +167,11 @@ describe('questionário pré', () => {
   test('erros de validação: 400 no formato padrão, um detalhe por item, e nada é gravado', async () => {
     const u = await participante();
     const def = (await u.api('get', '/api/questionarios/pre')).body;
-    const respostas = respostasCompletas(def, { A2: 9, A6: [6, 1], K1_R: 0, XYZ: 1 });
+    const respostas = respostasCompletas(def, { A2: 9, A6: [6, 1], KS1: 4, XYZ: 1 });
     delete respostas.HXF1;
     const res = await u.api('post', '/api/questionarios/pre').send({ respostas }).expect(400);
     assert.equal(res.body.erro.codigo, 'VALIDACAO');
-    assert.deepEqual(res.body.erro.detalhes.map((d) => d.campo).sort(), ['A2', 'A6', 'HXF1', 'K1_R', 'XYZ']);
+    assert.deepEqual(res.body.erro.detalhes.map((d) => d.campo).sort(), ['A2', 'A6', 'HXF1', 'KS1', 'XYZ']);
     const { rows } = await pool.query(
       'SELECT count(*)::int AS n FROM questionario_envios WHERE usuario_id = $1',
       [u.usuario.id],

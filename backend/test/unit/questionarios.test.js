@@ -52,7 +52,7 @@ describe('definição dos questionários', () => {
 
   test('blocos e itens na ordem de docs/questionario-pesquisa.txt (ABR2 antes de ABR1)', () => {
     const UES = ['FA1', 'FA2', 'FA3', 'PU1_R', 'PU2_R', 'PU3_R', 'AE1', 'AE2', 'AE3', 'RW1', 'RW2', 'RW3'];
-    const K = ['K1_R', 'K2_R', 'K3_R', 'K4_R', 'K5_R', 'K6', 'K7'];
+    const K = ['KS1', 'KS2', 'KS3', 'KS4', 'KS5', 'KS6', 'KS7'];
     const porBloco = (def) => def.blocos.map((b) => b.itens.map((i) => i.codigo));
     assert.deepEqual(porBloco(pre), [
       ['A1', 'A2', 'A3', 'A4', 'A5', 'A6'],
@@ -71,7 +71,9 @@ describe('definição dos questionários', () => {
     ]);
     // Texto e ordem de cada escolha, copiados do .txt: o valor exportado é o índice da opção.
     const opcoes = Object.fromEntries(
-      [...itens(pre), ...itens(pos)].filter((i) => i.opcoes).map((i) => [i.codigo, i.opcoes]),
+      [...itens(pre), ...itens(pos)]
+        .filter((i) => i.opcoes && !K.includes(i.codigo))
+        .map((i) => [i.codigo, i.opcoes]),
     );
     assert.deepEqual(opcoes, {
       A1: ['18–24', '25–34', '35–44', '45–54', '55 ou mais'],
@@ -123,9 +125,18 @@ describe('definição dos questionários', () => {
       MOT: ['Pontos', 'Conquistas', 'Ranking', 'Trivia', 'Explicações depois das respostas', 'Nenhum deles'],
       CMP: ['Muito pior', 'Pior', 'Igual', 'Melhor', 'Muito melhor', 'Não lembro o suficiente para comparar'],
     });
+    // Situações: 4 opções, "Não sei" por último, sem escala no bloco e iguais no pré e no pós.
+    for (const def of [pre, pos]) {
+      const bloco = def.blocos.find((b) => b.id === 'conhecimento');
+      assert.equal(bloco.escala, undefined);
+      for (const i of bloco.itens) {
+        assert.equal(i.opcoes.length, 4, i.codigo);
+        assert.equal(i.opcoes[3], 'Não sei o que faria.', i.codigo);
+      }
+    }
     assert.deepEqual(
-      itens(pre).find((i) => i.codigo === 'K1_R'),
-      itens(pos).find((i) => i.codigo === 'K1_R'),
+      itens(pre).filter((i) => K.includes(i.codigo)),
+      itens(pos).filter((i) => K.includes(i.codigo)),
     );
   });
 
@@ -274,20 +285,33 @@ describe('validarRespostas', () => {
         A1: 5,
         A2: -1,
         A3: 1.5,
-        K1_R: 0,
-        K2_R: 6,
+        FA1: 0,
+        FA2: 6,
+        KS1: 4,
+        KS2: -1,
         HXP1: 8,
         HXP4: '3',
         A6: 0,
       }),
     });
-    assert.deepEqual(Object.keys(erros).sort(), ['A1', 'A2', 'A3', 'A6', 'HXP1', 'HXP4', 'K1_R', 'K2_R']);
+    assert.deepEqual(Object.keys(erros).sort(), [
+      'A1',
+      'A2',
+      'A3',
+      'A6',
+      'FA1',
+      'FA2',
+      'HXP1',
+      'HXP4',
+      'KS1',
+      'KS2',
+    ]);
     assert.ok(Object.values(erros).every((m) => m === 'Resposta inválida'));
   });
 
   test('bordas válidas: 1 e máximo da escala, última opção, 7 no Hexad', () => {
     assert.doesNotThrow(() =>
-      validarRespostas(pre, { respostas: respostasValidas(pre, { K1_R: 1, K2_R: 5, HXF3: 7, A4: 8 }) }),
+      validarRespostas(pre, { respostas: respostasValidas(pre, { FA1: 1, FA2: 5, HXF3: 7, A4: 8, KS1: 3 }) }),
     );
   });
 
