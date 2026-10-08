@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 import { AuthProvider } from './contexto/Auth';
 import { ErrorBoundary } from './componentes/ErrorBoundary';
 import { AvisoAtualizacao } from './componentes/AvisoAtualizacao';
+import { AvisoInstalar } from './componentes/AvisoInstalar';
 import { Layout } from './componentes/Layout';
 import { RotaAdmin, RotaProtegida, RotaPublica } from './componentes/Rotas';
 import { Cadastro, Entrar, EsqueciSenha, RedefinirSenha } from './paginas/Auth';
@@ -56,6 +57,7 @@ export function App() {
             <Route path="*" element={<Navigate to="/aulas" replace />} />
           </Routes>
         </BrowserRouter>
+        <AvisoInstalar />
         <AvisoAtualizacao />
       </AuthProvider>
     </ErrorBoundary>

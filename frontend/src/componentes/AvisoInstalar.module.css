@@ -1,0 +1,58 @@
+/* Mesmo bloco do aviso de atualização, com X no canto e barra de tempo no rodapé. */
+.aviso {
+  composes: aviso from './AvisoAtualizacao.module.css';
+  overflow: hidden;
+  padding-right: calc(var(--esp-4) + 2rem);
+}
+
+.fechar {
+  position: absolute;
+  top: var(--esp-2);
+  right: var(--esp-2);
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--raio-sm);
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+.fechar:hover {
+  background: var(--cor-borda);
+}
+
+/* A barra é o timer: o fim da animação fecha o aviso (onAnimationEnd). */
+.tempo {
+  --duracao: 8s;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--cor-primaria);
+  transform-origin: left;
+  animation: encolher var(--duracao) linear forwards;
+}
+/* Quem está lendo ou com o foco no aviso ganha tempo. */
+.aviso:hover .tempo,
+.aviso:focus-within .tempo {
+  animation-play-state: paused;
+}
+/* base.css zera animações com movimento reduzido; aqui a barra é informação, não enfeite. */
+@media (prefers-reduced-motion: reduce) {
+  .tempo {
+    animation-duration: var(--duracao) !important;
+  }
+}
+
+@keyframes encolher {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}

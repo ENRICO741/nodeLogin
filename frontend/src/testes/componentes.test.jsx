@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { useRegisterSW } from 'virtual:pwa-register/react';
@@ -10,9 +10,10 @@ import { Avatar } from '../componentes/Avatar';
 import { CardResultado } from '../componentes/CardResultado';
 import { ErrorBoundary } from '../componentes/ErrorBoundary';
 import { AvisoAtualizacao } from '../componentes/AvisoAtualizacao';
+import { AvisoInstalar } from '../componentes/AvisoInstalar';
 import { QuestaoCard } from '../componentes/QuestaoCard';
 import { AuthProvider } from '../contexto/Auth';
-import { ADMIN, servidorFalso } from './utils';
+import { ADMIN, USUARIO, servidorFalso } from './utils';
 
 describe('Campo', () => {
   it('input com label associado', () => {
@@ -353,6 +354,167 @@ describe('AvisoAtualizacao', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Depois' }));
     expect(esconder).toHaveBeenCalledWith(false);
     useRegisterSW.mockReturnValue({ needRefresh: [false, vi.fn()], updateServiceWorker: vi.fn() });
+  });
+});
+
+describe('AvisoInstalar', () => {
+  const DIA = 24 * 60 * 60 * 1000;
+  const disparar = () => {
+    const e = new Event('beforeinstallprompt', { cancelable: true });
+    e.prompt = vi.fn();
+    act(() => window.dispatchEvent(e));
+    return e;
+  };
+  const userAgent = (ua) => vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(ua);
+  const barra = () => document.querySelector('[aria-hidden="true"][class*="tempo"]');
+  // Monta com sessão (ou sem) e espera o /auth/me responder.
+  const abrir = async ({ logado = true } = {}) => {
+    if (logado) localStorage.setItem('guardiao.token', 'token-teste');
+    servidorFalso({ 'GET /auth/me': USUARIO });
+    const r = render(
+      <AuthProvider>
+        <AvisoInstalar />
+      </AuthProvider>,
+    );
+    await act(() => new Promise((ok) => setTimeout(ok, 0)));
+    return r;
+  };
+
+  it('não aparece enquanto o navegador não diz que dá para instalar', async () => {
+    await abrir();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('deslogado (tela de login): não aparece', async () => {
+    await abrir({ logado: false });
+    disparar();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('evento antes do login não se perde: aparece assim que a sessão carrega', async () => {
+    localStorage.setItem('guardiao.token', 'token-teste');
+    servidorFalso({ 'GET /auth/me': USUARIO });
+    render(
+      <AuthProvider>
+        <AvisoInstalar />
+      </AuthProvider>,
+    );
+    disparar();
+    expect(await screen.findByRole('status')).toBeInTheDocument();
+  });
+
+  it('convite com barra de tempo; Instalar app abre o diálogo e fecha o aviso', async () => {
+    await abrir();
+    const e = disparar();
+    expect(e.defaultPrevented).toBe(true);
+    expect(screen.getByRole('status')).toHaveTextContent('Você sabia que também pode instalar o Guardião?');
+    expect(barra()).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Instalar app' }));
+    expect(e.prompt).toHaveBeenCalled();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('fim da barra de tempo fecha sozinho', async () => {
+    await abrir();
+    disparar();
+    // jsdom não tem AnimationEvent, então o React escuta a versão webkit; dispara as duas.
+    fireEvent.animationEnd(barra());
+    fireEvent(barra(), new Event('webkitAnimationEnd', { bubbles: true }));
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it.each(['Fechar', 'Agora não'])('%s fecha sem abrir o diálogo', async (nome) => {
+    await abrir();
+    const e = disparar();
+    await userEvent.click(screen.getByRole('button', { name: nome }));
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(e.prompt).not.toHaveBeenCalled();
+  });
+
+  it('appinstalled esconde o aviso', async () => {
+    await abrir();
+    disparar();
+    act(() => window.dispatchEvent(new Event('appinstalled')));
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('periódico: some por 3 dias depois de mostrado e volta depois disso', async () => {
+    const agora = vi.spyOn(Date, 'now').mockReturnValue(10 * DIA);
+    const { unmount } = await abrir();
+    disparar();
+    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(localStorage.getItem('instalar-mostrado-em')).toBe(String(10 * DIA));
+    unmount();
+
+    agora.mockReturnValue(13 * DIA - 1);
+    const segunda = await abrir();
+    disparar();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    segunda.unmount();
+
+    agora.mockReturnValue(13 * DIA);
+    await abrir();
+    disparar();
+    expect(screen.getByRole('status')).toBeInTheDocument();
+  });
+
+  it('já aberto como app instalado: nunca aparece', async () => {
+    window.matchMedia = vi.fn(() => ({ matches: true }));
+    await abrir();
+    disparar();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    delete window.matchMedia;
+  });
+
+  it('iPhone: sem API de instalação, ensina o caminho pelo Compartilhar', async () => {
+    userAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)');
+    await abrir();
+    expect(screen.getByRole('status')).toHaveTextContent('Adicionar à Tela de Início');
+    expect(screen.queryByRole('button', { name: 'Instalar app' })).not.toBeInTheDocument();
+    expect(barra()).toBeInTheDocument();
+  });
+
+  it('iPhone deslogado: também não aparece', async () => {
+    userAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)');
+    await abrir({ logado: false });
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('iPad (se apresenta como Mac, mas tem toque) também recebe a instrução', async () => {
+    userAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)');
+    Object.defineProperty(navigator, 'maxTouchPoints', { value: 5, configurable: true });
+    await abrir();
+    expect(screen.getByRole('status')).toHaveTextContent('Compartilhar');
+    delete navigator.maxTouchPoints;
+  });
+
+  it('Mac de verdade (sem toque) não recebe instrução de iOS', async () => {
+    userAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)');
+    await abrir();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  // Falha só na chave do convite; o token da sessão continua funcionando.
+  const quebrarStorage = (metodo) => {
+    const original = Storage.prototype[metodo];
+    vi.spyOn(Storage.prototype, metodo).mockImplementation(function (chave, ...resto) {
+      if (chave === 'instalar-mostrado-em') throw new Error('bloqueado');
+      return original.call(this, chave, ...resto);
+    });
+  };
+
+  it('localStorage sem leitura: não quebra e não mostra', async () => {
+    quebrarStorage('getItem');
+    await abrir();
+    disparar();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('localStorage sem gravação: mostra mesmo assim', async () => {
+    quebrarStorage('setItem');
+    await abrir();
+    disparar();
+    expect(screen.getByRole('status')).toBeInTheDocument();
   });
 });
 
