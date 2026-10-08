@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useQuiz } from '../hooks/useQuiz';
+import { embaralhar, useQuiz } from '../hooks/useQuiz';
 import { QuestaoCard } from '../componentes/QuestaoCard';
 import { ErroApi } from '../lib/api';
 
@@ -189,5 +189,120 @@ describe('quiz', () => {
     await userEvent.click(opcao('A'));
     await userEvent.click(await screen.findByRole('button', { name: 'Ver resultado' }));
     expect(onFinal).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('embaralhar', () => {
+  it('devolve as mesmas letras, sem mexer na lista original', () => {
+    const letras = ['a', 'b', 'c', 'd'];
+    const sorteadas = embaralhar(letras);
+    expect([...sorteadas].sort()).toEqual(letras);
+    expect(letras).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  it('lista vazia ou de um item volta igual', () => {
+    expect(embaralhar([])).toEqual([]);
+    expect(embaralhar(['a'])).toEqual(['a']);
+  });
+
+  it('cada letra cai em cada posição com a mesma chance (~25%)', () => {
+    const n = 24000;
+    const contagem = { a: [0, 0, 0, 0], b: [0, 0, 0, 0], c: [0, 0, 0, 0], d: [0, 0, 0, 0] };
+    for (let i = 0; i < n; i++) embaralhar(['a', 'b', 'c', 'd']).forEach((l, pos) => contagem[l][pos]++);
+    // Desvio padrão de cada contagem ~67; 2 pontos percentuais (480) é folga de mais de 7 desvios.
+    for (const posicoes of Object.values(contagem)) {
+      for (const c of posicoes) expect(Math.abs(c / n - 0.25)).toBeLessThan(0.02);
+    }
+  });
+});
+
+describe('ordem das alternativas', () => {
+  // Texto dos botões de alternativa, na ordem da tela.
+  const naTela = () =>
+    screen
+      .getAllByRole('button')
+      .filter((b) => b.textContent.includes('Opção'))
+      .map((b) => b.textContent.slice(1, 8));
+  const letrasNaTela = () =>
+    screen
+      .getAllByRole('button')
+      .filter((b) => b.textContent.includes('Opção'))
+      .map((b) => b.textContent[0]);
+
+  it('sorteada: a letra da tela segue a posição, mas a resposta vai com a letra original', async () => {
+    // Math.random sempre 0: o Fisher-Yates dá a ordem b, c, d, a.
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+    const enviarResposta = vi
+      .fn()
+      .mockResolvedValue({ correta: false, resposta_correta: 'a', pontos_ganhos: 0 });
+    try {
+      render(<Quiz enviarResposta={enviarResposta} />);
+      expect(naTela()).toEqual(['Opção B', 'Opção C', 'Opção D', 'Opção A']);
+      expect(letrasNaTela()).toEqual(['A', 'B', 'C', 'D']);
+
+      // Primeiro botão (letra "A" na tela) é a alternativa original b.
+      await userEvent.click(screen.getAllByRole('button')[0]);
+      expect(enviarResposta).toHaveBeenCalledWith('q1', 'b');
+      // A correta (original a) aparece marcada na última posição; a ordem não muda depois da resposta.
+      expect(await screen.findByLabelText('Resposta correta')).toBeInTheDocument();
+      expect(opcao('A')).toContainElement(screen.getByLabelText('Resposta correta'));
+      expect(opcao('B')).toContainElement(screen.getByLabelText('Sua resposta, incorreta'));
+      expect(naTela()).toEqual(['Opção B', 'Opção C', 'Opção D', 'Opção A']);
+    } finally {
+      random.mockRestore();
+    }
+  });
+
+  it('Math.random perto de 1 mantém a ordem original (caso de borda do sorteio)', () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.9999);
+    try {
+      render(<Quiz enviarResposta={vi.fn()} />);
+      expect(naTela()).toEqual(['Opção A', 'Opção B', 'Opção C', 'Opção D']);
+    } finally {
+      random.mockRestore();
+    }
+  });
+
+  it('cada tentativa sorteia de novo; na mesma tentativa a ordem fica', async () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+    const enviarResposta = vi
+      .fn()
+      .mockResolvedValue({ correta: true, resposta_correta: 'b', pontos_ganhos: 0 });
+    try {
+      const { unmount } = render(<Quiz enviarResposta={enviarResposta} />);
+      expect(naTela()).toEqual(['Opção B', 'Opção C', 'Opção D', 'Opção A']);
+      unmount();
+
+      // Nova tentativa (quiz montado de novo) com outro sorteio.
+      random.mockReturnValue(0.9999);
+      render(<Quiz enviarResposta={enviarResposta} />);
+      expect(naTela()).toEqual(['Opção A', 'Opção B', 'Opção C', 'Opção D']);
+      // Mudar o Math.random no meio da tentativa não reordena: o sorteio é feito uma vez, ao abrir.
+      random.mockReturnValue(0);
+      await userEvent.click(opcao('B'));
+      expect(await screen.findByText('Resposta correta!')).toBeInTheDocument();
+      expect(naTela()).toEqual(['Opção A', 'Opção B', 'Opção C', 'Opção D']);
+    } finally {
+      random.mockRestore();
+    }
+  });
+
+  it('erro da API não reordena: a nova tentativa de resposta usa a mesma ordem', async () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+    const enviarResposta = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('Sem conexão.'))
+      .mockResolvedValueOnce({ correta: true, resposta_correta: 'c', pontos_ganhos: 10 });
+    try {
+      render(<Quiz enviarResposta={enviarResposta} />);
+      await userEvent.click(opcao('C'));
+      expect(await screen.findByRole('alert')).toHaveTextContent('Sem conexão.');
+      expect(naTela()).toEqual(['Opção B', 'Opção C', 'Opção D', 'Opção A']);
+      await userEvent.click(opcao('C'));
+      expect(await screen.findByText('Resposta correta!')).toBeInTheDocument();
+      expect(enviarResposta.mock.calls.map(([, alt]) => alt)).toEqual(['c', 'c']);
+    } finally {
+      random.mockRestore();
+    }
   });
 });

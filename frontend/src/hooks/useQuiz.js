@@ -1,4 +1,16 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+
+const LETRAS = ['a', 'b', 'c', 'd'];
+
+// Fisher-Yates: cada uma das 24 ordens com a mesma chance.
+export function embaralhar(lista) {
+  const copia = [...lista];
+  for (let i = copia.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copia[i], copia[j]] = [copia[j], copia[i]];
+  }
+  return copia;
+}
 
 // Máquina de estado do quiz, compartilhada por aulas e trivia.
 // `enviarResposta(questaoId, alternativa)` devolve o feedback do servidor.
@@ -12,6 +24,10 @@ export function useQuiz({ questoes, enviarResposta, aoResponder, indiceInicial =
   // Alternativas cujo envio falhou por rede/5xx: o servidor pode ter gravado uma delas sem o retorno chegar.
   // Todas, não só a última: com a rede caindo, a gravada pode ter sido a primeira tentativa.
   const semRetorno = useRef(new Set());
+
+  // Ordem das alternativas sorteada a cada tentativa (cada vez que o quiz abre), para a posição da correta
+  // não ser previsível. Só a exibição muda: a resposta vai com a letra original.
+  const ordens = useMemo(() => questoes.map(() => embaralhar(LETRAS)), [questoes]);
 
   const questao = questoes[indice];
 
@@ -67,6 +83,7 @@ export function useQuiz({ questoes, enviarResposta, aoResponder, indiceInicial =
 
   return {
     questao,
+    ordem: ordens[indice],
     indice,
     total: questoes.length,
     ultima: indice === questoes.length - 1,

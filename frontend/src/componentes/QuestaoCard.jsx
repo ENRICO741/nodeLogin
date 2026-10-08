@@ -8,6 +8,8 @@ const LETRAS = ['a', 'b', 'c', 'd'];
 
 export function QuestaoCard({ quiz, textoFinal = 'Ver resultado', onFinal, finalizando = false }) {
   const { questao, indice, total, ultima, escolha, feedback, enviando, erro, responder, avancar } = quiz;
+  // `ordem`: letras originais na ordem sorteada da tentativa. A letra mostrada é a da posição na tela.
+  const ordem = quiz.ordem ?? LETRAS;
   const botaoProximaRef = useRef(null);
 
   // Depois da resposta, o foco vai para o botão de avançar (leitores de tela ouvem o feedback antes).
@@ -42,7 +44,7 @@ export function QuestaoCard({ quiz, textoFinal = 'Ver resultado', onFinal, final
       </h2>
 
       <div className={styles.alternativas}>
-        {LETRAS.map((letra) => {
+        {ordem.map((letra, posicao) => {
           const correta = feedback && letra === feedback.resposta_correta;
           const erradaEscolhida = feedback && letra === escolha && !feedback.correta;
           const estado = correta ? styles.correta : erradaEscolhida ? styles.errada : '';
@@ -56,7 +58,7 @@ export function QuestaoCard({ quiz, textoFinal = 'Ver resultado', onFinal, final
               onClick={() => responder(letra)}
             >
               <span className={styles.letra} aria-hidden="true">
-                {letra.toUpperCase()}
+                {LETRAS[posicao].toUpperCase()}
               </span>
               <span className={styles.textoAlternativa}>{questao[`alternativa_${letra}`]}</span>
               {correta && <Check aria-label="Resposta correta" size={20} />}
