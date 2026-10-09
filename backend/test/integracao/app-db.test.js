@@ -205,46 +205,50 @@ describe('banco', () => {
               (SELECT count(*)::int FROM badges) AS badges,
               (SELECT count(DISTINCT nome)::int FROM badges) AS nomes`,
     );
-    assert.deepEqual(rows[0], { trivia: 10, badges: 14, nomes: 14 });
+    assert.deepEqual(rows[0], { trivia: 180, badges: 14, nomes: 14 });
   });
 
-  test('seed em banco sem trivia liga cada questão à aula 01 (LGPD)', async () => {
+  test('seed em banco sem trivia liga cada questão à sua aula: 4 por nível em cada uma das 15', async () => {
     await pool.query('DELETE FROM questoes_trivia');
     await semear();
     const { rows } = await pool.query(
-      `SELECT count(*)::int AS total, count(*) FILTER (WHERE a.slug = 'introducao-lgpd')::int AS lgpd
-       FROM questoes_trivia q LEFT JOIN aulas a ON a.id = q.aula_referencia_id`,
+      `SELECT a.slug, q.dificuldade, count(*)::int AS n
+       FROM questoes_trivia q LEFT JOIN aulas a ON a.id = q.aula_referencia_id GROUP BY 1, 2`,
     );
-    assert.deepEqual(rows[0], { total: 10, lgpd: 10 });
+    assert.equal(rows.length, 15 * 3);
+    assert.ok(rows.every((r) => r.slug && r.n === 4));
   });
 
   test('seed que rodou antes da aula 01 existir: a subida seguinte liga as questões sem aula', async () => {
     const { rows: aula } = await pool.query("SELECT id FROM aulas WHERE slug = 'introducao-lgpd'");
-    const outra = (await pool.query('SELECT id FROM aulas WHERE ordem = 2')).rows[0].id;
-    const { rows: q } = await pool.query('SELECT id FROM questoes_trivia ORDER BY id');
-    // Simula o seed sem a aula 01: todas sem aula, menos uma que o admin ligou à aula 02.
+    const [outra, terceira] = (await pool.query('SELECT id FROM aulas WHERE ordem IN (2, 3) ORDER BY ordem'))
+      .rows;
+    const { rows: q } = await pool.query('SELECT id FROM questoes_trivia WHERE aula_referencia_id = $1', [
+      terceira.id,
+    ]);
+    // Simula o seed sem a aula 01: todas sem aula, menos uma (da aula 03) que o admin ligou à aula 02.
     await pool.query('UPDATE questoes_trivia SET aula_referencia_id = NULL');
-    await pool.query('UPDATE questoes_trivia SET aula_referencia_id = $2 WHERE id = $1', [q[0].id, outra]);
+    await pool.query('UPDATE questoes_trivia SET aula_referencia_id = $2 WHERE id = $1', [q[0].id, outra.id]);
+    const semAula = async () =>
+      (await pool.query('SELECT count(*)::int AS n FROM questoes_trivia WHERE aula_referencia_id IS NULL'))
+        .rows[0].n;
     try {
-      // Aula 01 ainda ausente (slug trocado): nada acontece e nada quebra.
+      // Aula 01 ainda ausente (slug trocado): as das outras aulas voltam, as 12 da aula 01 esperam, nada quebra.
       await pool.query("UPDATE aulas SET slug = 'temporario' WHERE id = $1", [aula[0].id]);
       await semear();
-      const semAula = (
-        await pool.query('SELECT count(*)::int AS n FROM questoes_trivia WHERE aula_referencia_id IS NULL')
-      ).rows[0].n;
-      assert.equal(semAula, q.length - 1);
+      assert.equal(await semAula(), 12);
       await pool.query("UPDATE aulas SET slug = 'introducao-lgpd' WHERE id = $1", [aula[0].id]);
       await semear();
-      const { rows } = await pool.query(
-        'SELECT aula_referencia_id, count(*)::int AS n FROM questoes_trivia GROUP BY 1 ORDER BY n DESC',
-      );
-      assert.deepEqual(rows, [
-        { aula_referencia_id: aula[0].id, n: q.length - 1 },
-        { aula_referencia_id: outra, n: 1 },
+      assert.equal(await semAula(), 0);
+      // A escolha do admin fica.
+      const { rows } = await pool.query('SELECT aula_referencia_id FROM questoes_trivia WHERE id = $1', [
+        q[0].id,
       ]);
+      assert.equal(rows[0].aula_referencia_id, outra.id);
     } finally {
       await pool.query("UPDATE aulas SET slug = 'introducao-lgpd' WHERE id = $1", [aula[0].id]);
-      await pool.query('UPDATE questoes_trivia SET aula_referencia_id = $1', [aula[0].id]);
+      await pool.query('UPDATE questoes_trivia SET aula_referencia_id = NULL');
+      await semear();
     }
   });
 

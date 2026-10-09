@@ -812,7 +812,7 @@ describe('GET /api/admin/estatisticas', () => {
       [['media', 1, 0, 1]],
     );
     assert.equal(s.trivia[0].duracao_media_ms, null, 'rodada aberta não tem duração');
-    assert.equal(s.questoesTrivia.length, 10);
+    assert.equal(s.questoesTrivia.length, 180); // lista também as desativadas
     assert.deepEqual(
       s.usuariosTrivia.map((t) => [t.apelido, t.dificuldade, t.total_respostas]),
       [[u.apelido, 'media', 1]],

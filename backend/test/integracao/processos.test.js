@@ -59,7 +59,7 @@ describe('scripts de banco', () => {
       const repetida = await rodarNode(['src/scripts/importar-aulas.js'], env);
       assert.match(repetida.saida, /0 nova\(s\), 0 atualizada\(s\), 15 sem mudança/);
       const seed = await rodarNode(['src/db/seed.js'], env);
-      assert.match(seed.saida, /"mensagem":"seed aplicado","trivia":10/);
+      assert.match(seed.saida, /"mensagem":"seed aplicado","trivia":180/);
     } finally {
       await pool.query(`DROP DATABASE IF EXISTS ${nome} WITH (FORCE)`);
     }

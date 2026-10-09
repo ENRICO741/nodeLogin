@@ -23,6 +23,23 @@ async function prepararBanco() {
   if (erros.length) throw new Error(`conteudo/aulas inválido: ${erros.join('; ')}`);
   await questoesDeTeste();
   await semear();
+  await triviaDeTeste();
+}
+
+// A trivia real tem 60 questões por nível, de todas as aulas. Os testes de sorteio e conquistas contam
+// com um banco pequeno: ficam ativas só 3 fáceis, 3 médias e 4 difíceis da aula 01.
+async function triviaDeTeste() {
+  const { rowCount } = await pool.query(
+    `UPDATE questoes_trivia q SET ativo = false
+     WHERE q.ativo AND q.id NOT IN (
+       SELECT id FROM (
+         SELECT t.id, t.dificuldade,
+           row_number() OVER (PARTITION BY t.dificuldade ORDER BY t.enunciado) AS n
+         FROM questoes_trivia t JOIN aulas a ON a.id = t.aula_referencia_id
+         WHERE a.slug = 'introducao-lgpd'
+       ) s WHERE n <= CASE dificuldade WHEN 'dificil' THEN 4 ELSE 3 END)`,
+  );
+  if (!rowCount) throw new Error('trivia sem questões');
 }
 
 // Quantidade e pontos das perguntas reais mudam com o conteúdo. Para os testes de pontuação, acertos e
