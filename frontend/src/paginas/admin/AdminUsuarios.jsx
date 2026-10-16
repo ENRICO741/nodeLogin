@@ -148,22 +148,24 @@ export function AdminUsuarios() {
             <table className={styles.tabela}>
               <thead>
                 <tr>
-                  {['Foto', 'Nome', 'E-mail', 'Administrador', 'Senha'].map((c) => (
-                    <th key={c} scope="col">
+                  {['#', 'Foto', 'Nome', 'Apelido', 'E-mail', 'Administrador', 'Senha'].map((c) => (
+                    <th key={c} scope="col" className={c === '#' ? styles.numero : undefined}>
                       {c}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {usuarios.flatMap((u) => {
+                {usuarios.flatMap((u, i) => {
                   const proprio = u.id === eu.id;
                   const linha = (
                     <tr key={u.id}>
+                      <td className={styles.numero}>{i + 1}</td>
                       <td>
                         <Avatar url={u.foto_perfil_url} nome={u.nome} />
                       </td>
                       <td>{u.nome}</td>
+                      <td style={{ overflowWrap: 'anywhere' }}>{u.apelido}</td>
                       <td style={{ overflowWrap: 'anywhere' }}>{u.email}</td>
                       <td>
                         <label className="campo-check">
@@ -202,7 +204,7 @@ export function AdminUsuarios() {
                   return [
                     linha,
                     <tr key={`${u.id}-senha`}>
-                      <td colSpan={5}>
+                      <td colSpan={7}>
                         <FormSenha
                           usuario={u}
                           aoCancelar={() => fecharSenha(u.id)}

@@ -687,7 +687,7 @@ describe('Usuários (admin)', () => {
     screen
       .getAllByRole('row')
       .slice(1)
-      .map((tr) => within(tr).getAllByRole('cell')[1].textContent);
+      .map((tr) => within(tr).getAllByRole('cell')[2].textContent);
   const caixa = (nome) => screen.getByRole('checkbox', { name: `Administrador: ${nome}` });
   const linha = (nome) => screen.getByRole('cell', { name: nome }).closest('tr');
   const botaoSenha = (nome) => screen.getByRole('button', { name: `Redefinir senha de ${nome}` });
@@ -697,8 +697,10 @@ describe('Usuários (admin)', () => {
     await comoAdmin('/admin/usuarios', { 'GET /admin/usuarios': LISTA });
     expect(await screen.findByText('maria@empresa.com')).toBeInTheDocument();
     expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toEqual([
+      '#',
       'Foto',
       'Nome',
+      'Apelido',
       'E-mail',
       'Administrador',
       'Senha',
@@ -711,7 +713,7 @@ describe('Usuários (admin)', () => {
     // sem foto: a inicial no lugar da imagem
     const linhaMaria = linha('Maria Silva');
     expect(linhaMaria.querySelector('img')).toBeNull();
-    expect(within(linhaMaria).getAllByRole('cell')[0].textContent).toBe('M');
+    expect(within(linhaMaria).getAllByRole('cell')[1].textContent).toBe('M');
 
     await userEvent.selectOptions(screen.getByLabelText('Mostrar'), 'admin');
     expect(nomes()).toEqual(['Ana Admin', 'Bruno Lima']);

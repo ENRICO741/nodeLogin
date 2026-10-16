@@ -303,19 +303,27 @@ describe('questões de trivia', () => {
 });
 
 describe('usuários', () => {
-  test('lista ativos (admins e usuários) só com nome, e-mail, foto e papel', async () => {
+  test('lista ativos (admins e usuários) só com nome, apelido, e-mail, foto e papel', async () => {
     const u = await novoUsuario({ nome: 'Ana Lista' });
     const inativo = await novoUsuario();
     await pool.query('UPDATE usuarios SET ativo = false WHERE id = $1', [inativo.usuario.id]);
 
     const lista = (await admin.api('get', '/api/admin/usuarios').expect(200)).body;
-    assert.deepEqual(Object.keys(lista[0]).sort(), ['email', 'foto_perfil_url', 'id', 'nome', 'papel']);
+    assert.deepEqual(Object.keys(lista[0]).sort(), [
+      'apelido',
+      'email',
+      'foto_perfil_url',
+      'id',
+      'nome',
+      'papel',
+    ]);
     assert.equal(lista.find((x) => x.id === admin.usuario.id).papel, 'admin');
     assert.deepEqual(
       lista.find((x) => x.id === u.usuario.id),
       {
         id: u.usuario.id,
         nome: 'Ana Lista',
+        apelido: u.apelido,
         email: u.email,
         foto_perfil_url: null,
         papel: 'usuario',
@@ -376,6 +384,7 @@ describe('usuários', () => {
     assert.deepEqual(promovido, {
       id: u.usuario.id,
       nome: u.nome,
+      apelido: u.apelido,
       email: u.email,
       foto_perfil_url: null,
       papel: 'admin',

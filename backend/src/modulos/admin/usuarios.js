@@ -7,7 +7,7 @@ const { naoEncontrado, conflito } = require('../../lib/erros');
 const logger = require('../../lib/logger');
 const { idDaRota, senha, esquemaPapel } = require('../../lib/validacao');
 
-const CAMPOS = 'id, nome, email, foto_perfil_url, papel';
+const CAMPOS = 'id, nome, apelido, email, foto_perfil_url, papel';
 
 const esquemaSenha = z.object({ senha });
 
