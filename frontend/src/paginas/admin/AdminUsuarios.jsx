@@ -122,7 +122,7 @@ export function AdminUsuarios() {
   if (erro) return <ErroCarregamento erro={erro} onTentarDeNovo={recarregar} />;
 
   const usuarios = dados
-    .map((u) => atualizados[u.id] ?? u)
+    .map((u) => ({ ...u, ...atualizados[u.id] }))
     .filter((u) => filtro === 'todos' || u.papel === filtro);
 
   return (
@@ -148,7 +148,17 @@ export function AdminUsuarios() {
             <table className={styles.tabela}>
               <thead>
                 <tr>
-                  {['#', 'Foto', 'Nome', 'Apelido', 'E-mail', 'Administrador', 'Senha'].map((c) => (
+                  {[
+                    '#',
+                    'Foto',
+                    'Nome',
+                    'Apelido',
+                    'E-mail',
+                    'Questionário pré',
+                    'Questionário pós',
+                    'Administrador',
+                    'Senha',
+                  ].map((c) => (
                     <th key={c} scope="col" className={c === '#' ? styles.numero : undefined}>
                       {c}
                     </th>
@@ -167,6 +177,8 @@ export function AdminUsuarios() {
                       <td>{u.nome}</td>
                       <td style={{ overflowWrap: 'anywhere' }}>{u.apelido}</td>
                       <td style={{ overflowWrap: 'anywhere' }}>{u.email}</td>
+                      <td>{u.pre_em ? new Date(u.pre_em).toLocaleString('pt-BR') : '—'}</td>
+                      <td>{u.pos_em ? new Date(u.pos_em).toLocaleString('pt-BR') : '—'}</td>
                       <td>
                         <label className="campo-check">
                           <input
@@ -204,7 +216,7 @@ export function AdminUsuarios() {
                   return [
                     linha,
                     <tr key={`${u.id}-senha`}>
-                      <td colSpan={7}>
+                      <td colSpan={9}>
                         <FormSenha
                           usuario={u}
                           aoCancelar={() => fecharSenha(u.id)}

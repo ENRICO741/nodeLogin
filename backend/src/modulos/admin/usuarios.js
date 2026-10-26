@@ -14,7 +14,12 @@ const esquemaSenha = z.object({ senha });
 const router = Router();
 
 router.get('/', async (_req, res) => {
-  const { rows } = await query(`SELECT ${CAMPOS} FROM usuarios WHERE ativo ORDER BY lower(nome), id`);
+  const { rows } = await query(
+    `SELECT ${CAMPOS},
+       (SELECT enviado_em FROM questionario_envios WHERE usuario_id = u.id AND momento = 'pre') AS pre_em,
+       (SELECT enviado_em FROM questionario_envios WHERE usuario_id = u.id AND momento = 'pos') AS pos_em
+     FROM usuarios u WHERE ativo ORDER BY lower(nome), id`,
+  );
   res.json(rows);
 });
 
