@@ -702,6 +702,8 @@ describe('Usuários (admin)', () => {
       'Nome',
       'Apelido',
       'E-mail',
+      'Questionário pré',
+      'Questionário pós',
       'Administrador',
       'Senha',
     ]);

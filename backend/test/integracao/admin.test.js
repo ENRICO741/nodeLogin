@@ -303,7 +303,7 @@ describe('questões de trivia', () => {
 });
 
 describe('usuários', () => {
-  test('lista ativos (admins e usuários) só com nome, apelido, e-mail, foto e papel', async () => {
+  test('lista ativos (admins e usuários) só com nome, apelido, e-mail, foto, papel e datas dos questionários', async () => {
     const u = await novoUsuario({ nome: 'Ana Lista' });
     const inativo = await novoUsuario();
     await pool.query('UPDATE usuarios SET ativo = false WHERE id = $1', [inativo.usuario.id]);
@@ -316,6 +316,8 @@ describe('usuários', () => {
       'id',
       'nome',
       'papel',
+      'pos_em',
+      'pre_em',
     ]);
     assert.equal(lista.find((x) => x.id === admin.usuario.id).papel, 'admin');
     assert.deepEqual(
@@ -327,8 +329,12 @@ describe('usuários', () => {
         email: u.email,
         foto_perfil_url: null,
         papel: 'usuario',
+        pre_em: lista.find((x) => x.id === u.usuario.id).pre_em,
+        pos_em: null,
       },
     );
+    // novoUsuario já grava o envio do pré (test/ajuda.js)
+    assert.ok(!Number.isNaN(Date.parse(lista.find((x) => x.id === u.usuario.id).pre_em)));
     assert.ok(!lista.some((x) => x.id === inativo.usuario.id), 'inativo não aparece');
     const posicao = (id) => lista.findIndex((x) => x.id === id);
     assert.ok(posicao(u.usuario.id) < posicao(admin.usuario.id), 'ordenado por nome');
