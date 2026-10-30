@@ -9,7 +9,7 @@
 
 PWA mobile-first de **conscientização em segurança da informação** para o ambiente corporativo, desenvolvido como Trabalho de Conclusão de Curso. O projeto avalia se a gamificação torna o treinamento mais engajador: o app ensina, pontua e, ao mesmo tempo, coleta os dados pseudonimizados da pesquisa.
 
-**Produção:** https://guardiaoimpacta.brazilsouth.cloudapp.azure.com
+**Produção:** https://guardiaoimpacta.brazilsouth.cloudapp.azure.com (disponível até 02/11/2026)
 
 ## Sumário
 
@@ -28,9 +28,9 @@ PWA mobile-first de **conscientização em segurança da informação** para o a
 
 | Área            | O que faz                                                                                                                                                                                         |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Aulas**       | Trilha fixa de 15 aulas (LGPD, phishing, engenharia social, senhas, incidentes…) com 60 perguntas. Cada pergunta pontua só no primeiro acerto; a aula concluída paga um bônus uma única vez.       |
-| **Modo trivia** | 180 questões em três níveis (60 por nível), cada uma ligada a uma aula. Abre depois das 15 aulas concluídas. Rodada de 5 questões (mínimo 3 disponíveis), que só termina com todas respondidas. |
-| **Quiz**        | As alternativas aparecem em ordem sorteada a cada tentativa, nas aulas e na trivia. A resposta vai com a letra original, então banco e estatísticas não mudam.                                    |
+| **Aulas**       | Trilha fixa de 15 aulas (LGPD, phishing, engenharia social, senhas, incidentes…) com 4 perguntas ao final de cada aula. Cada pergunta pontua só no primeiro acerto; a aula concluída paga um bônus uma única vez.       |
+| **Modo trivia** | 180 questões em três níveis (60 por nível), cada uma ligada a uma aula. Abre depois das 15 aulas concluídas. Rodada de 5 questões, que só termina após todas serem respondidas. |
+| **Quiz**        | As alternativas aparecem em ordem sorteada a cada tentativa, nas aulas e na trivia.                                    |
 | **Gamificação** | Pontos, conquistas (badges) e ranking.                                                                                                                                                            |
 | **PWA**         | Instalável, com convite para instalar (no máximo a cada 3 dias; no iOS, ensina o caminho pelo Compartilhar), aviso de nova versão e tema claro/escuro.                                             |
 | **Pesquisa**    | Consentimento no cadastro, questionários pré e pós, telemetria de uso e exportação em CSV pseudonimizado.                                                                                         |
@@ -118,7 +118,7 @@ As 180 questões ficam em `backend/src/db/seed.js`, cada uma com o slug da aula 
 
 ### Consentimento
 
-Ter conta é participar da pesquisa, sem identificação pelo nome (os dados exportados são **pseudonimizados**, não anônimos). O aceite é obrigatório no cadastro e não pode ser retirado pelo app: o perfil não tem essa opção e a API ignora o campo. Admins ficam fora da pesquisa.
+Ter conta é participar da pesquisa, sem identificação pelo nome (os dados exportados são **pseudonimizados**, não totalmente anônimos). O aceite é obrigatório no cadastro e não pode ser retirado pelo app: o perfil não tem essa opção e a API ignora o campo. Admins ficam fora da pesquisa.
 
 ### Exportação
 
@@ -260,10 +260,10 @@ Passo a passo da VM, rollback e restauração de backup: [deploy/README.md](depl
 
 Decididas pelos autores e mantidas fora da versão atual:
 
-- exclusão ou desativação da própria conta pelo app (aguarda o parecer de ética);
+- exclusão ou desativação da própria conta pelo app;
 - confirmação de e-mail no cadastro;
-- revogação individual de JWT (a troca de senha já invalida os tokens antigos);
+- revogação individual de JWT;
 - backups fora da VM;
 - deduplicação de visitas e rodadas no backend.
 
-O modelo de análise estatística (Python) e os dados exportados da pesquisa ficam fora do repositório.
+O modelo de análise estatística (Python) e os dados exportados da pesquisa ficaram fora do repositório.
