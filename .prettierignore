@@ -2,4 +2,5 @@ package-lock.json
 **/public/
 *.md
 conteudo/**/*.html
+docs/*.html
 .claude/
