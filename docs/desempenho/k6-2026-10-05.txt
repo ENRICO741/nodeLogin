@@ -1,3 +1,12 @@
+# Saída bruta do k6 — 04 e 05/10/2026 (VM descartável D2s_v4, cópia da produção)
+# 14 execuções, incluindo tentativas intermediárias. Horários dos cabeçalhos em UTC.
+# As que importam:
+#   1 e 3  -> antes do ajuste de rate limit e pool: auth p95 de 1,81 s e 4,87 s
+#   6 e 9  -> depois do ajuste (commit f5699bf): auth p95 de 280 ms e 500 ms
+#   12     -> teste principal: 100 usuários, 100% dos checks, app p95 20 ms / p99 25 ms, auth p95 150 ms
+#   14     -> estresse 250 a 1000 usuários: em 1000, p95 41 ms / p99 76 ms
+# Resumo e contexto: README.md desta pasta.
+
 ######## RESULTADO 1 — 2026-10-04T22:31:24  (1791 chars)
   █ THRESHOLDS 
 
@@ -293,7 +302,6 @@ time="2026-10-04T20:18:46-03:00" level=error msg="thresholds on metrics 'http_re
 guardiao-api-1 Up 25 minutes (healthy)
 guardiao-db-1 Up 25 minutes (healthy)
 monitor iniciado
-[This command modified 1 file you've previously read: ..\..\..\..\AppData\Local\Temp\claude\c--Users-samu--source-repos-Faculdade-nodeLogin\c2331b08-4009-4f49-a2bc-2ffe1eabefcf\scratchpad\monitorar.sh. Call Read before editing.]
 ######## RESULTADO 6 — 2026-10-04T23:41:19  (2077 chars)
   █ THRESHOLDS 
 
@@ -418,7 +426,6 @@ monitor iniciado
   trilhas_concluidas: [ 'count>=50' ]
 }
 [ 'novos' ] [ 'count>=100' ]
-[This command modified 1 file you've previously read: deploy\carga.js. Call Read before editing.]
 ######## RESULTADO 9 — 2026-10-04T23:54:27  (2245 chars)
 monitor iniciado
 
@@ -656,7 +663,6 @@ novos logados: 50
 contas: 100
 http_req_duration{grupo:app,carga:1000} | http_req_duration{grupo:app,carga:250} | http_req_duration{grupo:app,carga:500} | http_req_duration{grupo:app,carga:750}
 monitor iniciado
-[This command modified 1 file you've previously read: ..\..\..\..\AppData\Local\Temp\claude\c--Users-samu--source-repos-Faculdade-nodeLogin\c2331b08-4009-4f49-a2bc-2ffe1eabefcf\scratchpad\monitorar.sh. Call Read before editing.]
 ######## RESULTADO 14 — 2026-10-05T14:42:34  (2684 chars)
 exit=99
   █ THRESHOLDS 

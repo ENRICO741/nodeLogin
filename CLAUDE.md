@@ -6,7 +6,7 @@ PWA de conscientização em segurança da informação (TCC). Visão geral e arq
 
 - `frontend/`: React 19 + Vite. `backend/`: Node 24 + Express 5 + Postgres (`pg`), API em `/api`.
 - `deploy/`: Caddyfile, scripts da VM e `deploy/azure/` (criar-vm.sh, cloud-init.yaml).
-- `conteudo/`: aulas em HTML. `docs/`: modelo relacional.
+- `conteudo/`: aulas em HTML. `docs/`: modelo relacional, questionários, `seguranca/` (varreduras) e `desempenho/` (k6).
 - Front e API na mesma origem (`/api`); não há CORS.
 
 ## Comandos

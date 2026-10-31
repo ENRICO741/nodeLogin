@@ -53,7 +53,7 @@ frontend/  React 19 + Vite + vite-plugin-pwa   → build estático servido pelo 
 backend/   Node 24 + Express 5 + Postgres (pg) → API REST em /api
 deploy/    Caddyfile, scripts da VM e deploy/azure/ (template da VM e cloud-init)
 conteudo/  aulas em HTML (uma pasta por aula) · guia e modelo para quem escreve
-docs/      modelo relacional (ERD)
+docs/      modelo relacional (ERD), questionários, varreduras de segurança e testes de carga
 
 docker-compose.yml       desenvolvimento: Postgres · API · Vite · Mailpit
 docker-compose.prod.yml  produção: Caddy (HTTPS + proxy /api) · API · Postgres
@@ -92,6 +92,19 @@ O front e a API ficam sempre na **mesma origem**: `/api` passa pelo proxy do Vit
 - **Cabeçalhos:** helmet na API; no Caddy, CSP restritiva (`script-src 'self'`, `frame-ancestors 'none'`) e HTTPS automático.
 - **Infra:** só as portas 80 e 443 ficam abertas; a VM não tem porta 22 exposta. O deploy entra no Azure por OIDC, sem segredo guardado no GitHub.
 - **Dados da pesquisa:** os CSVs não trazem nome, e-mail nem apelido; cada pessoa vira um pseudônimo derivado de `PESQUISA_SEGREDO`.
+
+### Varreduras
+
+Em 01/10/2026, contra a stack de produção rodando localmente:
+
+| Tipo | Ferramenta | Resultado |
+| ---- | ---------- | --------- |
+| DAST | OWASP ZAP baseline e full scan (ativo) | 0 falhas; só avisos de baixo risco (CSP `img-src`, cabeçalhos COEP/CORP) |
+| SAST | Semgrep (601 regras, 130 arquivos) | 0 alertas no código; 4 de configuração |
+| SCA | Trivy (dependências e imagens) | 0 CVEs nas dependências; 19 CVEs na imagem da API → 0 depois de remover o npm da imagem |
+| Segredos | Gitleaks | 1 falso positivo, analisado |
+
+Relatórios, correções aplicadas e limitações: [docs/seguranca](docs/seguranca/README.md).
 
 ## Conteúdo
 
@@ -239,14 +252,16 @@ A cobertura mínima é de **80%** em linhas, branches, funções e statements; a
 
 ### Desempenho
 
-Teste de carga com k6 numa VM descartável idêntica à de produção (D2s_v4, 2 vCPU, 8 GB), em 05/10/2026:
+Testes de carga com k6 numa VM descartável idêntica à de produção (D2s_v4, 2 vCPU, 8 GB):
 
-| Cenário                                      | Resultado                                                         |
-| -------------------------------------------- | ----------------------------------------------------------------- |
-| 100 usuários simultâneos por 3 min           | 0 falha; p95 de 20 ms e p99 de 25 ms (auth: p95 de 150 ms); API abaixo de 20% de CPU |
-| Estresse até 1000 usuários                   | p95 de 41 ms e p99 de 76 ms; banco a ~60% de CPU, API a ~45%     |
+| Data  | Cenário                                      | Resultado                                                         |
+| ----- | -------------------------------------------- | ----------------------------------------------------------------- |
+| 04/10 | 100 usuários, antes e depois do ajuste de rate limit e pool (`f5699bf`) | Login/cadastro: p95 de 1,8 a 4,9 s → 280 a 500 ms |
+| 05/10 | 100 usuários simultâneos por 3 min           | 0 falha; p95 de 20 ms e p99 de 25 ms (auth: p95 de 150 ms); API abaixo de 20% de CPU |
+| 05/10 | Estresse até 1000 usuários                   | p95 de 41 ms e p99 de 76 ms; banco a ~60% de CPU, API a ~45%     |
+| 30/10 | Estresse caótico de 100 a 1500 usuários      | Até 1400: p99 de 275 ms e 0 falhas. Em 1500, `concederBadges` estoura o `statement_timeout` de 10 s |
 
-O próximo gargalo é o banco.
+O próximo gargalo conhecido é a consulta de `concederBadges` no banco. Saídas do k6 e detalhes: [docs/desempenho](docs/desempenho/README.md).
 
 ## Deploy e CI/CD
 

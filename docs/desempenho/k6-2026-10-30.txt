@@ -1,0 +1,277 @@
+######## RESULTADO — 2026-10-30  (estresse de 100 a 1500 usuários, bcrypt custo 4)
+Cenário: VM descartável, cópia da de produção (D2s_v4, 2 vCPU, 8 GB, commit 543f548), k6 rodando no notebook.
+2000 contas criadas e com o questionário pré respondido antes de iniciar o k6 (fora da contagem).
+BCRYPT_CUSTO=4 e limite de auth por IP removido, só nessa VM, para medir API, front e banco e não o bcrypt.
+Rampa: 100 (20 s), 500 (40 s), 1000 (60 s) e depois +100 usuários a cada 60 s. Acima de 1000, 1 em cada 10
+usuários novos cria conta (10 a cada 100); os demais entram numa das contas criadas antes.
+Cliques de 1 a 15 s, com rajadas aleatórias sem pausa. Abort automático no primeiro patamar acima de 1000
+com p99 do grupo app >= 1 s. Tempos em ms, medidos do notebook (incluem a internet até a Azure).
+Colunas: vus = usuários do patamar; rps = requisições por segundo (média do patamar);
+app_* = latência das rotas do app; auth_* = login e cadastro; falha% = http_req_failed.
+O patamar de 1500 abortou com ~15 s e gerou poucas requisições; o rps dele não é confiável.
+
+
+vus	rps	app_p95	app_p99	app_max	auth_p95	auth_p99	falha%
+100	35	18	30	69	14	33	0
+500	106	19	28	59	16	20	0
+1000	187	39	94	592	22	53	0
+1100	219	51	113	512	22	33	0
+1200	241	58	125	641	34	41	0
+1300	260	68	184	655	26	38	0
+1400	284	90	275	473	47	57	0
+1500	31	100	2184	3839	17	18	0
+(patamares 1600 a 3500 não rodaram: o teste abortou no de 1500)
+
+Total: 78187 req; falhas 0.00%; 429: 0
+time="2026-10-30T12:55:04-03:00" level=error msg="thresholds on metrics 'http_req_duration{grupo:app,carga:1500}' were crossed; at least one has abortOnFail enabled, stopping test prematurely"
+
+Causa do travamento em 1500 (logs da API e do Postgres):
+- às 12:54:35 (horário local) o tráfego caiu de ~270 para 16 req/s e depois 1 req/s por ~12 s;
+- 16 erros "canceling statement due to statement timeout" (10 s), todos na consulta WITH novos AS (...)
+  de concederBadges (backend/src/modulos/pontuacao.js), chamada em trivia/finalizar;
+- 8 respostas 503 em /api/saude no mesmo intervalo;
+- CPU, locks e pg_stat_activity não foram medidos no momento do travamento.
+
+######## SCRIPT (caos.js)
+// Teste de estresse caótico do Guardião Impacta (VM descartável carga-vm).
+// MODO=preparo  na VM (docker, rede do compose): cria VUS contas u_<n> com progresso variado.
+// MODO=caos     do notebook: 0->100 (20s) ->500 (40s) ->1000 (60s); depois +100 a cada 60s até MAX.
+//               VU 1..2000 entram numa conta u_<n>; acima de 1000, 1 em cada 10 cadastra conta nova.
+//               Cliques de 1 a 15 s, com rajadas aleatórias sem pausa. Aborta no 1º patamar com p99(app) >= 1s.
+/* global __ENV, __VU, console */
+import http from 'k6/http';
+import exec from 'k6/execution';
+import { check, sleep } from 'k6';
+
+const SITE = __ENV.BASE_URL;
+const MODO = __ENV.MODO || 'caos';
+const SENHA = 'Carga#Teste2026';
+const VUS = Number(__ENV.VUS || 2000);
+const MAX = Number(__ENV.MAX || 3500);
+const ALTERNATIVAS = ['a', 'b', 'c', 'd'];
+const PATAMARES = [100, 500, 1000];
+for (let n = 1100; n <= MAX; n += 100) PATAMARES.push(n);
+
+const patamarAtual = () => {
+  const t = exec.instance.currentTestRunDuration / 1000;
+  if (t <= 20) return 100;
+  if (t <= 60) return 500;
+  if (t <= 120) return 1000;
+  return Math.min(1000 + 100 * Math.ceil((t - 120) / 60), MAX);
+};
+
+const estagios = [
+  { duration: '20s', target: 100 },
+  { duration: '40s', target: 500 },
+  { duration: '60s', target: 1000 },
+  ...PATAMARES.slice(3).flatMap((n) => [
+    { duration: '60s', target: n },
+  ]),
+  { duration: '10s', target: 0 },
+];
+
+const submetricas = { 'http_reqs{status:429}': ['count>=0'] };
+if (MODO === 'caos') {
+  for (const n of PATAMARES) {
+    submetricas[`http_req_duration{grupo:app,carga:${n}}`] =
+      n > 1000 ? [{ threshold: 'p(99)<1000', abortOnFail: true, delayAbortEval: '15s' }] : ['max>=0'];
+    submetricas[`http_req_duration{grupo:auth,carga:${n}}`] = ['max>=0'];
+    submetricas[`http_reqs{carga:${n}}`] = ['count>=0'];
+    submetricas[`http_req_failed{carga:${n}}`] = ['rate>=0'];
+  }
+}
+
+export const options = {
+  scenarios: {
+    [MODO]:
+      MODO === 'preparo'
+        ? { executor: 'per-vu-iterations', vus: VUS, iterations: 1, maxDuration: '15m' }
+        : { executor: 'ramping-vus', stages: estagios, gracefulRampDown: '0s', gracefulStop: '5s' },
+  },
+  summaryTrendStats: ['avg', 'med', 'p(95)', 'p(99)', 'max'],
+  thresholds: submetricas,
+  noConnectionReuse: false,
+};
+
+let token;
+let sessao;
+let contaNova = false;
+
+function req(metodo, rota, corpo, nome, esperado = 200, grupo = 'app', aceitos = [esperado]) {
+  const tags = { name: nome, grupo };
+  if (MODO === 'caos') tags.carga = String(patamarAtual());
+  const res = http.request(metodo, `${SITE}/api${rota}`, corpo === undefined ? null : JSON.stringify(corpo), {
+    headers: { 'Content-Type': 'application/json', ...(token && { Authorization: `Bearer ${token}` }) },
+    tags,
+  });
+  return check(res, { [`${nome} ${esperado}`]: (r) => aceitos.includes(r.status) }) ? res : null;
+}
+
+const pausa = (min, max) => MODO === 'preparo' || sleep(min + Math.random() * (max - min));
+const clique = () => pausa(1, 15);
+const sortear = (lista) => lista[Math.floor(Math.random() * lista.length)];
+const evento = (tipo_evento, extra = {}) =>
+  MODO !== 'preparo' &&
+  req('POST', '/eventos', { sessao_id: sessao, tipo_evento, ...extra }, 'POST /eventos', 204);
+
+function cadastrar(apelido) {
+  const cadastro = req(
+    'POST',
+    '/auth/cadastro',
+    {
+      nome: `Carga ${__VU}`,
+      apelido,
+      email: `${apelido}@carga.teste`,
+      senha: SENHA,
+      consentiu_pesquisa: true,
+    },
+    'POST /auth/cadastro',
+    201,
+    'auth',
+  );
+  token = cadastro?.json('token');
+  contaNova = true;
+}
+
+function entrar() {
+  if (MODO === 'preparo') return cadastrar(`u_${__VU}`);
+  // acima de 1000, 1 em cada 10 usuários novos cria conta (10 a cada 100, ~1 a cada 6 s); o resto já tinha conta
+  if (__VU > 1000 && __VU % 10 === 0) return cadastrar(`novo_${__VU}_${Date.now().toString(36)}`);
+  const n = ((__VU - 1) % VUS) + 1;
+  token = req('POST', '/auth/login', { identificador: `u_${n}`, senha: SENHA }, 'POST /auth/login', 200, 'auth')?.json(
+    'token',
+  );
+}
+
+// Questionário inicial da pesquisa: sem ele a primeira aula dá 403. 409 = a conta já respondeu.
+function responderPre() {
+  const def = req('GET', '/questionarios/pre', undefined, 'GET /questionarios/pre', 200, 'app', [200, 409, 404]);
+  if (!def || def.status !== 200) return;
+  const resp = {};
+  const atende = (se) => !se || resp[se.item] === se.igual;
+  for (const bloco of def.json('blocos')) {
+    if (!atende(bloco.se)) continue;
+    for (const item of bloco.itens) {
+      if (!atende(item.se)) continue;
+      if (item.aberta) resp[item.codigo] = 'ok';
+      else if (item.multipla) resp[item.codigo] = [0];
+      else if (item.opcoes) resp[item.codigo] = Math.floor(Math.random() * item.opcoes.length);
+      else resp[item.codigo] = 1 + Math.floor(Math.random() * bloco.escala.length);
+    }
+  }
+  req('POST', '/questionarios/pre', { respostas: resp }, 'POST /questionarios/pre', 201);
+}
+
+function responderTodas(questoes, rota, nome) {
+  for (const q of questoes) {
+    clique();
+    req('POST', rota, { questao_id: q.id, alternativa: sortear(ALTERNATIVAS) }, nome);
+  }
+}
+
+function fazerAula(id) {
+  const aula = req('GET', `/aulas/${id}`, undefined, 'GET /aulas/:id');
+  const visita = aula && req('POST', `/aulas/${id}/visitas`, undefined, 'POST /aulas/:id/visitas', 201);
+  if (!visita) return false;
+  evento('aula_iniciada', { tela: 'aula' });
+  const inicio = Date.now();
+  clique();
+  evento('aula_conteudo_lido', { tela: 'aula', duracao_ms: Date.now() - inicio, metadata: { rolagem_max: 100 } });
+  const visitaId = visita.json('id');
+  responderTodas(aula.json('questoes'), `/visitas/${visitaId}/respostas`, 'POST /visitas/:id/respostas');
+  clique();
+  if (!req('POST', `/visitas/${visitaId}/finalizar`, undefined, 'POST /visitas/:id/finalizar')) return false;
+  evento('aula_concluida', { tela: 'aula' });
+  return true;
+}
+
+function jogarTrivia() {
+  const rodada = req('POST', '/trivia/rodadas', { dificuldade: sortear(['facil', 'media', 'dificil']) }, 'POST /trivia/rodadas', 201);
+  if (!rodada) return;
+  evento('trivia_iniciada', { tela: 'trivia' });
+  const id = rodada.json('id');
+  responderTodas(rodada.json('questoes'), `/trivia/rodadas/${id}/respostas`, 'POST /trivia/rodadas/:id/respostas');
+  clique();
+  if (req('POST', `/trivia/rodadas/${id}/finalizar`, undefined, 'POST /trivia/rodadas/:id/finalizar')) {
+    evento('resultado_visualizado', { tela: 'trivia' });
+  }
+}
+
+function preparar() {
+  const alvo = __VU <= VUS / 2 ? 15 : 1 + ((__VU * 5) % 14);
+  for (let i = 0; i < alvo; i++) {
+    const pendente = req('GET', '/aulas', undefined, 'GET /aulas')
+      ?.json()
+      .find((a) => !a.concluida);
+    if (!pendente || !fazerAula(pendente.id)) return;
+  }
+}
+
+// Rajada: o usuário toca em várias telas seguidas, sem pausa.
+function rajada() {
+  for (let i = 0; i < 3 + Math.floor(Math.random() * 4); i++) {
+    req('GET', sortear(['/aulas', '/ranking', '/badges', '/perfil', '/auth/me']), undefined, 'GET rajada');
+  }
+}
+
+export default function () {
+  if (!token) {
+    if (MODO === 'preparo') sleep(__VU * 0.05); // escalona: 1000 cadastros juntos estouram o bcrypt e o timeout
+    if (MODO !== 'preparo') http.get(`${SITE}/`, { tags: { name: 'GET / (PWA)', grupo: 'app', carga: String(patamarAtual()) } });
+    sleep(Math.random() * 5);
+    entrar();
+    if (!token) {
+      sleep(5);
+      return;
+    }
+    if (contaNova) responderPre();
+    if (MODO === 'preparo') return preparar();
+    sessao = req('POST', '/sessoes', { standalone: true, largura_tela: 390 }, 'POST /sessoes', 201)?.json('id');
+  }
+  req('GET', '/auth/me', undefined, 'GET /auth/me');
+  const resposta = req('GET', '/aulas', undefined, 'GET /aulas');
+  if (!resposta) return clique();
+  evento('tela_visualizada', { tela: 'aulas' });
+  clique();
+  if (Math.random() < 0.15) rajada();
+
+  const aulas = resposta.json();
+  const pendentes = aulas.filter((a) => !a.concluida);
+  if (pendentes.length) fazerAula(pendentes[0].id);
+  else if (Math.random() < 0.25) fazerAula(sortear(aulas).id);
+  else jogarTrivia();
+  clique();
+  if (Math.random() > 1 / 3) return;
+  req('GET', '/ranking', undefined, 'GET /ranking');
+  clique();
+  req('GET', '/badges', undefined, 'GET /badges');
+  req('GET', '/perfil', undefined, 'GET /perfil');
+  clique();
+}
+
+export function handleSummary(data) {
+  const m = data.metrics;
+  const v = (nome, campo) => m[nome]?.values?.[campo];
+  const linhas = PATAMARES.map((n) => {
+    const secs = n === 100 ? 20 : n === 500 ? 40 : n === 1000 ? 60 : 60;
+    const app = `http_req_duration{grupo:app,carga:${n}}`;
+    const auth = `http_req_duration{grupo:auth,carga:${n}}`;
+    return {
+      vus: n,
+      rps: Math.round((v(`http_reqs{carga:${n}}`, 'count') ?? 0) / secs),
+      app_p95: Math.round(v(app, 'p(95)') ?? -1),
+      app_p99: Math.round(v(app, 'p(99)') ?? -1),
+      app_max: Math.round(v(app, 'max') ?? -1),
+      auth_p95: Math.round(v(auth, 'p(95)') ?? -1),
+      auth_p99: Math.round(v(auth, 'p(99)') ?? -1),
+      falha_pct: +(100 * (v(`http_req_failed{carga:${n}}`, 'rate') ?? 0)).toFixed(2),
+    };
+  }).filter((l) => l.app_p99 >= 0);
+  const tab = ['vus\trps\tapp_p95\tapp_p99\tapp_max\tauth_p95\tauth_p99\tfalha%']
+    .concat(linhas.map((l) => Object.values(l).join('\t')))
+    .join('\n');
+  return {
+    stdout: `\n${tab}\n\nTotal: ${v('http_reqs', 'count')} req; falhas ${(100 * v('http_req_failed', 'rate')).toFixed(2)}%; 429: ${v('http_reqs{status:429}', 'count') ?? 0}\n`,
+    [__ENV.OUT || 'resumo.json']: JSON.stringify({ linhas, geral: m }, null, 1),
+  };
+}

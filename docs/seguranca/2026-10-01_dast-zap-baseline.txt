@@ -1,0 +1,44 @@
+# OWASP ZAP baseline (passivo)
+# Fonte: sessão Claude Code 7f4578ef-853c-4466-bcc6-411465373ed3 (projeto nodeLogin / Guardião Digital), 01/10/2026.
+# Reconstruído do histórico da conversa: os arquivos originais do scanner foram apagados com a limpeza da pasta temporária.
+# Alvo: http://host.docker.internal:8080 (stack prod local guardiao-local, SMTP desligado)
+# Linhas PASS foram omitidas no histórico; só WARN/FAIL e total.
+
+Using the Automation Framework
+Total of 20 URLs
+WARN-NEW: Information Disclosure - Suspicious Comments [10027] x 1 
+	http://host.docker.internal:8080/assets/index-CY_dPof0.js (200 OK)
+WARN-NEW: Storable and Cacheable Content [10049] x 6 
+	http://host.docker.internal:8080/assets/index-C-gD6Eq9.css (200 OK)
+	http://host.docker.internal:8080/assets/index-CY_dPof0.js (200 OK)
+	http://host.docker.internal:8080/apple-touch-icon-180x180.png (200 OK)
+	http://host.docker.internal:8080/favicon.ico (200 OK)
+	http://host.docker.internal:8080/logo.svg (200 OK)
+WARN-NEW: CSP: Wildcard Directive [10055] x 8 
+	http://host.docker.internal:8080 (200 OK)
+	http://host.docker.internal:8080/ (200 OK)
+	http://host.docker.internal:8080/entrar (200 OK)
+	http://host.docker.internal:8080/sitemap.xml (200 OK)
+	http://host.docker.internal:8080 (200 OK)
+WARN-NEW: Modern Web Application [10109] x 5 
+	http://host.docker.internal:8080 (200 OK)
+	http://host.docker.internal:8080/ (200 OK)
+	http://host.docker.internal:8080/entrar (200 OK)
+	http://host.docker.internal:8080/esqueci-senha (200 OK)
+	http://host.docker.internal:8080/sitemap.xml (200 OK)
+WARN-NEW: Cross-Origin-Embedder-Policy Header Missing or Invalid [90004] x 11 
+	http://host.docker.internal:8080 (200 OK)
+	http://host.docker.internal:8080/ (200 OK)
+	http://host.docker.internal:8080/sitemap.xml (200 OK)
+	http://host.docker.internal:8080 (200 OK)
+	http://host.docker.internal:8080/ (200 OK)
+FAIL-NEW: 0	FAIL-INPROG: 0	WARN-NEW: 5	WARN-INPROG: 0	INFO: 0	IGNORE: 0	PASS: 62
+
+# Detalhe CSP (regra 10055):
+"uri": "http://host.docker.internal:8080/api/auth/esqueci-senha"
+<p>The following directives either allow wildcard sources (or ancestors), are not defined, or are overly broadly defined:</p><p>img-src</p>
+
+deploy\Caddyfile:18:		Referrer-Policy strict-origin-when-cross-origin
+deploy\Caddyfile:19:		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+deploy\Caddyfile:20:		Content-Security-Policy "default-src 'self'; img-src 'self' https: data:; style-src 'self' 
+'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"

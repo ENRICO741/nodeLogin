@@ -1,0 +1,26 @@
+# OWASP ZAP full scan (ativo, -m 5 -T 40)
+# Fonte: sessão Claude Code 7f4578ef-853c-4466-bcc6-411465373ed3 (projeto nodeLogin / Guardião Digital), 01/10/2026.
+# Reconstruído do histórico da conversa: os arquivos originais do scanner foram apagados com a limpeza da pasta temporária.
+# Linhas PASS omitidas no histórico.
+
+Total of 20 URLs
+WARN-NEW: CSP: Wildcard Directive [10055] x 8 
+	http://host.docker.internal:8080/ (200 OK)
+	http://host.docker.internal:8080/ (200 OK)
+	http://host.docker.internal:8080/sitemap.xml (200 OK)
+	http://host.docker.internal:8080 (200 OK)
+	http://host.docker.internal:8080/sitemap.xml (200 OK)
+WARN-NEW: Cross-Origin-Resource-Policy Header Missing or Invalid [90004] x 12 
+	http://host.docker.internal:8080/ (200 OK)
+	http://host.docker.internal:8080/ (200 OK)
+	http://host.docker.internal:8080/ (200 OK)
+	http://host.docker.internal:8080/robots.txt (200 OK)
+	http://host.docker.internal:8080/apple-touch-icon-180x180.png (200 OK)
+FAIL-NEW: 0	FAIL-INPROG: 0	WARN-NEW: 2	WARN-INPROG: 0	INFO: 0	IGNORE: 0	PASS: 139
+
+# Comando executado:
+{
+ "command": "$s='<pasta-temporaria>\\sec'; New-Item -ItemType Directory -Force $s | Out-Null\ndocker run --rm -v \"${s}:/zap/wrk:rw\" ghcr.io/zaproxy/zaproxy:stable zap-baseline.py -t http://host.docker.internal:8080 -j -r zap-baseline.html -J zap-baseline.json *> \"$s\\zap-baseline.log\"\ndocker run --rm -v \"${s}:/zap/wrk:rw\" ghcr.io/zaproxy/zaproxy:stable zap-full-scan.py -t http://host.docker.internal:8080 -j -m 5 -T 40 -r zap-full.html -J zap-full.json *> \"$s\\zap-full.log\"\n'ZAP fim'",
+ "run_in_background": true,
+ "timeout": 5400000
+}
