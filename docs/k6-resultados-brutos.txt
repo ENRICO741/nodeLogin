@@ -1,0 +1,723 @@
+######## RESULTADO 1 — 2026-10-04T22:31:24  (1791 chars)
+  █ THRESHOLDS 
+
+    checks
+    ✓ 'rate>0.99' rate=100.00%
+
+    http_req_duration{grupo:app}
+    ✓ 'p(95)<500' p(95)=19.57ms
+
+    http_req_duration{grupo:auth}
+    ✓ 'p(95)<3000' p(95)=1.81s
+
+    http_req_failed
+    ✓ 'rate<0.01' rate=0.00%
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 14007   78.181246/s
+    checks_succeeded...: 100.00% 14007 out of 14007
+    checks_failed......: 0.00%   0 out of 14007
+
+    ✓ POST /auth/cadastro 201
+    ✓ POST /auth/login 200
+    ✓ POST /sessoes 201
+    ✓ GET /auth/me 200
+    ✓ GET /aulas 200
+    ✓ POST /eventos 204
+    ✓ GET /aulas/:id 200
+    ✓ POST /aulas/:id/visitas 201
+    ✓ POST /visitas/:id/respostas 200
+    ✓ POST /visitas/:id/finalizar 200
+    ✓ GET /ranking 200
+    ✓ GET /badges 200
+    ✓ GET /perfil 200
+
+    HTTP
+    http_req_duration..............: avg=22.72ms  min=0s       med=9.68ms   max=2.21s    p(90)=17.06ms p(95)=21.19ms
+      { expected_response:true }...: avg=22.72ms  min=0s       med=9.68ms   max=2.21s    p(90)=17.06ms p(95)=21.19ms
+      { grupo:app }................: avg=10.93ms  min=0s       med=9.64ms   max=653.84ms p(90)=16.45ms p(95)=19.57ms
+      { grupo:auth }...............: avg=842.57ms min=251.64ms med=779.78ms max=2.21s    p(90)=1.47s   p(95)=1.81s  
+    http_req_failed................: 0.00%  0 out of 14107
+    http_reqs......................: 14107  78.739404/s
+
+    EXECUTION
+    iteration_duration.............: avg=14.41s   min=9.37s    med=13.95s   max=26.67s   p(90)=17.74s  p(95)=21.48s 
+    iterations.....................: 1039   5.799266/s
+    vus............................: 1      min=1          max=100
+    vus_max........................: 100    min=100        max=100
+
+    NETWORK
+    data_received..................: 15 MB  81 kB/s
+    data_sent......................: 1.8 MB 9.9 kB/s
+######## RESULTADO 2 — 2026-10-04T23:08:16  (5280 chars)
+1	// Teste de carga (k6): 100 usuários simultâneos por 2 minutos fazendo o caminho do app
+2	// (cadastro, login, aulas em sequência, trivia, ranking, conquistas, perfil e telemetria).
+3	// Rode contra uma VM descartável, nunca a de produção: cria 100 contas e enche telemetria e respostas.
+4	// Uso: k6 run -e BASE_URL=https://guardiao-carga.brazilsouth.cloudapp.azure.com deploy/carga.js
+5	/* global __ENV, __VU */
+6	import http from 'k6/http';
+7	import { check, sleep } from 'k6';
+8	
+9	const SITE = __ENV.BASE_URL;
+10	const SENHA = 'Carga#Teste2026';
+11	const ALTERNATIVAS = ['a', 'b', 'c', 'd'];
+12	
+13	export const options = {
+14	  scenarios: {
+15	    usuarios: {
+16	      executor: 'ramping-vus',
+17	      stages: [
+18	        { duration: '30s', target: 100 },
+19	        { duration: '2m', target: 100 },
+20	        { duration: '15s', target: 0 },
+21	      ],
+22	    },
+23	  },
+24	  thresholds: {
+25	    http_req_failed: ['rate<0.01'],
+26	    checks: ['rate>0.99'],
+27	    // bcrypt com custo 12 é lento de propósito; o resto do app tem de ser rápido.
+28	    'http_req_duration{grupo:auth}': ['p(95)<3000'],
+29	    'http_req_duration{grupo:app}': ['p(95)<500'],
+30	  },
+31	};
+32	
+33	// Estado de cada VU (cada VU é um usuário e mantém a sessão entre iterações).
+34	let token;
+35	let sessao;
+36	
+37	function req(metodo, rota, corpo, nome, esperado = 200, grupo = 'app') {
+38	  const res = http.request(metodo, `${SITE}/api${rota}`, corpo === undefined ? null : JSON.stringify(corpo), {
+39	    headers: { 'Content-Type': 'application/json', ...(token && { Authorization: `Bearer ${token}` }) },
+40	    tags: { name: nome, grupo },
+41	  });
+42	  return check(res, { [`${nome} ${esperado}`]: (r) => r.status === esperado }) ? res : null;
+43	}
+44	
+45	const pausa = (min = 1, max = 3) => sleep(min + Math.random() * (max - min));
+46	const sortear = (lista) => lista[Math.floor(Math.random() * lista.length)];
+47	const evento = (tipo_evento, extra = {}) =>
+48	  req('POST', '/eventos', { sessao_id: sessao, tipo_evento, ...extra }, 'POST /eventos', 204);
+49	
+50	function entrar() {
+51	  http.get(`${SITE}/`, { tags: { name: 'GET / (PWA)', grupo: 'app' } });
+52	  const apelido = `carga_${__VU}_${Date.now().toString(36)}`;
+53	  const cadastro = req(
+54	    'POST',
+55	    '/auth/cadastro',
+56	    {
+57	      nome: `Carga ${__VU}`,
+58	      apelido,
+59	      email: `${apelido}@carga.teste`,
+60	      senha: SENHA,
+61	      consentiu_pesquisa: true,
+62	    },
+63	    'POST /auth/cadastro',
+64	    201,
+65	    'auth',
+66	  );
+67	  if (!cadastro) return;
+68	  token = cadastro.json('token');
+69	  pausa();
+70	  const login = req(
+71	    'POST',
+72	    '/auth/login',
+73	    { identificador: apelido, senha: SENHA },
+74	    'POST /auth/login',
+75	    200,
+76	    'auth',
+77	  );
+78	  if (login) token = login.json('token');
+79	  sessao = req('POST', '/sessoes', { standalone: false, largura_tela: 390 }, 'POST /sessoes', 201)?.json(
+80	    'id',
+81	  );
+82	}
+83	
+84	function responderTodas(questoes, rota, nome) {
+85	  for (const q of questoes) {
+86	    pausa();
+87	    req('POST', rota, { questao_id: q.id, alternativa: sortear(ALTERNATIVAS) }, nome);
+88	  }
+89	}
+90	
+91	function fazerAula(id) {
+92	  const aula = req('GET', `/aulas/${id}`, undefined, 'GET /aulas/:id');
+93	  const visita = aula && req('POST', `/aulas/${id}/visitas`, undefined, 'POST /aulas/:id/visitas', 201);
+94	  if (!visita) return;
+95	  evento('aula_iniciada', { tela: 'aula' });
+96	  pausa(3, 8); // lendo o conteúdo
+97	  evento('a
+######## RESULTADO 3 — 2026-10-04T23:18:46  (2292 chars)
+  █ THRESHOLDS 
+
+    checks
+    ✓ 'rate>0.99' rate=99.99%
+
+    http_req_duration{grupo:app}
+    ✓ 'p(95)<500' p(95)=41.95ms
+
+    http_req_duration{grupo:auth}
+    ✗ 'p(95)<3000' p(95)=4.87s
+
+    http_req_failed
+    ✓ 'rate<0.01' rate=0.00%
+
+    rodadas_trivia
+    ✓ 'count>=100' count=1009
+
+    trilhas_concluidas
+    ✓ 'count>=100' count=100
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 27753  162.978296/s
+    checks_succeeded...: 99.99% 27751 out of 27753
+    checks_failed......: 0.00%  2 out of 27753
+
+    ✓ POST /auth/cadastro 201
+    ✓ POST /auth/login 200
+    ✓ POST /sessoes 201
+    ✗ GET /auth/me 200
+      ↳  99% — ✓ 2508 / ✗ 1
+    ✓ GET /aulas 200
+    ✓ POST /eventos 204
+    ✓ GET /aulas/:id 200
+    ✓ POST /aulas/:id/visitas 201
+    ✓ POST /visitas/:id/respostas 200
+    ✓ POST /visitas/:id/finalizar 200
+    ✗ GET /ranking 200
+      ↳  99% — ✓ 828 / ✗ 1
+    ✓ GET /badges 200
+    ✓ GET /perfil 200
+    ✓ POST /trivia/rodadas 201
+    ✓ POST /trivia/rodadas/:id/respostas 200
+    ✓ POST /trivia/rodadas/:id/finalizar 200
+
+    CUSTOM
+    rodadas_trivia.................: 1009   5.925309/s
+    trilhas_concluidas.............: 100    0.587246/s
+
+    HTTP
+    http_req_duration..............: avg=30.36ms min=504.29µs med=12.03ms max=6.5s  p(90)=27.24ms p(95)=47.94ms
+      { expected_response:true }...: avg=30ms    min=504.29µs med=12.03ms max=6.5s  p(90)=27.24ms p(95)=47.92ms
+      { grupo:app }................: avg=18.65ms min=504.29µs med=11.99ms max=5.12s p(90)=26.24ms p(95)=41.95ms
+      { grupo:auth }...............: avg=1.65s   min=263.17ms med=1.11s   max=6.5s  p(90)=3.74s   p(95)=4.87s  
+    http_req_failed................: 0.00%  2 out of 27853
+    http_reqs......................: 27853  163.565542/s
+
+    EXECUTION
+    iteration_duration.............: avg=5.8s    min=2.83s    med=5.44s   max=17.8s p(90)=7.74s   p(95)=8.73s  
+    iterations.....................: 2509   14.733994/s
+    vus............................: 1      min=1          max=100
+    vus_max........................: 100    min=100        max=100
+
+    NETWORK
+    data_received..................: 24 MB  139 kB/s
+    data_sent......................: 3.6 MB 21 kB/s
+
+
+
+time="2026-10-04T20:18:46-03:00" level=error msg="thresholds on metrics 'http_req_duration{grupo:auth}' have been crossed"
+######## RESULTADO 4 — 2026-10-04T23:35:10  (2690 chars)
+1	// Teste de carga (k6): 100 usuários simultâneos por 2 minutos fazendo o caminho do app
+2	// (cadastro, login, trilha inteira de aulas, depois trivia; ranking, conquistas, perfil e telemetria).
+3	// Pausas curtas de propósito: cada usuário termina as 15 aulas em ~1,5 min e joga trivia no resto.
+4	// Rode contra uma VM descartável, nunca a de produção: cria 100 contas e enche telemetria e respostas.
+5	// Uso: k6 run -e BASE_URL=https://guardiao-carga.brazilsouth.cloudapp.azure.com deploy/carga.js
+6	/* global __ENV, __VU */
+7	import http from 'k6/http';
+8	import { check, sleep } from 'k6';
+9	import { Counter } from 'k6/metrics';
+10	
+11	const SITE = __ENV.BASE_URL;
+12	const SENHA = 'Carga#Teste2026';
+13	const ALTERNATIVAS = ['a', 'b', 'c', 'd'];
+14	const trilhasConcluidas = new Counter('trilhas_concluidas');
+15	const rodadasTrivia = new Counter('rodadas_trivia');
+16	
+17	export const options = {
+18	  scenarios: {
+19	    usuarios: {
+20	      executor: 'ramping-vus',
+21	      stages: [
+22	        { duration: '30s', target: 100 },
+23	        { duration: '2m', target: 100 },
+24	        { duration: '15s', target: 0 },
+25	      ],
+26	    },
+27	  },
+28	  thresholds: {
+29	    http_req_failed: ['rate<0.01'],
+30	    checks: ['rate>0.99'],
+31	    // bcrypt com custo 12 é lento de propósito; o resto do app tem de ser rápido.
+32	    'http_req_duration{grupo:auth}': ['p(95)<3000'],
+33	    'http_req_duration{grupo:app}': ['p(95)<500'],
+34	    // Todos os 100 usuários precisam chegar ao fim da trilha e jogar trivia.
+35	    trilhas_concluidas: ['count>=100'],
+36	    rodadas_trivia: ['count>=100'],
+37	  },
+38	};
+39	
+40	// Estado de cada VU (cada VU é um usuário e mantém a sessão entre iterações).
+41	let token;
+42	let sessao;
+43	
+44	function req(metodo, rota, corpo, nome, esperado = 200, grupo = 'app') {
+45	  const res = http.request(metodo, `${SITE}/api${rota}`, corpo === undefined ? null : JSON.stringify(corpo), {
+46	    headers: { 'Content-Type': 'application/json', ...(token && { Authorization: `Bearer ${token}` }) },
+47	    tags: { name: nome, grupo },
+48	  });
+49	  return check(res, { [`${nome} ${esperado}`]: (r) => r.status === esperado }) ? res : null;
+50	}
+51	
+52	const pausa = (min = 0.5, max = 1.5) => sleep(min + Math.random() * (max - min));
+53	const sortear = (lista) => lista[Math.floor(Math.random() * lista.length)];
+54	const evento = (tipo_evento, extra = {}) =>
+55	  req('POST', '/eventos', { sessao_id: sessao, tipo_evento, ...extra }, 'POST /eventos', 204);
+56	
+57	function entrar() {
+58	  http.get(`${SITE}/`, { tags: { name: 'GET / (PWA)', grupo: 'app' } });
+59	  const apelido = `carga_${__VU}_${Date.now().toString(36)}`;
+60	  const cadastro = req(
+######## RESULTADO 5 — 2026-10-04T23:37:22  (542 chars)
+[{"duration":"30s","target":50},{"duration":"3m0s","target":50},{"duration":"15s","target":0}] [
+  'checks',
+  'http_req_duration{grupo:app}',
+  'http_req_duration{grupo:auth}',
+  'http_req_failed',
+  'rodadas_trivia'
+]
+guardiao-api-1 Up 25 minutes (healthy)
+guardiao-db-1 Up 25 minutes (healthy)
+monitor iniciado
+[This command modified 1 file you've previously read: ..\..\..\..\AppData\Local\Temp\claude\c--Users-samu--source-repos-Faculdade-nodeLogin\c2331b08-4009-4f49-a2bc-2ffe1eabefcf\scratchpad\monitorar.sh. Call Read before editing.]
+######## RESULTADO 6 — 2026-10-04T23:41:19  (2077 chars)
+  █ THRESHOLDS 
+
+    checks
+    ✓ 'rate>0.99' rate=100.00%
+
+    http_req_duration{grupo:app}
+    ✓ 'p(95)<100' p(95)=20.52ms
+    ✓ 'p(99)<300' p(99)=28.5ms
+
+    http_req_duration{grupo:auth}
+    ✓ 'p(95)<2000' p(95)=280.17ms
+    ✓ 'p(99)<3000' p(99)=304.95ms
+
+    http_req_failed
+    ✓ 'rate<0.01' rate=0.00%
+
+    rodadas_trivia
+    ✓ 'count>=50' count=1337
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 19888   86.700109/s
+    checks_succeeded...: 100.00% 19888 out of 19888
+    checks_failed......: 0.00%   0 out of 19888
+
+    ✓ POST /auth/login 200
+    ✓ POST /sessoes 201
+    ✓ GET /auth/me 200
+    ✓ GET /aulas 200
+    ✓ POST /eventos 204
+    ✓ GET /aulas/:id 200
+    ✓ POST /aulas/:id/visitas 201
+    ✓ POST /trivia/rodadas 201
+    ✓ POST /trivia/rodadas/:id/respostas 200
+    ✓ POST /visitas/:id/finalizar 200
+    ✓ POST /trivia/rodadas/:id/finalizar 200
+    ✓ GET /ranking 200
+    ✓ GET /badges 200
+    ✓ GET /perfil 200
+    ✓ POST /visitas/:id/respostas 200
+
+    CUSTOM
+    rodadas_trivia.................: 1337   5.828542/s
+
+    HTTP
+    http_req_duration..............: avg=12.51ms med=10.87ms  p(90)=17.78ms  p(95)=20.74ms  p(99)=29.77ms  max=316.83ms
+      { expected_response:true }...: avg=12.51ms med=10.87ms  p(90)=17.78ms  p(95)=20.74ms  p(99)=29.77ms  max=316.83ms
+      { grupo:app }................: avg=11.88ms med=10.86ms  p(90)=17.68ms  p(95)=20.52ms  p(99)=28.5ms   max=230.21ms
+      { grupo:auth }...............: avg=262.1ms med=257.82ms p(90)=273.68ms p(95)=280.17ms p(99)=304.95ms max=316.83ms
+    http_req_failed................: 0.00%  0 out of 19938
+    http_reqs......................: 19938  86.91808/s
+
+    EXECUTION
+    iteration_duration.............: avg=5.91s   med=5.74s    p(90)=7.78s    p(95)=8.32s    p(99)=9.15s    max=10.12s  
+    iterations.....................: 1741   7.589747/s
+    vus............................: 2      min=2          max=50
+    vus_max........................: 50     min=50         max=50
+
+    NETWORK
+    data_received..................: 16 MB  69 kB/s
+    data_sent......................: 2.6 MB 11 kB/s
+######## RESULTADO 7 — 2026-10-04T23:48:00  (2262 chars)
+1	// Teste de carga (k6): usuários simultâneos fazendo o caminho do app (cadastro ou login, trilha inteira
+2	// de aulas, depois trivia e revisão de aulas; ranking, conquistas, perfil e telemetria).
+3	// Pausas curtas de propósito: cada usuário novo termina as 15 aulas em ~1,5 min e joga trivia no resto.
+4	// Rode contra uma VM descartável, nunca a de produção: cria contas e enche telemetria e respostas.
+5	//
+6	// Usuários novos (padrão: 100 por 2 min):
+7	//   k6 run -e BASE_URL=https://guardiao-carga.brazilsouth.cloudapp.azure.com deploy/carga.js
+8	// Usuários já cadastrados por uma rodada anterior (JSON com os apelidos; a senha é SENHA):
+9	//   k6 run -e BASE_URL=... -e USUARIOS=usuarios.json -e VUS=50 -e DURACAO=3m deploy/carga.js
+10	/* global __ENV, __VU, open */
+11	import http from 'k6/http';
+12	import { check, sleep } from 'k6';
+13	import { Counter } from 'k6/metrics';
+14	
+15	const SITE = __ENV.BASE_URL;
+16	const SENHA = 'Carga#Teste2026';
+17	const VUS = Number(__ENV.VUS || 100);
+18	const EXISTENTES = __ENV.USUARIOS ? JSON.parse(open(__ENV.USUARIOS)) : null;
+19	const ALTERNATIVAS = ['a', 'b', 'c', 'd'];
+20	const trilhasConcluidas = new Counter('trilhas_concluidas');
+21	const rodadasTrivia = new Counter('rodadas_trivia');
+22	
+23	export const options = {
+24	  scenarios: {
+25	    usuarios: {
+26	      executor: 'ramping-vus',
+27	      stages: [
+28	        { duration: '30s', target: VUS },
+29	        { duration: __ENV.DURACAO || '2m', target: VUS },
+30	        { duration: '15s', target: 0 },
+31	      ],
+32	    },
+33	  },
+34	  summaryTrendStats: ['avg', 'med', 'p(90)', 'p(95)', 'p(99)', 'max'],
+35	  thresholds: {
+36	    http_req_failed: ['rate<0.01'],
+37	    checks: ['rate>0.99'],
+38	    // bcrypt com custo 12 é lento de propósito; o resto do app tem de ser rápido.
+39	    'http_req_duration{grupo:auth}': ['p(95)<2000', 'p(99)<3000'],
+40	    'http_req_duration{grupo:app}': ['p(95)<100', 'p(99)<300'],
+41	    // Todo usuário joga trivia; os novos precisam antes chegar ao fim da trilha.
+42	    rodadas_trivia: [`count>=${VUS}`],
+43	    ...(!EXISTENTES && { trilhas_concluidas: [`count>=${VUS}`] }),
+44	  },
+45	};
+46	
+47	// Estado de cada VU (cada VU é um usuário e mantém a sessão entre iterações).
+48	let token;
+49	let sessao;
+50	
+######## RESULTADO 8 — 2026-10-04T23:48:20  (519 chars)
+[ 'existentes', 'novos' ] [{"duration":"30s","target":50},{"duration":"3m0s","target":50},{"duration":"15s","target":0}] {
+  checks: [ 'rate>0.99' ],
+  'http_req_duration{grupo:app}': [ 'p(95)<100', 'p(99)<300' ],
+  'http_req_duration{grupo:auth}': [ 'p(95)<2000', 'p(99)<3000' ],
+  http_req_failed: [ 'rate<0.01' ],
+  rodadas_trivia: [ 'count>=100' ],
+  trilhas_concluidas: [ 'count>=50' ]
+}
+[ 'novos' ] [ 'count>=100' ]
+[This command modified 1 file you've previously read: deploy\carga.js. Call Read before editing.]
+######## RESULTADO 9 — 2026-10-04T23:54:27  (2245 chars)
+monitor iniciado
+
+
+  █ THRESHOLDS 
+
+    checks
+    ✓ 'rate>0.99' rate=100.00%
+
+    http_req_duration{grupo:app}
+    ✓ 'p(95)<100' p(95)=31.32ms
+    ✓ 'p(99)<300' p(99)=56.82ms
+
+    http_req_duration{grupo:auth}
+    ✓ 'p(95)<2000' p(95)=500.67ms
+    ✓ 'p(99)<3000' p(99)=605.68ms
+
+    http_req_failed
+    ✓ 'rate<0.01' rate=0.00%
+
+    rodadas_trivia
+    ✓ 'count>=100' count=2115
+
+    trilhas_concluidas
+    ✓ 'count>=50' count=50
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 39872   172.119451/s
+    checks_succeeded...: 100.00% 39872 out of 39872
+    checks_failed......: 0.00%   0 out of 39872
+
+    ✓ POST /auth/cadastro 201
+    ✓ POST /auth/login 200
+    ✓ POST /sessoes 201
+    ✓ GET /auth/me 200
+    ✓ GET /aulas 200
+    ✓ POST /eventos 204
+    ✓ POST /trivia/rodadas 201
+    ✓ POST /trivia/rodadas/:id/respostas 200
+    ✓ GET /aulas/:id 200
+    ✓ POST /aulas/:id/visitas 201
+    ✓ POST /trivia/rodadas/:id/finalizar 200
+    ✓ POST /visitas/:id/respostas 200
+    ✓ POST /visitas/:id/finalizar 200
+    ✓ GET /ranking 200
+    ✓ GET /badges 200
+    ✓ GET /perfil 200
+
+    CUSTOM
+    rodadas_trivia.................: 2115   9.130032/s
+    trilhas_concluidas.............: 50     0.21584/s
+
+    HTTP
+    http_req_duration..............: avg=15.77ms  med=11.8ms   p(90)=24.57ms  p(95)=32.09ms  p(99)=70.29ms  max=925.13ms
+      { expected_response:true }...: avg=15.77ms  med=11.8ms   p(90)=24.57ms  p(95)=32.09ms  p(99)=70.29ms  max=925.13ms
+      { grupo:app }................: avg=14.82ms  med=11.78ms  p(90)=24.27ms  p(95)=31.32ms  p(99)=56.82ms  max=460.45ms
+      { grupo:auth }...............: avg=270.46ms med=245.65ms p(90)=413.95ms p(95)=500.67ms p(99)=605.68ms max=925.13ms
+    http_req_failed................: 0.00%  0 out of 39972
+    http_reqs......................: 39972  172.551131/s
+
+    EXECUTION
+    iteration_duration.............: avg=5.83s    med=5.69s    p(90)=7.74s    p(95)=8.37s    p(99)=9.45s    max=11.92s  
+    iterations.....................: 3532   15.246938/s
+    vus............................: 2      min=2          max=100
+    vus_max........................: 100    min=100        max=100
+
+    NETWORK
+    data_received..................: 33 MB  142 kB/s
+    data_sent......................: 5.1 MB 22 kB/s
+######## RESULTADO 10 — 2026-10-05T14:16:50  (4574 chars)
+1	// Teste de carga (k6) do Guardião Impacta. Rode contra uma VM descartável, nunca a de produção:
+2	// cria contas e enche telemetria e respostas. Cliques: 2 a 15 s nas aulas e na navegação, 1 a 10 s na trivia.
+3	//
+4	// MODO=preparo   roda NA VM, na rede do compose, e cria VUS contas "existentes" com progresso variado
+5	//                (a metade termina a trilha). Imprime "CONTA <apelido> <token>". Os cadastros saem de
+6	//                outro IP, então não gastam o teto de auth por IP do teste principal.
+7	//   docker run --rm -i --network guardiao_default grafana/k6 run -e MODO=preparo -e VUS=50 \
+8	//     -e BASE_URL=http://api:4000 - < deploy/carga.js
+9	// MODO=teste     (padrão) VUS usuários por DURACAO. VU ímpar é aluno novo (cadastro e trilha); VU par usa
+10	//                uma conta de CONTAS (arquivo com as linhas CONTA): 3 em 5 já logados, 2 em 5 fazem login.
+11	//                Com 100 VUs são 70 requisições de auth no IP do k6, abaixo do teto de 100 em 15 min.
+12	//   k6 run -e BASE_URL=https://guardiao-carga.brazilsouth.cloudapp.azure.com -e CONTAS=contas.txt deploy/carga.js
+13	// MODO=estresse  só contas de CONTAS, já logadas (sem auth), subindo pelos ESTAGIOS (padrão 100,200,300,400)
+14	//                com DURACAO em cada um; mostra p95 e p99 por patamar.
+15	/* global __ENV, __VU, open */
+16	import http from 'k6/http';
+17	import exec from 'k6/execution';
+18	import { check, sleep } from 'k6';
+19	import { Counter } from 'k6/metrics';
+20	
+21	const SITE = __ENV.BASE_URL;
+22	const MODO = __ENV.MODO || 'teste';
+23	const SENHA = 'Carga#Teste2026';
+24	const VUS = Number(__ENV.VUS || 100);
+25	const DURACAO = __ENV.DURACAO || (MODO === 'estresse' ? '1m' : '3m');
+26	const ESTAGIOS = (__ENV.ESTAGIOS || '100,200,300,400').split(',').map(Number);
+27	const CONTAS = __ENV.CONTAS
+28	  ? open(__ENV.CONTAS)
+29	      .split('\n')
+30	      .filter((linha) => linha.startsWith('CONTA '))
+31	      .map((linha) => {
+32	        const [, apelido, token] = linha.trim().split(' ');
+33	        return { apelido, token };
+34	      })
+35	  : [];
+36	const ALTERNATIVAS = ['a', 'b', 'c', 'd'];
+37	const aulasConcluidas = new Counter('aulas_concluidas');
+38	const trilhasConcluidas = new Counter('trilhas_concluidas');
+39	const rodadasTrivia = new Counter('rodadas_trivia');
+40	
+41	const patamar = (vus) => [
+42	  { duration: '30s', target: vus },
+43	  { duration: DURACAO, target: vus },
+44	];
+45	const CENARIOS = {
+46	  preparo: { executor: 'per-vu-iterations', vus: VUS, iterations: 1, maxDuration: '10m' },
+47	  teste: { executor: 'ramping-vus', stages: [...patamar(VUS), { duration: '15s', target: 0 }] },
+48	  estresse: {
+49	    executor: 'ramping-vus',
+50	    stages: [...ESTAGIOS.flatMap(patamar), { duration: '15s', target: 0 }],
+51	  },
+52	};
+53	// bcrypt é lento de propósito; o resto do app tem de ser rápido.
+54	const LATENCIA_APP = ['p(95)<100', 'p(99)<300'];
+55	
+56	export const options = {
+57	  scenarios: { [MODO]: CENARIOS[MODO] },
+58	  summaryTrendStats: ['avg', 'med', 'p(90)', 'p(95)', 'p(99)', 'max'],
+59	  thresholds: {
+60	    http_req_failed: ['rate<0.01'],
+61	    checks: ['rate>0.99'],
+62	    // Ninguém pode bater no rate limit.
+63	    'http_reqs{status:429}': ['count==0'],
+64	    ...(MODO !== 'preparo' && {
+65	      'http_req_duration{grupo:app}': LATENCIA_APP,
+66	      'http_req_duration{grupo:auth}': ['p(95)<2000', 'p(99)<3000'],
+67	    }),
+68	    // Todo aluno novo conclui aula; os existentes com a trilha completa (metade deles) jogam tri
+######## RESULTADO 11 — 2026-10-05T14:17:36  (1087 chars)
+preparo per-vu-iterations 50
+    checks | http_req_failed | http_reqs{status:429}
+teste ramping-vus [{"duration":"30s","target":100},{"duration":"3m0s","target":100},{"duration":"15s","target":10},{"duration":"2m0s","target":10},{"duration":"10s","target":0}]
+    aulas_concluidas | checks | http_req_duration{grupo:app,fase:final} | http_req_duration{grupo:app,fase:pico} | http_req_duration{grupo:app} | http_req_duration{grupo:auth} | http_req_failed | http_reqs{status:429} | rodadas_trivia
+estresse ramping-vus [{"duration":"30s","target":100},{"duration":"1m0s","target":100},{"duration":"30s","target":200},{"duration":"1m0s","target":200},{"duration":"30s","target":300},{"duration":"1m0s","target":300},{"duration":"30s","target":400},{"duration":"1m0s","target":400},{"duration":"15s","target":0}]
+    checks | http_req_duration{grupo:app,carga:100} | http_req_duration{grupo:app,carga:200} | http_req_duration{grupo:app,carga:300} | http_req_duration{grupo:app,carga:400} | http_req_duration{grupo:app} | http_req_duration{grupo:auth} | http_req_failed | http_reqs{status:429}
+######## RESULTADO 12 — 2026-10-05T14:32:33  (2800 chars)
+exit=0
+novos logados: 50
+
+
+  █ THRESHOLDS 
+
+    aulas_concluidas
+    ✓ 'count>=50' count=341
+
+    checks
+    ✓ 'rate>0.99' rate=100.00%
+
+    http_req_duration{grupo:app,fase:final}
+    ✓ 'p(95)<100' p(95)=20.77ms
+    ✓ 'p(99)<300' p(99)=26.36ms
+
+    http_req_duration{grupo:app,fase:pico}
+    ✓ 'p(95)<100' p(95)=20.1ms
+    ✓ 'p(99)<300' p(99)=25.29ms
+
+    http_req_duration{grupo:app}
+    ✓ 'p(95)<100' p(95)=20.15ms
+    ✓ 'p(99)<300' p(99)=25.45ms
+
+    http_req_duration{grupo:auth}
+    ✓ 'p(95)<2000' p(95)=150.03ms
+    ✓ 'p(99)<3000' p(99)=167.98ms
+
+    http_req_failed
+    ✓ 'rate<0.01' rate=0.00%
+
+    http_reqs{status:429}
+    ✓ 'count==0' count=0
+
+    rodadas_trivia
+    ✓ 'count>=25' count=104
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 5729    15.116085/s
+    checks_succeeded...: 100.00% 5729 out of 5729
+    checks_failed......: 0.00%   0 out of 5729
+
+    ✓ POST /sessoes 201
+    ✓ GET /auth/me 200
+    ✓ GET /aulas 200
+    ✓ POST /eventos 204
+    ✓ POST /auth/login 200
+    ✓ POST /auth/cadastro 201
+    ✓ GET /aulas/:id 200
+    ✓ POST /aulas/:id/visitas 201
+    ✓ POST /trivia/rodadas 201
+    ✓ POST /trivia/rodadas/:id/respostas 200
+    ✓ POST /visitas/:id/respostas 200
+    ✓ POST /visitas/:id/finalizar 200
+    ✓ POST /trivia/rodadas/:id/finalizar 200
+    ✓ GET /ranking 200
+    ✓ GET /badges 200
+    ✓ GET /perfil 200
+
+    CUSTOM
+    aulas_concluidas...............: 341    0.899736/s
+    rodadas_trivia.................: 104    0.274406/s
+
+    HTTP
+    http_req_duration..............: avg=13.67ms  med=11.23ms  p(90)=18.41ms  p(95)=20.82ms  p(99)=133.41ms max=224.67ms
+      { expected_response:true }...: avg=13.67ms  med=11.23ms  p(90)=18.41ms  p(95)=20.82ms  p(99)=133.41ms max=224.67ms
+      { grupo:app,fase:final }.....: avg=12.72ms  med=11.5ms   p(90)=19.29ms  p(95)=20.77ms  p(99)=26.36ms  max=32.31ms 
+      { grupo:app,fase:pico }......: avg=12.2ms   med=11.22ms  p(90)=17.76ms  p(95)=20.1ms   p(99)=25.29ms  max=224.67ms
+      { grupo:app }................: avg=12.16ms  med=11.2ms   p(90)=17.84ms  p(95)=20.15ms  p(99)=25.45ms  max=224.67ms
+      { grupo:auth }...............: avg=137.25ms med=135.34ms p(90)=140.82ms p(95)=150.03ms p(99)=167.98ms max=185.55ms
+    http_req_failed................: 0.00%  0 out of 5829
+    http_reqs......................: 5829   15.379937/s
+      { status:429 }...............: 0      0/s
+
+    EXECUTION
+    iteration_duration.............: avg=49.15s   med=47.94s   p(90)=1m5s     p(95)=1m11s    p(99)=1m23s    max=1m26s   
+    iterations.....................: 447    1.179419/s
+    vus............................: 1      min=1         max=100
+    vus_max........................: 100    min=100       max=100
+
+    NETWORK
+    data_received..................: 5.5 MB 15 kB/s
+    data_sent......................: 908 kB 2.4 kB/s
+######## RESULTADO 13 — 2026-10-05T14:35:41  (420 chars)
+contas: 100
+http_req_duration{grupo:app,carga:1000} | http_req_duration{grupo:app,carga:250} | http_req_duration{grupo:app,carga:500} | http_req_duration{grupo:app,carga:750}
+monitor iniciado
+[This command modified 1 file you've previously read: ..\..\..\..\AppData\Local\Temp\claude\c--Users-samu--source-repos-Faculdade-nodeLogin\c2331b08-4009-4f49-a2bc-2ffe1eabefcf\scratchpad\monitorar.sh. Call Read before editing.]
+######## RESULTADO 14 — 2026-10-05T14:42:34  (2684 chars)
+exit=99
+  █ THRESHOLDS 
+    checks
+    ✓ 'rate>0.99' rate=99.99%
+    http_req_duration{grupo:app,carga:1000}
+    ✓ 'p(95)<100' p(95)=41.19ms
+    ✓ 'p(99)<300' p(99)=75.61ms
+    http_req_duration{grupo:app,carga:250}
+    ✓ 'p(95)<100' p(95)=20.76ms
+    ✓ 'p(99)<300' p(99)=27.22ms
+    http_req_duration{grupo:app,carga:500}
+    ✓ 'p(95)<100' p(95)=22.96ms
+    ✓ 'p(99)<300' p(99)=32.82ms
+    http_req_duration{grupo:app,carga:750}
+    ✓ 'p(95)<100' p(95)=30.32ms
+    ✓ 'p(99)<300' p(99)=86.71ms
+    http_req_duration{grupo:app}
+    ✓ 'p(95)<100' p(95)=33.09ms
+    ✓ 'p(99)<300' p(99)=66.48ms
+    http_req_duration{grupo:auth}
+    ✓ 'p(95)<2000' p(95)=0s
+    ✓ 'p(99)<3000' p(99)=0s
+    http_req_failed
+    ✓ 'rate<0.01' rate=0.00%
+    http_reqs{status:429}
+    ✗ 'count==0' count=1
+  █ TOTAL RESULTS 
+    checks_total.......: 58262  143.861804/s
+    checks_succeeded...: 99.99% 58261 out of 58262
+    checks_failed......: 0.00%  1 out of 58262
+    ✓ POST /sessoes 201
+    ✓ GET /auth/me 200
+    ✓ GET /aulas 200
+    ✗ POST /eventos 204
+      ↳  99% — ✓ 20244 / ✗ 1
+    ✓ GET /aulas/:id 200
+    ✓ POST /aulas/:id/visitas 201
+    ✓ POST /trivia/rodadas 201
+    ✓ POST /trivia/rodadas/:id/respostas 200
+    ✓ POST /visitas/:id/respostas 200
+    ✓ POST /trivia/rodadas/:id/finalizar 200
+    ✓ POST /visitas/:id/finalizar 200
+    ✓ GET /ranking 200
+    ✓ GET /badges 200
+    ✓ GET /perfil 200
+    CUSTOM
+    aulas_concluidas...............: 2984   7.368158/s
+    rodadas_trivia.................: 1461   3.607533/s
+    trilhas_concluidas.............: 224    0.553106/s
+    HTTP
+    http_req_duration..............: avg=15.72ms med=12.24ms p(90)=25.2ms  p(95)=33.09ms p(99)=66.48ms max=599.77ms
+      { expected_response:true }...: avg=15.72ms med=12.24ms p(90)=25.2ms  p(95)=33.1ms  p(99)=66.48ms max=599.77ms
+      { grupo:app,carga:1000 }.....: avg=18ms    med=13.81ms p(90)=31.32ms p(95)=41.19ms p(99)=75.61ms max=278.33ms
+      { grupo:app,carga:250 }......: avg=12.17ms med=11.15ms p(90)=18.01ms p(95)=20.76ms p(99)=27.22ms max=286.52ms
+      { grupo:app,carga:500 }......: avg=12.76ms med=11.23ms p(90)=19.6ms  p(95)=22.96ms p(99)=32.82ms max=142.52ms
+      { grupo:app,carga:750 }......: avg=15.91ms med=12.01ms p(90)=23.48ms p(95)=30.32ms p(99)=86.71ms max=599.77ms
+      { grupo:app }................: avg=15.72ms med=12.24ms p(90)=25.2ms  p(95)=33.09ms p(99)=66.48ms max=599.77ms
+      { grupo:auth }...............: avg=0s      med=0s      p(90)=0s      p(95)=0s      p(99)=0s      max=0s      
+    http_req_failed................: 0.00%  1 out of 59262
+    http_reqs......................: 59262  146.331026/s
+      { status:429 }...............: 1      0.002469/s
+    EXECUTION
+total: 14

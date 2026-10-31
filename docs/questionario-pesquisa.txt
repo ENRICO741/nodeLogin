@@ -1,0 +1,416 @@
+QUESTIONÁRIOS DA PESQUISA - GUARDIÃO IMPACTA (RASCUNHO v2)
+===========================================================
+
+Situação:
+- Revisado por revisores simulados (IA).
+- Falta: retrotradução humana e piloto com 3 a 5 pessoas.
+- Simulação navegável: docs/questionario.html (abas pré e pós)
+
+Códigos:
+- Sigla do construto + número.
+- Final _R = item invertido: nota = (máximo da escala + 1) - resposta.
+
+Aplicação:
+- Itens em ordem aleatória dentro de cada bloco.
+- Não mostrar o nome do construto.
+- ATN fica no meio do bloco Hexad.
+- Texto de abertura: "Não existem respostas certas ou erradas. Suas respostas são
+  usadas só nesta pesquisa e analisadas sem o seu nome." (alinhar com o TCLE)
+
+
+=====================================================================
+QUESTIONÁRIO PRÉ (antes do 1º uso) - 40 itens
+=====================================================================
+anamnese 6 + treinamento anterior 4 + UES-SF 12 + conhecimento 7
++ Hexad 10 + atenção 1
+
+--- 1. Anamnese ---
+A1  Qual é a sua faixa etária?
+    18-24 / 25-34 / 35-44 / 45-54 / 55 ou mais
+A2  Qual é o seu gênero?
+    Feminino / Masculino / Outro / Prefiro não informar
+A3  Qual é a sua escolaridade?
+    Até o ensino médio (completo ou não) / Superior incompleto /
+    Superior completo / Pós-graduação
+A4  Em qual área você trabalha?
+    (Profissionais de TI são filtrados no recrutamento.)
+    Administrativo / Financeiro ou contábil / Recursos humanos /
+    Comercial ou vendas / Marketing ou comunicação / Jurídico /
+    Atendimento ao cliente / Operações ou logística / Outra
+A5  Com que frequência você joga jogos digitais (celular, computador ou console)?
+    Nunca / Raramente (menos de 1 vez por mês) / Algumas vezes por mês /
+    Algumas vezes por semana / Todos os dias
+A6  Quais destas plataformas de ensino com pontos, medalhas ou ranking você
+    já usou? Marque todas as que se aplicam.
+    Duolingo / Kahoot! / Quizizz / Khan Academy /
+    Treinamento da empresa com pontos, medalhas ou ranking / Outra / Nenhuma
+    ("Nenhuma" desmarca as outras.)
+    Análise: quantidade de plataformas = experiência prévia com gamificação
+    (possível moderador da mudança entre o pré e o pós).
+
+--- 2. Treinamento anterior ---
+C1  Você já fez algum treinamento de segurança da informação (sobre senhas,
+    golpes por e-mail, proteção de dados etc.), no trabalho, na faculdade ou
+    por conta própria?
+    Sim / Não / Não lembro
+    -> Se Não ou Não lembro: pula C2-C4 e a UES-SF.
+C2  Há quanto tempo você fez o treinamento mais recente?
+    Menos de 6 meses / Entre 6 meses e 1 ano / Entre 1 e 2 anos /
+    Mais de 2 anos / Não lembro
+C3  Qual era o formato principal desse treinamento?
+    Vídeo ou curso online / Palestra ou aula presencial /
+    Material para leitura / Simulação de e-mail falso (phishing) /
+    Jogo ou quiz com pontos ou ranking / Outro
+C4  Esse treinamento era obrigatório?
+    Sim / Não / Não lembro
+
+--- 3. UES-SF adaptada ---
+Fonte: O'Brien, H. L.; Cairns, P.; Hall, M. (2018). International Journal of
+Human-Computer Studies, 112, 28-39. https://doi.org/10.1016/j.ijhcs.2018.01.004
+Comparar com a UES-Br (Miranda, Li & Darin, 2021,
+https://doi.org/10.1145/3474705) quando houver acesso.
+
+Escala de 5 pontos:
+  1 Discordo totalmente / 2 Discordo / 3 Nem concordo nem discordo /
+  4 Concordo / 5 Concordo totalmente
+
+Pontuação:
+- Inverter os itens PU.
+- Nota da subescala = média dos seus itens.
+- Nota geral = média dos 12 itens.
+
+Cabeçalho: "Pense no treinamento de segurança da informação mais recente que
+você fez. Nas frases sobre aparência, considere o visual de slides, vídeos,
+telas ou materiais."
+
+        PRÉ (treinamento mais recente)                       | ORIGINAL (Application X)
+FA1    Fiquei tão envolvido(a) nesse treinamento que       | I lost myself in this experience.
+       esqueci o que acontecia ao meu redor.
+FA2    Enquanto fazia esse treinamento, o tempo passou sem  | The time I spent using Application X
+       eu perceber.                                         | just slipped away.
+FA3    Fiquei totalmente concentrado(a) nesse treinamento.  | I was absorbed in this experience.
+PU1_R  Eu me senti frustrado(a) durante esse treinamento.   | I felt frustrated while using this Application X.
+PU2_R  Achei confuso acompanhar esse treinamento.           | I found this Application X confusing to use.
+PU3_R  Fazer esse treinamento foi desgastante.              | Using this Application X was taxing.
+AE1    O visual desse treinamento era atraente.             | This Application X was attractive.
+AE2    Esse treinamento tinha uma aparência bonita.         | This Application X was aesthetically appealing.
+AE3    A apresentação desse treinamento (imagens, cores)    | This Application X appealed to my senses.
+       era agradável.
+RW1    Fazer esse treinamento valeu a pena.                 | Using Application X was worthwhile.
+RW2    Minha experiência com esse treinamento foi           | My experience was rewarding.
+       gratificante.
+RW3    Eu me senti interessado(a) nesse treinamento.        | I felt interested in this experience.
+
+Decisões de adaptação:
+- A escala fica ancorada no treinamento mais recente, o mesmo de C2 a C4.
+- "Gratificante" em RW2, para não ser lido como pontos no pós.
+- "Acompanhar" em PU2, para medir uso e não conteúdo.
+- AE3 sem "sentidos", que soou estranho no pré-teste, e sem "sons", porque o app
+  não tem áudio. O texto fica igual no pré e no pós.
+- FA1 diz "esqueci o que acontecia ao meu redor": "me desliguei" foi lido ao pé
+  da letra.
+
+--- 4. Conhecimento em segurança ---
+Base: as 7 áreas do HAIS-Q.
+- Parsons et al. (2014), Computers & Security, 42, 165-176.
+  https://doi.org/10.1016/j.cose.2013.12.003
+- Parsons et al. (2017), Computers & Security, 66, 40-51.
+  https://doi.org/10.1016/j.cose.2017.01.004
+
+Formato: situações do dia a dia (julgamento situacional), 1 por área, com
+redação própria. Substituiu em 2026-10-07 as frases K1-K7 em escala Likert,
+que davam efeito teto e abriam espaço para a desejabilidade social (marcar o
+"certo" sem agir assim).
+Cada situação tem 4 opções, nesta ordem fixa:
+- 1 correta;
+- 2 erradas que parecem responsáveis (quem só "sabe o discurso" cai nelas);
+- "Não sei o que faria." sempre por último (índice 3; evita o chute).
+A posição da correta varia entre os itens. As opções não copiam as perguntas
+do quiz das aulas.
+Gabarito: só na análise (comentário no definicao.js; não vai ao front).
+Valor gravado: índice da opção (0-3).
+Pontuação: correta = 1; errada ou "Não sei" = 0. Nota = soma de 0 a 7
+(reportar também cada item e a proporção de "Não sei").
+Teste: Wilcoxon pareado na soma; McNemar por item como exploratório.
+Aplicado no PRÉ e no PÓS (mesmas situações e mesma ordem de opções).
+
+Cabeçalho (pré): "Isto não é uma prova. Escolha o que você faria de verdade,
+num dia corrido, mesmo que não seja o ideal. Muita gente age diferente, e é
+isso que queremos entender."
+
+(* = correta)
+
+KS1  [Senhas, aula 07]
+     Alguém liga dizendo ser do suporte de TI. A pessoa sabe seu nome e seu
+     setor, diz que sua conta foi bloqueada e pede sua senha para liberar.
+     O que você faria?
+     0 Passo a senha, já que a pessoa tem meus dados e parece ser do suporte.
+     1 Passo a senha e troco por uma nova logo depois da ligação.
+     2 * Desligo e procuro o suporte pelo canal oficial da empresa.
+     3 Não sei o que faria.
+KS2  [E-mail, aulas 04-06]
+     Chega um e-mail do endereço de um colega: "Segue o documento que você
+     pediu", com um link. Você não lembra de ter pedido nada. O que você
+     faria?
+     0 Abro o link, porque o endereço é de um colega conhecido.
+     1 * Confirmo com o colega por outro meio (telefone, chat da empresa)
+         antes de abrir.
+     2 Respondo o próprio e-mail perguntando se foi ele que mandou.
+     3 Não sei o que faria.
+KS3  [Internet, aulas 08-09]
+     Você recebe por mensagem uma promoção de uma loja conhecida. O site tem
+     cadeado ao lado do endereço e pede login e cartão. O que você faria?
+     0 Compro, porque o cadeado mostra que o site é seguro.
+     1 Compro se o site tiver o logotipo e as cores da loja.
+     2 * Confiro o endereço ou entro digitando o endereço da loja antes de
+         informar qualquer dado.
+     3 Não sei o que faria.
+KS4  [Redes sociais, aulas 06 e 11]
+     No primeiro dia no emprego novo, você quer postar uma foto. Nela
+     aparecem seu crachá e a tela do computador. O que você faria?
+     0 * Tiro outra foto (ou corto) sem o crachá e sem a tela.
+     1 Posto só para amigos, com o perfil fechado.
+     2 Posto assim, porque é só uma foto de comemoração.
+     3 Não sei o que faria.
+KS5  [Dispositivos móveis, aulas 09-10]
+     Você está num café e precisa mandar um arquivo do trabalho com urgência.
+     O Wi-Fi pede uma senha que está escrita no balcão. O que você faria?
+     0 Uso o Wi-Fi do café, porque com senha a rede é protegida.
+     1 Uso o Wi-Fi do café, mas no modo anônimo do navegador.
+     2 * Uso os dados móveis do celular ou a VPN da empresa.
+     3 Não sei o que faria.
+KS6  [Manuseio de informação, aulas 01-02 e 12]
+     Você acha um pen drive no estacionamento da empresa com a etiqueta
+     "Salários 2026". O que você faria?
+     0 Conecto no meu computador para descobrir de quem é e devolver.
+     1 * Entrego à TI ou à segurança sem conectar em computador nenhum.
+     2 Conecto num computador pessoal, para não arriscar a rede da empresa.
+     3 Não sei o que faria.
+KS7  [Incidentes, aulas 13-14]
+     Você clicou num link de e-mail e depois percebeu que era suspeito.
+     Aparentemente nada aconteceu. O que você faria?
+     0 * Aviso a TI logo, mesmo que nada pareça ter acontecido.
+     1 Apago o e-mail e passo um antivírus por conta própria.
+     2 Não faço nada, já que nada aconteceu.
+     3 Não sei o que faria.
+
+--- 5. Hexad (Hexad-12 sem o tipo Disruptor) ---
+Fontes:
+- Seleção dos itens: Krath, J. et al. (2023). Hexad-12. CHI '23.
+  https://doi.org/10.1145/3544548.3580968
+- Texto PT-BR validado: Santos, A. C. G. et al. (2022). Scientific Reports,
+  12, 4920. https://doi.org/10.1038/s41598-022-08820-x (CC BY 4.0)
+- Escala original: Tondello, G. F. et al. (2019), versão revisada do Hexad.
+
+Observações:
+- O Hexad-12 não foi validado no Brasil.
+- O Disruptor saiu: cargas fracas no Brasil e alta desejabilidade social num
+  estudo de segurança.
+- Usar "(a)" em "vitorioso(a)" é um ajuste mínimo de gênero.
+
+Escala de 7 pontos:
+  1 Discordo totalmente / 2 Discordo / 3 Discordo parcialmente /
+  4 Nem concordo nem discordo / 5 Concordo parcialmente / 6 Concordo /
+  7 Concordo totalmente
+Aviso antes do bloco: "Atenção: a partir daqui a escala tem 7 pontos."
+Cabeçalho: "Indique o quanto você concorda que cada frase descreve você."
+
+Pontuação:
+- Soma dos 2 itens de cada tipo (de 2 a 14).
+- Confiabilidade: Spearman-Brown em vez de alfa.
+- Análise exploratória.
+
+HXP1  Sinto-me feliz se sou capaz de ajudar os outros.
+      (It makes me happy if I am able to help others.)
+HXP4  O bem-estar dos demais é importante para mim.
+      (The well-being of others is important to me.)
+HXS2  Gosto de fazer parte de uma equipe.
+      (I like being part of a team.)
+HXS4  Gosto de atividades em grupo.
+      (I enjoy group activities.)
+HXA2  Gosto de dominar tarefas difíceis.
+      (I like mastering difficult tasks.)
+HXA4  Gosto de sair vitorioso(a) de circunstâncias difíceis.
+      (I enjoy emerging victorious out of difficult circumstances.)
+HXR2  Recompensas são uma ótima forma de me motivar.
+      (Rewards are a great way to motivate me.)
+HXR4  Se a recompensa for suficiente, farei o esforço.
+      (If the reward is sufficient, I will put in the effort.)
+HXF1  É importante para mim seguir meu próprio caminho.
+      (It is important to me to follow my own path.)
+HXF3  Ser independente é importante para mim.
+      (Being independent is important to me.)
+ATN   Para mostrar que está lendo com atenção, marque "Discordo totalmente"
+      nesta frase.
+      Quem não marcar 1 é excluído da análise.
+
+
+=====================================================================
+QUESTIONÁRIO PÓS (libera 14 dias após o pré, fecha no dia 28) - 32 itens
+=====================================================================
+UES-SF 12 + sobre o app 9 (com ATN) + recurso mais motivador 1 +
+conhecimento 7 + comparação 1 + abertas 2
+
+Ordem dos blocos: UES -> app -> recurso motivador -> conhecimento ->
+comparação -> abertas. A comparação fica depois, para não ancorar a UES e o
+conhecimento. Anamnese e Hexad não se repetem.
+
+Aviso (antes de começar): "Você só pode responder este questionário uma vez. Responda quando já tiver usado o app o suficiente para dar sua opinião. Sua resposta ajuda muito a pesquisa."
+Texto de abertura: "Não existem respostas certas ou erradas, e críticas ajudam
+tanto quanto elogios. Suas respostas são usadas só nesta pesquisa e analisadas
+sem o seu nome."
+
+--- 1. UES-SF sobre o app ---
+Mesma escala, mesma pontuação e mesma frase do pré; muda só o objeto.
+Cabeçalho: "Pense nas vezes em que usou o Guardião Impacta nas últimas semanas.
+Nas frases sobre aparência, considere o visual das telas. Se usou pouco,
+responda pelo que viu."
+FA1    Fiquei tão envolvido(a) no app que esqueci o que acontecia ao meu redor.
+FA2    Enquanto usava o app, o tempo passou sem eu perceber.
+FA3    Fiquei totalmente concentrado(a) usando o app.
+PU1_R  Eu me senti frustrado(a) usando o app.
+PU2_R  Achei confuso usar o app.
+PU3_R  Usar o app foi desgastante.
+AE1    O visual do app era atraente.
+AE2    O app tinha uma aparência bonita.
+AE3    A apresentação do app (imagens, cores) era agradável.
+RW1    Usar o app valeu a pena.
+RW2    Minha experiência com o app foi gratificante.
+RW3    Eu me senti interessado(a) usando o app.
+
+--- 2. Sobre os recursos do app (itens próprios) ---
+- Escala de 5 pontos.
+- "(+ não usei)" = o item tem a opção extra "Não vi / não usei esse recurso",
+  codificada como 0 = ausente (não é o ponto neutro).
+- Analisar item a item, sem somar com a UES-SF.
+- Validar o conteúdo com 2 ou 3 professores.
+GAM1    Os pontos me motivaram a responder mais perguntas.  (+ não usei)
+GAM2    O ranking me fez querer voltar ao app.  (+ não usei)
+GAM3    As conquistas me deram vontade de completar mais aulas.  (+ não usei)
+GAM4    As explicações depois de cada resposta me ajudaram a aprender.
+        (É feedback, não gamificação: reportar separado.)
+ATN     Para mostrar que está lendo com atenção, marque "Discordo totalmente"
+        nesta frase.  (no meio do bloco)
+GAM5    Comparar minha pontuação com a dos colegas me deixou desconfortável.
+        (+ não usei)
+GAM6_R  Pontos, conquistas e ranking não fizeram diferença na forma como usei
+        o app.  (indiferença; equilibra a aquiescência)
+EXT     Usei o app mais pela pontuação do que pelo conteúdo.
+        (motivação extrínseca)
+APR1    Depois de usar o app, eu me sinto mais preparado(a) para reconhecer
+        golpes digitais.  (autoeficácia; vem antes do conhecimento de propósito)
+
+--- 3. Recurso mais motivador ---
+MOT  Qual destes recursos mais motivou você a usar o app?
+     Pontos / Conquistas / Ranking / Trivia / Explicações depois das
+     respostas / Nenhum deles
+     (Cruzar com os tipos do Hexad do pré.)
+
+--- 4. Conhecimento ---
+As mesmas situações KS1-KS7 do pré, em ordem aleatória.
+Cabeçalho: "Estas situações são as mesmas do início, de propósito. Responda
+pelo que você faria hoje."
+Efeito de teste: mitigado pela análise dose-resposta (o ganho em KS deve
+acompanhar o uso real registrado pelo app).
+
+--- 5. Comparação (só quem respondeu C1 = Sim no pré) ---
+CMP  No geral, comparando com o treinamento de segurança da informação mais
+     recente que você fez antes (curso online, palestra sobre golpes ou
+     senhas etc.), o Guardião Impacta foi:
+     Muito pior / Pior / Igual / Melhor / Muito melhor /
+     Não lembro o suficiente para comparar
+     (Descritivo, não é evidência principal.)
+
+--- 6. Abertas (opcionais; espere 30-50% de preenchimento) ---
+ABR2  O que você mudaria no app?  (vem primeiro, para pegar as críticas)
+ABR1  O que você mais gostou no app?
+
+Cortados do rascunho anterior:
+- "Eu recomendaria o app para colegas": puxa a resposta para agradar e pouco
+  informa.
+- "Aprendi coisas que vou usar no dia a dia": repete APR1 e o conhecimento.
+- "Prefiro aprender assim do que nos treinamentos que já fiz": virou CMP.
+
+
+=====================================================================
+PROTOCOLO DE APLICAÇÃO
+=====================================================================
+Dia 0     Cadastro + TCLE + questionário PRÉ (obrigatório, antes da 1ª aula).
+          Orientação: fazer uma aula por dia (15 aulas, ritmo previsto).
+Dia 14    O PÓS é liberado no app. Envio do 1º e-mail convidando a responder.
+Dia 18    2º e-mail, só para quem ainda não respondeu.
+Dia 28    O PÓS fecha. Respostas depois disso não são aceitas.
+
+Regras do PÓS:
+- Opcional (participação voluntária, conforme o TCLE).
+- Só pode ser respondido uma vez. Mostrar uma tela de confirmação antes do
+  envio final.
+- Não dar pontos nem conquistas por responder: misturaria com o ranking e
+  criaria incentivo para agradar.
+- Evitar "satisfeito" e "necessário para o trabalho" no texto: sugerem a
+  resposta e pressionam a participação.
+
+Na análise:
+- dias_desde_pre (de 14 a 28) entra como covariável.
+- Viés de abandono: comparar quem respondeu o pós com quem não respondeu, nas
+  notas do pré, no Hexad, no uso do app e na anamnese.
+- Recrutamento: com 14 dias, o abandono tende a ser maior. Recrutar 70 a 80
+  pessoas para chegar a cerca de 35 pares.
+
+
+=====================================================================
+VIESES E MITIGAÇÃO
+=====================================================================
+- Memória (lembrança do treinamento antigo):
+  ancorar no treinamento mais recente; perguntar o formato antes da UES;
+  fazer análise de sensibilidade sem quem respondeu "Mais de 2 anos".
+- Desejabilidade social:
+  texto de anonimato; convite que não venha do gestor; Disruptor fora;
+  conhecimento medido por situações com erradas "responsáveis", opção
+  "Não sei" e cabeçalho que normaliza o erro ("Isto não é uma prova").
+- Demanda do experimentador:
+  o pré não fala de gamificação; o pós é respondido sem o pesquisador.
+- Efeito novidade:
+  janela mínima de uso antes do pós; dias e sessões entram como covariável.
+  Sem grupo de controle, é uma limitação declarada.
+- Mudança de objeto entre o pré e o pós:
+  descrever como "comparação pareada entre experiências", não como efeito
+  causal do app.
+- Aquiescência:
+  itens invertidos na UES; o conhecimento é de múltipla escolha (sem
+  concordar/discordar).
+- Respondente desatento:
+  item ATN nos dois questionários. Regra (errar = sair da análise) definida
+  antes da coleta.
+- Uso desigual (quem usou pouco):
+  opção "não usei" nos itens de recurso; o uso registrado no app entra como
+  covariável ou estrato.
+
+
+=====================================================================
+TRADE-OFF (frase para o TCC)
+=====================================================================
+"A adaptação dos itens da UES-SF ao objeto 'treinamento anterior' preservou a
+correspondência item a item com o pós, condição para a comparação pareada, ao
+custo de afastar a redação da versão validada. Por isso foi seguida de
+retrotradução e pré-teste cognitivo (Beaton et al., 2000). O uso de formas
+reduzidas (UES-SF, Hexad-12 e um item por área do HAIS-Q) diminuiu a carga de
+resposta e o abandono, em troca de menor confiabilidade por subescala. Por
+isso, os resultados por subescala são tratados como exploratórios."
+
+
+=====================================================================
+PROCESSO DE TRADUÇÃO (versão enxuta de Beaton et al., 2000)
+=====================================================================
+Beaton, D. E. et al. (2000). Spine, 25(24), 3186-3191.
+
+1. Tradução inicial.
+   Feita, e revisada por 4 revisores simulados: retrotradução cega,
+   psicometria, entrevista cognitiva e efeito teto.
+2. Retrotradução humana: alguém fluente em inglês traduz o português de volta
+   SEM ver o original.
+3. Comparar com o original e ajustar onde o sentido mudou.
+4. Piloto com 3 a 5 pessoas do público-alvo (usar docs/questionario-pre.html
+   no modo revisão). Cada uma diz o que entendeu de cada item.
+5. No TCC: descrever o processo, citar as escalas como "adaptadas de" e
+   reportar a confiabilidade (alfa na UES; Spearman-Brown no Hexad).

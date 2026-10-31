@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Questionários: validação</title>
+<style>
+  :root {
+    --fundo: #f6f7f9; --cartao: #fff; --texto: #1c2430; --suave: #5b6675; --borda: #d9dee5;
+    --destaque: #1f5fbf; --destaque-fundo: #e8f0fc; --alerta: #9a5b00; --alerta-fundo: #fff4e0;
+    --ok: #1d7a46; --erro: #b3261e;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fundo: #12161c; --cartao: #1b2129; --texto: #e6eaf0; --suave: #9aa5b4; --borda: #2e3743;
+      --destaque: #7fb0ff; --destaque-fundo: #1d2b42; --alerta: #f0b45a; --alerta-fundo: #33281a;
+      --ok: #5fcf8e; --erro: #ff8a80;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--fundo); color: var(--texto); font: 16px/1.5 system-ui, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  h2 { font-size: 1.15rem; margin: 0 0 4px; }
+  .abas { display: flex; gap: 8px; margin: 16px 0 0; }
+  .abas label { border: 1px solid var(--borda); border-radius: 999px; padding: 6px 16px; cursor: pointer; font-weight: 600; }
+  .abas label:has(input:checked) { background: var(--destaque); color: var(--cartao); border-color: var(--destaque); }
+  .abas input { position: absolute; opacity: 0; }
+  .controles { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 16px 0; }
+  .controles label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+  .notas, .bloco, .resultado { background: var(--cartao); border: 1px solid var(--borda); border-radius: 12px; padding: 16px; margin: 16px 0; }
+  .notas summary { cursor: pointer; font-weight: 600; }
+  .notas li { margin: 4px 0; }
+  .aviso { background: var(--alerta-fundo); color: var(--alerta); border-radius: 8px; padding: 8px 12px; font-weight: 600; }
+  .intro { color: var(--suave); }
+  .fonte { font-size: .8rem; color: var(--suave); }
+  fieldset.item { border: 0; border-top: 1px solid var(--borda); margin: 0; padding: 14px 0; }
+  fieldset.item.faltando legend { color: var(--erro); }
+  legend { padding: 0; font-weight: 600; }
+  .cod { display: inline-block; font: 600 .75rem ui-monospace, monospace; background: var(--destaque-fundo); color: var(--destaque); border-radius: 6px; padding: 1px 6px; margin-right: 6px; vertical-align: 2px; }
+  .en { color: var(--suave); font-style: italic; font-size: .9rem; margin: 2px 0 0; }
+  small.en { display: block; font-size: .78rem; }
+  .ops { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .ops label { flex: 1 1 110px; display: flex; gap: 6px; align-items: flex-start; border: 1px solid var(--borda); border-radius: 8px; padding: 6px 8px; cursor: pointer; font-size: .9rem; }
+  .ops label.nao-usei { flex-basis: 100%; border-style: dashed; }
+  .ops label:has(input:checked) { border-color: var(--destaque); background: var(--destaque-fundo); }
+  .ops input { margin-top: 3px; }
+  textarea.aberta { width: 100%; font: inherit; margin-top: 10px; }
+  .rev { margin-top: 8px; font-size: .85rem; }
+  .rev textarea { width: 100%; font: inherit; margin-top: 4px; }
+  body:not(.revisao) .en, body:not(.revisao) .cod, body:not(.revisao) .rev, body:not(.revisao) .fonte,
+  body:not(.revisao) .notas, body:not(.revisao) .so-pos { display: none; }
+  button { font: inherit; font-weight: 600; border: 0; border-radius: 8px; padding: 10px 18px; background: var(--destaque); color: var(--cartao); cursor: pointer; }
+  .resultado table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+  .resultado td, .resultado th { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--borda); }
+  .resultado textarea { width: 100%; min-height: 160px; font: .8rem ui-monospace, monospace; }
+  .ok { color: var(--ok); } .falha { color: var(--erro); }
+</style>
+</head>
+<body class="revisao">
+<main>
+  <h1>Questionários: Guardião Impacta</h1>
+  <div class="abas" role="radiogroup" aria-label="Questionário">
+    <label><input type="radio" name="questionario" value="pre"> Antes do app (pré)</label>
+    <label><input type="radio" name="questionario" value="pos"> Depois do app (pós)</label>
+  </div>
+  <p class="intro" id="abertura"></p>
+
+  <div class="controles">
+    <label><input type="checkbox" id="modo-revisao" checked> Modo revisão (inglês, códigos, comentários e notas)</label>
+    <label><input type="checkbox" id="aleatorio"> Ordem aleatória dos itens, como no app</label>
+    <label class="so-pos"><input type="checkbox" id="sim-treinamento" checked> Simular: respondeu "Sim" em C1 no pré</label>
+  </div>
+
+  <details class="notas">
+    <summary>Notas para revisores: fontes, adaptações e vieses</summary>
+    <ul>
+      <li><strong>Pré (40 itens):</strong> anamnese 6, treinamento anterior 4, UES-SF 12, conhecimento 7, Hexad 10, atenção 1.
+        <strong>Pós (32 itens):</strong> UES-SF 12, sobre o app 9 (inclui atenção), recurso mais motivador 1, conhecimento 7, comparação 1, abertas 2.</li>
+      <li><strong>Aplicação:</strong>
+        <ul>
+          <li>O pré é obrigatório, no cadastro, antes da 1ª aula.</li>
+          <li>O pós libera 14 dias depois do pré (ritmo previsto: uma aula por dia) e fecha no dia 28.</li>
+          <li>O pós é opcional e só pode ser respondido uma vez, com confirmação antes de enviar.</li>
+          <li>E-mail no dia 14 e lembrete no dia 18, só para quem ainda não respondeu.</li>
+          <li>Na análise, os dias entre o pré e o pós entram como covariável, e quem respondeu é comparado com quem não respondeu.</li>
+        </ul></li>
+      <li><strong>UES-SF</strong> (O'Brien, Cairns &amp; Hall, 2018). A adaptação é nossa e ainda falta a retrotradução humana. Comparar com a UES-Br (Miranda, Li &amp; Darin, 2021) quando houver acesso.
+        <ul>
+          <li>Pré e pós usam a mesma frase, mudando só o objeto: "esse treinamento" ou "o app". O tempo verbal é o passado nos dois.</li>
+          <li>O pré fica ancorado no treinamento <em>mais recente</em>, o mesmo de C2 a C4.</li>
+          <li>Os itens AE vêm com uma instrução sobre o visual. AE3 diz "(imagens, cores)": o app não tem som, e "sentidos" soou estranho no pré-teste.</li>
+          <li>RW2 usa "gratificante", para não ser lido como pontos. PU2 mede uso ("acompanhar", "usar o app"), não conteúdo.</li>
+          <li>FA1 diz "esqueci o que acontecia ao meu redor": "me desliguei" foi lido ao pé da letra.</li>
+          <li>O Wilcoxon da UES só vale para quem respondeu C1 = Sim no pré.</li>
+        </ul></li>
+      <li><strong>Conhecimento:</strong> 1 item por área de foco do HAIS-Q (Parsons et al., 2014; Parsons et al., 2017), cada um ligado a aulas do app.
+        <ul>
+          <li>Redação própria sobre enganos comuns, para evitar o efeito teto. Os itens falam de fatos, não da política de cada empresa.</li>
+          <li>_R = invertido. Não há certo ou errado exibido, nem no pré nem no pós. Os mesmos itens repetem no pós.</li>
+          <li>O efeito de teste é mitigado pela análise dose-resposta: o ganho deve acompanhar o uso real. Quem quase não usou serve de quase-controle descritivo.</li>
+          <li>Na análise, o ponto do meio também significa "não sei".</li>
+        </ul></li>
+      <li><strong>Hexad (só no pré):</strong> itens do Hexad-12 (Krath et al., 2023) com o texto PT-BR validado de Santos et al. (2022).
+        <ul>
+          <li>O Disruptor saiu: cargas fracas no Brasil e alta desejabilidade social.</li>
+          <li>7 pontos, conforme o original. Confiabilidade por Spearman-Brown. Análise exploratória.</li>
+        </ul></li>
+      <li><strong>Sobre o app (só no pós):</strong> itens próprios, analisados item a item.
+        <ul>
+          <li>GAM1–GAM3 e GAM5 têm "Não vi / não usei esse recurso" (código 0 = ausente), para não confundir com o ponto neutro.</li>
+          <li>GAM6_R (indiferença) e GAM5 (desconforto) equilibram a aquiescência. EXT mede a motivação extrínseca.</li>
+          <li>GAM4 é feedback, não gamificação: reportar separado.</li>
+          <li>APR1 (sentir-se preparado) é autoeficácia, diferente do conhecimento. Por isso vem antes do bloco de conhecimento.</li>
+        </ul></li>
+      <li><strong>Comparação (CMP):</strong> fica depois da UES e do conhecimento, para não ancorar as respostas. É descritiva, não é evidência principal, por causa da novidade, da memória e do efeito de contraste.</li>
+      <li><strong>Vieses e mitigação:</strong>
+        <ul>
+          <li>Demanda: o autor do app é o pesquisador. O texto do topo pede críticas, as respostas são pseudonimizadas e o pré não fala de gamificação.</li>
+          <li>Memória: ancorar no treinamento mais recente e fazer análise de sensibilidade sem "mais de 2 anos".</li>
+          <li>Desatenção: um item ATN em cada questionário. A regra de exclusão (errar o ATN = sair da análise) é definida antes da coleta.</li>
+          <li>Uso desigual: o app registra o uso, que entra como covariável ou estrato.</li>
+        </ul></li>
+    </ul>
+  </details>
+
+  <form id="questionario" novalidate></form>
+  <section class="resultado" id="resultado" hidden></section>
+</main>
+
+<script>
+const E5 = [
+  ['Discordo totalmente', 'Strongly disagree'], ['Discordo', 'Disagree'],
+  ['Nem concordo nem discordo', 'Neither agree nor disagree'], ['Concordo', 'Agree'],
+  ['Concordo totalmente', 'Strongly agree'],
+];
+const E7 = [
+  ['Discordo totalmente', 'Strongly disagree'], ['Discordo', 'Disagree'],
+  ['Discordo parcialmente', 'Somewhat disagree'], ['Nem concordo nem discordo', 'Neither agree nor disagree'],
+  ['Concordo parcialmente', 'Somewhat agree'], ['Concordo', 'Agree'], ['Concordo totalmente', 'Strongly agree'],
+];
+const NAO_LEMBRO = ['Não lembro', "I don't remember"];
+const ATN = { c: 'ATN', pt: 'Para mostrar que está lendo com atenção, marque "Discordo totalmente" nesta frase.', en: 'To show you are reading carefully, select "Strongly disagree" for this statement.' };
+
+// Mesmos itens no pré e no pós: a mudança entre os dois momentos é a medida.
+const CONHECIMENTO = [
+  { c: 'K1_R', area: 'Senhas', pt: 'Posso informar minha senha ao suporte de TI se ele pedir por telefone.', en: 'I can give my password to IT support if they ask for it by phone.' },
+  { c: 'K2_R', area: 'E-mail', pt: 'Se um e-mail vem do endereço de um colega conhecido, posso clicar no link sem verificar.', en: "If an email comes from a known colleague's address, I can click its link without checking." },
+  { c: 'K3_R', area: 'Internet', pt: 'Se aparece um cadeado ao lado do endereço do site, o site é confiável.', en: 'If a padlock appears next to the website address, the site is trustworthy.' },
+  { c: 'K4_R', area: 'Redes sociais', pt: 'Não há problema em postar nas redes sociais uma foto em que aparece meu crachá da empresa.', en: "It's fine to post a photo showing my company badge on social media." },
+  { c: 'K5_R', area: 'Dispositivos móveis', pt: 'Uma rede Wi-Fi pública que pede senha (por exemplo, de um café) é segura para acessar o e-mail do trabalho.', en: 'A public Wi-Fi network that requires a password (e.g., at a café) is safe for accessing work email.' },
+  { c: 'K6', area: 'Manuseio de informação', pt: 'Um pen drive achado em lugar público pode instalar vírus se for conectado a um computador.', en: 'A USB stick found in a public place can install malware if plugged into a computer.' },
+  { c: 'K7', area: 'Incidentes', pt: 'Se eu clicar sem querer em um link suspeito, devo avisar a TI mesmo que nada pareça ter acontecido.', en: 'If I accidentally click a suspicious link, I should tell IT even if nothing seems to have happened.' },
+];
+const FONTE_UES = "UES-SF: O'Brien, Cairns & Hall (2018), adaptada. _R = item invertido.";
+const FONTE_K = 'Áreas do HAIS-Q (Parsons et al., 2014; Parsons et al., 2017), 1 item por área, redação própria sobre enganos comuns. _R = invertido.';
+
+// Itens do pré que só aparecem se C1 = Sim (opção 0).
+const FEZ_TREINAMENTO = (r) => r.C1 === 0;
+
+const QUESTIONARIOS = {
+  pre: {
+    abertura: 'Antes de começar a usar o app. Não existem respostas certas ou erradas. Suas respostas são usadas só nesta pesquisa e analisadas sem o seu nome.',
+    blocos: [
+      {
+        titulo: ['Sobre você', 'About you'],
+        itens: [
+          { c: 'A1', pt: 'Qual é a sua faixa etária?', en: 'What is your age group?',
+            op: [['18–24'], ['25–34'], ['35–44'], ['45–54'], ['55 ou mais', '55 or older']] },
+          { c: 'A2', pt: 'Qual é o seu gênero?', en: 'What is your gender?',
+            op: [['Feminino', 'Female'], ['Masculino', 'Male'], ['Outro', 'Other'], ['Prefiro não informar', 'Prefer not to say']] },
+          { c: 'A3', pt: 'Qual é a sua escolaridade?', en: 'What is your highest level of education?',
+            op: [['Até o ensino médio (completo ou não)', 'Up to high school (complete or not)'], ['Superior incompleto', 'Some college'],
+                 ['Superior completo', "Bachelor's degree"], ['Pós-graduação', 'Postgraduate degree']] },
+          { c: 'A4', pt: 'Em qual área você trabalha?', en: 'Which area do you work in?',
+            op: [['Administrativo', 'Administration'], ['Financeiro ou contábil', 'Finance or accounting'], ['Recursos humanos', 'Human resources'],
+                 ['Comercial ou vendas', 'Sales'], ['Marketing ou comunicação', 'Marketing or communications'], ['Jurídico', 'Legal'],
+                 ['Atendimento ao cliente', 'Customer service'], ['Operações ou logística', 'Operations or logistics'], ['Outra', 'Other']] },
+          { c: 'A5', pt: 'Com que frequência você joga jogos digitais (celular, computador ou console)?',
+            en: 'How often do you play digital games (mobile, computer or console)?',
+            op: [['Nunca', 'Never'], ['Raramente (menos de 1 vez por mês)', 'Rarely (less than once a month)'], ['Algumas vezes por mês', 'A few times a month'],
+                 ['Algumas vezes por semana', 'A few times a week'], ['Todos os dias', 'Every day']] },
+          { c: 'A6', multi: true, pt: 'Quais destas plataformas de ensino com pontos, medalhas ou ranking você já usou? Marque todas as que se aplicam.',
+            en: 'Which of these learning platforms with points, badges or leaderboards have you used? Select all that apply.',
+            op: [['Duolingo'], ['Kahoot!'], ['Quizizz'], ['Khan Academy'],
+                 ['Treinamento da empresa com pontos, medalhas ou ranking', 'Company training with points, badges or leaderboard'],
+                 ['Outra', 'Other'], ['Nenhuma', 'None']] },
+        ],
+      },
+      {
+        titulo: ['Treinamentos anteriores', 'Previous training'],
+        itens: [
+          { c: 'C1', pt: 'Você já fez algum treinamento de segurança da informação (sobre senhas, golpes por e-mail, proteção de dados etc.), no trabalho, na faculdade ou por conta própria?',
+            en: 'Have you ever taken any information security training (on passwords, email scams, data protection, etc.), at work, at college or on your own?',
+            op: [['Sim', 'Yes'], ['Não', 'No'], NAO_LEMBRO] },
+          { c: 'C2', se: FEZ_TREINAMENTO, pt: 'Há quanto tempo você fez o treinamento mais recente?', en: 'How long ago did you take the most recent training?',
+            op: [['Menos de 6 meses', 'Less than 6 months'], ['Entre 6 meses e 1 ano', 'Between 6 months and 1 year'], ['Entre 1 e 2 anos', 'Between 1 and 2 years'],
+                 ['Mais de 2 anos', 'More than 2 years'], NAO_LEMBRO] },
+          { c: 'C3', se: FEZ_TREINAMENTO, pt: 'Qual era o formato principal desse treinamento?', en: 'What was the main format of that training?',
+            op: [['Vídeo ou curso online', 'Video or online course'], ['Palestra ou aula presencial', 'In-person talk or class'],
+                 ['Material para leitura', 'Reading material'], ['Simulação de e-mail falso (phishing)', 'Simulated fake email (phishing)'],
+                 ['Jogo ou quiz com pontos ou ranking', 'Game or quiz with points or leaderboard'], ['Outro', 'Other']] },
+          { c: 'C4', se: FEZ_TREINAMENTO, pt: 'Esse treinamento era obrigatório?', en: 'Was that training mandatory?',
+            op: [['Sim', 'Yes'], ['Não', 'No'], NAO_LEMBRO] },
+        ],
+      },
+      {
+        titulo: ['Sua experiência com esse treinamento', 'Your experience with that training'],
+        intro: ['Pense no treinamento de segurança da informação mais recente que você fez. Nas frases sobre aparência, considere o visual de slides, vídeos, telas ou materiais.',
+                'Think about the most recent information security training you took. For the statements about appearance, consider the look of slides, videos, screens or materials.'],
+        fonte: FONTE_UES, se: FEZ_TREINAMENTO, escala: E5, aleatorio: true,
+        itens: [
+          { c: 'FA1', pt: 'Fiquei tão envolvido(a) nesse treinamento que esqueci o que acontecia ao meu redor.', en: 'I lost myself in this training.' },
+          { c: 'FA2', pt: 'Enquanto fazia esse treinamento, o tempo passou sem eu perceber.', en: 'The time I spent in this training just slipped away.' },
+          { c: 'FA3', pt: 'Fiquei totalmente concentrado(a) nesse treinamento.', en: 'I was absorbed in this training.' },
+          { c: 'PU1_R', pt: 'Eu me senti frustrado(a) durante esse treinamento.', en: 'I felt frustrated while taking this training.' },
+          { c: 'PU2_R', pt: 'Achei confuso acompanhar esse treinamento.', en: 'I found this training confusing to follow.' },
+          { c: 'PU3_R', pt: 'Fazer esse treinamento foi desgastante.', en: 'Taking this training was taxing.' },
+          { c: 'AE1', pt: 'O visual desse treinamento era atraente.', en: 'This training was attractive.' },
+          { c: 'AE2', pt: 'Esse treinamento tinha uma aparência bonita.', en: 'This training was aesthetically appealing.' },
+          { c: 'AE3', pt: 'A apresentação desse treinamento (imagens, cores) era agradável.', en: 'This training appealed to my senses.' },
+          { c: 'RW1', pt: 'Fazer esse treinamento valeu a pena.', en: 'Taking this training was worthwhile.' },
+          { c: 'RW2', pt: 'Minha experiência com esse treinamento foi gratificante.', en: 'My experience with this training was rewarding.' },
+          { c: 'RW3', pt: 'Eu me senti interessado(a) nesse treinamento.', en: 'I felt interested in this training.' },
+        ],
+      },
+      {
+        titulo: ['Segurança no dia a dia', 'Security in everyday work'],
+        intro: ['Indique o quanto você concorda com cada frase.', 'Indicate how much you agree with each statement.'],
+        fonte: FONTE_K, escala: E5, aleatorio: true, itens: CONHECIMENTO,
+      },
+      {
+        titulo: ['Como você é', 'What you are like'],
+        aviso: ['Atenção: a partir daqui a escala tem 7 pontos.', 'Note: from here on the scale has 7 points.'],
+        intro: ['Indique o quanto você concorda que cada frase descreve você.', 'Indicate how much you agree that each statement describes you.'],
+        fonte: 'Hexad-12 (Krath et al., 2023) sem Disruptor; texto PT-BR de Santos et al. (2022). ATN = verificação de atenção (fica no meio).',
+        escala: E7, aleatorio: true,
+        itens: [
+          { c: 'HXP1', pt: 'Sinto-me feliz se sou capaz de ajudar os outros.', en: 'It makes me happy if I am able to help others.' },
+          { c: 'HXP4', pt: 'O bem-estar dos demais é importante para mim.', en: 'The well-being of others is important to me.' },
+          { c: 'HXS2', pt: 'Gosto de fazer parte de uma equipe.', en: 'I like being part of a team.' },
+          { c: 'HXS4', pt: 'Gosto de atividades em grupo.', en: 'I enjoy group activities.' },
+          { c: 'HXA2', pt: 'Gosto de dominar tarefas difíceis.', en: 'I like mastering difficult tasks.' },
+          ATN,
+          { c: 'HXA4', pt: 'Gosto de sair vitorioso(a) de circunstâncias difíceis.', en: 'I enjoy emerging victorious out of difficult circumstances.' },
+          { c: 'HXR2', pt: 'Recompensas são uma ótima forma de me motivar.', en: 'Rewards are a great way to motivate me.' },
+          { c: 'HXR4', pt: 'Se a recompensa for suficiente, farei o esforço.', en: 'If the reward is sufficient, I will put in the effort.' },
+          { c: 'HXF1', pt: 'É importante para mim seguir meu próprio caminho.', en: 'It is important to me to follow my own path.' },
+          { c: 'HXF3', pt: 'Ser independente é importante para mim.', en: 'Being independent is important to me.' },
+        ],
+      },
+    ],
+  },
+  pos: {
+    abertura: 'Depois de usar o app. Você só pode responder este questionário uma vez. Responda quando já tiver usado o app o suficiente para dar sua opinião. Sua resposta ajuda muito a pesquisa. Não existem respostas certas ou erradas, e críticas ajudam tanto quanto elogios. Suas respostas são usadas só nesta pesquisa e analisadas sem o seu nome.',
+    blocos: [
+      {
+        titulo: ['Sua experiência com o app', 'Your experience with the app'],
+        intro: ['Pense nas vezes em que usou o Guardião Impacta nas últimas semanas. Nas frases sobre aparência, considere o visual das telas. Se usou pouco, responda pelo que viu.',
+                'Think about the times you used Guardião Impacta in the past weeks. For the statements about appearance, consider the look of the screens. If you used it little, answer based on what you saw.'],
+        fonte: FONTE_UES, escala: E5, aleatorio: true,
+        itens: [
+          { c: 'FA1', pt: 'Fiquei tão envolvido(a) no app que esqueci o que acontecia ao meu redor.', en: 'I lost myself in this app.' },
+          { c: 'FA2', pt: 'Enquanto usava o app, o tempo passou sem eu perceber.', en: 'The time I spent using the app just slipped away.' },
+          { c: 'FA3', pt: 'Fiquei totalmente concentrado(a) usando o app.', en: 'I was absorbed in this app.' },
+          { c: 'PU1_R', pt: 'Eu me senti frustrado(a) usando o app.', en: 'I felt frustrated while using this app.' },
+          { c: 'PU2_R', pt: 'Achei confuso usar o app.', en: 'I found this app confusing to use.' },
+          { c: 'PU3_R', pt: 'Usar o app foi desgastante.', en: 'Using this app was taxing.' },
+          { c: 'AE1', pt: 'O visual do app era atraente.', en: 'This app was attractive.' },
+          { c: 'AE2', pt: 'O app tinha uma aparência bonita.', en: 'This app was aesthetically appealing.' },
+          { c: 'AE3', pt: 'A apresentação do app (imagens, cores) era agradável.', en: 'This app appealed to my senses.' },
+          { c: 'RW1', pt: 'Usar o app valeu a pena.', en: 'Using the app was worthwhile.' },
+          { c: 'RW2', pt: 'Minha experiência com o app foi gratificante.', en: 'My experience with the app was rewarding.' },
+          { c: 'RW3', pt: 'Eu me senti interessado(a) usando o app.', en: 'I felt interested in this app.' },
+        ],
+      },
+      {
+        titulo: ['Sobre os recursos do app', 'About the app features'],
+        intro: ['Indique o quanto você concorda com cada frase. Se não viu ou não usou o recurso, marque essa opção.',
+                "Indicate how much you agree with each statement. If you didn't see or use the feature, select that option."],
+        fonte: 'Itens próprios, analisados item a item. "Não vi / não usei" = 0 (ausente). ATN no meio.',
+        escala: E5, aleatorio: true,
+        itens: [
+          { c: 'GAM1', naoUsei: true, pt: 'Os pontos me motivaram a responder mais perguntas.', en: 'The points motivated me to answer more questions.' },
+          { c: 'GAM2', naoUsei: true, pt: 'O ranking me fez querer voltar ao app.', en: 'The leaderboard made me want to come back to the app.' },
+          { c: 'GAM3', naoUsei: true, pt: 'As conquistas me deram vontade de completar mais aulas.', en: 'The badges made me want to complete more lessons.' },
+          { c: 'GAM4', pt: 'As explicações depois de cada resposta me ajudaram a aprender.', en: 'The explanations after each answer helped me learn.' },
+          ATN,
+          { c: 'GAM5', naoUsei: true, pt: 'Comparar minha pontuação com a dos colegas me deixou desconfortável.', en: "Comparing my score with my colleagues' made me uncomfortable." },
+          { c: 'GAM6_R', pt: 'Pontos, conquistas e ranking não fizeram diferença na forma como usei o app.', en: "Points, badges and the leaderboard made no difference to how I used the app." },
+          { c: 'EXT', pt: 'Usei o app mais pela pontuação do que pelo conteúdo.', en: 'I used the app more for the points than for the content.' },
+          { c: 'APR1', pt: 'Depois de usar o app, eu me sinto mais preparado(a) para reconhecer golpes digitais.', en: 'After using the app, I feel better prepared to recognise online scams.' },
+        ],
+      },
+      {
+        titulo: ['O que mais motivou você', 'What motivated you most'],
+        itens: [
+          { c: 'MOT', pt: 'Qual destes recursos mais motivou você a usar o app?', en: 'Which of these features motivated you most to use the app?',
+            op: [['Pontos', 'Points'], ['Conquistas', 'Badges'], ['Ranking', 'Leaderboard'], ['Trivia', 'Trivia'],
+                 ['Explicações depois das respostas', 'Explanations after the answers'], ['Nenhum deles', 'None of them']] },
+        ],
+      },
+      {
+        titulo: ['Segurança no dia a dia', 'Security in everyday work'],
+        intro: ['Estas frases são as mesmas do início, de propósito: queremos ver se algo mudou. Responda pelo que você pensa hoje.',
+                'These statements are the same as at the start, on purpose: we want to see if anything changed. Answer based on what you think today.'],
+        fonte: FONTE_K, escala: E5, aleatorio: true, itens: CONHECIMENTO,
+      },
+      {
+        titulo: ['Comparação', 'Comparison'],
+        se: () => document.getElementById('sim-treinamento').checked,
+        fonte: 'Só para quem respondeu C1 = Sim no pré. Descritivo; fica depois da UES e do conhecimento para não ancorá-los.',
+        itens: [
+          { c: 'CMP', pt: 'No geral, comparando com o treinamento de segurança da informação mais recente que você fez antes (curso online, palestra sobre golpes ou senhas etc.), o Guardião Impacta foi:',
+            en: 'Overall, compared with the most recent information security training you took before (online course, talk about scams or passwords, etc.), Guardião Impacta was:',
+            op: [['Muito pior', 'Much worse'], ['Pior', 'Worse'], ['Igual', 'About the same'], ['Melhor', 'Better'], ['Muito melhor', 'Much better'],
+                 ['Não lembro o suficiente para comparar', "I don't remember enough to compare"]] },
+        ],
+      },
+      {
+        titulo: ['Para terminar (opcional)', 'To finish (optional)'],
+        itens: [
+          { c: 'ABR2', texto: true, pt: 'O que você mudaria no app?', en: 'What would you change in the app?' },
+          { c: 'ABR1', texto: true, pt: 'O que você mais gostou no app?', en: 'What did you like most about the app?' },
+        ],
+      },
+    ],
+  },
+};
+
+const form = document.getElementById('questionario');
+let blocos = [];
+let inicio = Date.now();
+const el = (tag, attrs = {}, ...filhos) => {
+  const e = document.createElement(tag);
+  Object.assign(e, attrs);
+  e.append(...filhos);
+  return e;
+};
+const textoEn = (en) => el('small', { className: 'en', textContent: en });
+const todosItens = () => blocos.flatMap((b) => b.itens);
+
+function renderItem(item, escala) {
+  const f = el('fieldset', { className: 'item' });
+  f.dataset.c = item.c;
+  const opcoes = (escala ?? item.op ?? []).map(([pt, en], k) => el('label', {},
+    el('input', { type: item.multi ? 'checkbox' : 'radio', name: item.c, value: escala ? k + 1 : k }),
+    el('span', {}, escala ? `${k + 1} · ${pt}` : pt, en ? textoEn(en) : '')));
+  if (item.naoUsei) opcoes.push(el('label', { className: 'nao-usei' }, el('input', { type: 'radio', name: item.c, value: 0 }),
+    el('span', {}, 'Não vi / não usei esse recurso', textoEn("I didn't see / use this feature"))));
+  f.append(
+    el('legend', {}, el('span', { className: 'cod', textContent: item.c + (item.area ? ` · ${item.area}` : '') }), item.pt),
+    el('p', { className: 'en', textContent: item.en }),
+    item.texto ? el('textarea', { className: 'aberta', name: item.c, rows: 3 }) : el('div', { className: 'ops' }, ...opcoes),
+    el('details', { className: 'rev' }, el('summary', { textContent: 'Comentário do revisor' }),
+      el('textarea', { name: `${item.c}__comentario`, rows: 2, placeholder: 'Ficou claro? O que você entendeu?' })),
+  );
+  return f;
+}
+
+// Monta um questionário; trocar de aba descarta as respostas da simulação.
+function montar(id) {
+  const q = QUESTIONARIOS[id];
+  // Cópia rasa: o mesmo item (ex.: conhecimento) aparece nos dois questionários com nós DOM diferentes.
+  blocos = q.blocos.map((b) => ({ ...b, itens: b.itens.map((it) => ({ ...it })) }));
+  document.getElementById('abertura').textContent = q.abertura;
+  document.body.dataset.questionario = id;
+  document.querySelector('.so-pos').hidden = id !== 'pos';
+  document.getElementById('resultado').hidden = true;
+  form.replaceChildren();
+  for (const b of blocos) {
+    const s = el('section', { className: 'bloco' });
+    b.secao = s;
+    s.append(el('h2', {}, b.titulo[0]), el('p', { className: 'en', textContent: b.titulo[1] }));
+    if (b.aviso) s.append(el('p', { className: 'aviso' }, b.aviso[0], textoEn(b.aviso[1])));
+    if (b.intro) s.append(el('p', { className: 'intro' }, b.intro[0], textoEn(b.intro[1])));
+    if (b.fonte) s.append(el('p', { className: 'fonte', textContent: b.fonte }));
+    b.itens.forEach((item) => s.append(item.no = renderItem(item, b.escala)));
+    form.append(s);
+  }
+  form.append(el('button', { type: 'submit', textContent: 'Concluir simulação' }));
+  inicio = Date.now();
+  ordenar();
+  aplicarCondicoes();
+}
+
+function respostas() {
+  const tipo = Object.fromEntries(todosItens().map((it) => [it.c, it]));
+  const r = {};
+  for (const [k, v] of new FormData(form)) {
+    const it = tipo[k];
+    if (!it) continue;
+    if (it.texto) { if (v.trim()) r[k] = v.trim(); }
+    else if (it.multi) (r[k] ??= []).push(Number(v));
+    else r[k] = Number(v);
+  }
+  return r;
+}
+
+function aplicarCondicoes() {
+  const r = respostas();
+  for (const b of blocos) {
+    if (b.se) b.secao.hidden = !b.se(r);
+    for (const item of b.itens) if (item.se) item.no.hidden = !item.se(r);
+  }
+}
+
+// Ordem aleatória por bloco (Fisher-Yates); ATN sempre no meio. Desmarcar volta à ordem original.
+function ordenar() {
+  const aleatorio = document.getElementById('aleatorio').checked;
+  for (const b of blocos.filter((b) => b.aleatorio)) {
+    let nos = b.itens.filter((it) => it.c !== 'ATN').map((it) => it.no);
+    if (aleatorio) {
+      for (let i = nos.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [nos[i], nos[j]] = [nos[j], nos[i]];
+      }
+      const atn = b.itens.find((it) => it.c === 'ATN');
+      if (atn) nos.splice(Math.floor(nos.length / 2), 0, atn.no);
+    } else {
+      nos = b.itens.map((it) => it.no);
+    }
+    nos.forEach((n) => b.secao.append(n));
+  }
+}
+
+const media = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : NaN);
+const fmt = (x, casas = 2) => (Number.isNaN(x) ? '—' : x.toFixed(casas).replace('.', ','));
+
+function escores(r) {
+  const valor = (c, max) => (c.endsWith('_R') ? max + 1 - r[c] : r[c]);
+  const sub = (prefixo, max) => Object.keys(r).filter((c) => c.startsWith(prefixo) && r[c] > 0).map((c) => valor(c, max));
+  const linhas = [];
+  const ues = ['FA', 'PU', 'AE', 'RW'];
+  if (ues.some((s) => sub(s, 5).length)) {
+    for (const s of ues) linhas.push([`UES ${s} (média 1–5)`, fmt(media(sub(s, 5)))]);
+    linhas.push(['UES geral (média 1–5)', fmt(media(ues.flatMap((s) => sub(s, 5))))]);
+  }
+  const k = media(sub('K', 5));
+  if (!Number.isNaN(k)) linhas.push(['Conhecimento (média 1–5)', `${fmt(k)} (${fmt(((k - 1) / 4) * 100, 0)}%)`]);
+  const tipos = { HXP: 'Filantropo', HXS: 'Socializador', HXA: 'Conquistador', HXR: 'Jogador', HXF: 'Espírito livre' };
+  for (const [p, nome] of Object.entries(tipos)) {
+    const v = sub(p, 7);
+    if (v.length) linhas.push([`Hexad ${nome} (soma 2–14)`, String(v.reduce((a, b) => a + b, 0))]);
+  }
+  return linhas;
+}
+
+form.addEventListener('change', (e) => {
+  const item = todosItens().find((it) => it.c === e.target.name);
+  if (item?.multi && e.target.checked) {
+    const nenhuma = String(item.op.length - 1);
+    for (const cx of form.querySelectorAll(`input[name="${item.c}"]`))
+      if (cx !== e.target && (e.target.value === nenhuma || cx.value === nenhuma)) cx.checked = false;
+  }
+  aplicarCondicoes();
+});
+document.getElementById('aleatorio').addEventListener('change', ordenar);
+document.getElementById('sim-treinamento').addEventListener('change', aplicarCondicoes);
+document.getElementById('modo-revisao').addEventListener('change', (e) => document.body.classList.toggle('revisao', e.target.checked));
+for (const aba of document.querySelectorAll('input[name="questionario"]'))
+  aba.addEventListener('change', () => { location.hash = aba.value; montar(aba.value); });
+
+form.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const r = respostas();
+  const visiveis = [...form.querySelectorAll('fieldset.item')]
+    .filter((f) => !f.hidden && !f.closest('section').hidden && !f.querySelector('textarea.aberta'));
+  const faltando = visiveis.filter((f) => !(f.dataset.c in r));
+  visiveis.forEach((f) => f.classList.toggle('faltando', faltando.includes(f)));
+  const comentarios = {};
+  for (const [k, v] of new FormData(form)) if (k.endsWith('__comentario') && v.trim()) comentarios[k.split('__')[0]] = v.trim();
+  const dados = { questionario: document.body.dataset.questionario, duracao_s: Math.round((Date.now() - inicio) / 1000), respostas: r, comentarios };
+
+  const res = document.getElementById('resultado');
+  res.hidden = false;
+  res.replaceChildren(
+    el('h2', { textContent: 'Resultado da simulação' }),
+    el('p', { className: faltando.length ? 'falha' : 'ok',
+      textContent: faltando.length ? `Faltam ${faltando.length} itens (marcados em vermelho): ${faltando.map((f) => f.dataset.c).join(', ')}` : 'Todos os itens respondidos.' }),
+    el('p', { className: r.ATN === 1 ? 'ok' : 'falha',
+      textContent: r.ATN === 1 ? 'Verificação de atenção: passou.' : 'Verificação de atenção: não passou (a resposta seria descartada na análise).' }),
+    el('p', { textContent: `Tempo de resposta: ${Math.floor(dados.duracao_s / 60)} min ${dados.duracao_s % 60} s` }),
+    el('table', {}, ...escores(r).map(([a, b]) => el('tr', {}, el('td', { textContent: a }), el('td', { textContent: b })))),
+    el('p', { textContent: 'Respostas e comentários (copie e envie ao pesquisador):' }),
+    el('textarea', { readOnly: true, value: JSON.stringify(dados, null, 2) }),
+  );
+  res.scrollIntoView({ behavior: 'smooth' });
+});
+
+const inicial = location.hash === '#pos' ? 'pos' : 'pre';
+document.querySelector(`input[name="questionario"][value="${inicial}"]`).checked = true;
+montar(inicial);
+</script>
+</body>
+</html>
