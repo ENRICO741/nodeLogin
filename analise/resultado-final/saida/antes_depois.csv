@@ -1,0 +1,3 @@
+medida,n_pares,mediana_pre,mediana_pos,mediana_delta,W,p,r_rank_biserial,r_ic95_inf,r_ic95_sup,p_holm
+UES,4,3.5,3.791666666666667,0.25,3.0,0.625,0.4,,,0.625
+K,6,4.0,6.5,2.5,0.0,0.0625,1.0,1.0,1.0,0.125

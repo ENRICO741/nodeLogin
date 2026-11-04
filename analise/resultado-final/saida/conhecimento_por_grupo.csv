@@ -1,0 +1,24 @@
+variavel,grupo,n,mediana_acertos,pct_nivel_alto,pct_nao_sei
+C1 treinamento anterior,Sim,16,6.5,75.0,6.25
+C1 treinamento anterior,Não,13,5.0,84.61538461538461,6.593406593406593
+C1 treinamento anterior,Não lembro,2,4.5,50.0,0.0
+A1 idade,18-24,8,5.0,62.5,5.357142857142857
+A1 idade,25-34,14,6.0,85.71428571428571,5.1020408163265305
+A1 idade,35-44,4,6.5,100.0,0.0
+A1 idade,45-54,4,5.0,50.0,17.857142857142858
+A1 idade,55 ou mais,1,6.0,100.0,0.0
+A3 escolaridade,Até o ensino médio (completo ou não),4,6.5,100.0,0.0
+A3 escolaridade,Superior incompleto,12,6.0,75.0,3.5714285714285716
+A3 escolaridade,Superior completo,9,6.0,77.77777777777779,7.936507936507937
+A3 escolaridade,Pós-graduação,6,6.0,66.66666666666666,11.904761904761905
+A5 jogos digitais,Nunca,1,3.0,0.0,0.0
+A5 jogos digitais,Raramente (menos de 1 vez por mês),8,5.0,62.5,7.142857142857143
+A5 jogos digitais,Algumas vezes por mês,7,6.0,71.42857142857143,2.0408163265306123
+A5 jogos digitais,Algumas vezes por semana,8,6.5,100.0,1.7857142857142858
+A5 jogos digitais,Todos os dias,7,6.0,85.71428571428571,14.285714285714286
+tipo Hexad dominante,Filantropo,3,6.0,100.0,4.761904761904762
+tipo Hexad dominante,Socializador,2,6.5,100.0,7.142857142857143
+tipo Hexad dominante,Conquistador,2,5.5,100.0,7.142857142857143
+tipo Hexad dominante,Jogador,3,7.0,66.66666666666666,0.0
+tipo Hexad dominante,Espirito_livre,7,5.0,85.71428571428571,6.122448979591836
+tipo Hexad dominante,Empate,14,6.0,64.28571428571429,7.142857142857143

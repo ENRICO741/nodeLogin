@@ -1,0 +1,8 @@
+regra,momento,n,de
+envio repetido (vale o primeiro),pre e pos,0,
+errou o ATN,pre,1,32.0
+errou o ATN,pos,0,6.0
+"resposta uniforme na Hexad (só marcado, não excluído)",pre,2,
+"resposta uniforme na UES (só marcado, não excluído)",pre e pos,0,
+pré depois da 1ª atividade (fora do pareamento),pre,0,31.0
+sem UES pareada (C1 diferente de Sim),pre,2,6.0

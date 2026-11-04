@@ -1,0 +1,6 @@
+item,opcao,n,pct
+CMP,Muito pior,0,0.0
+CMP,Pior,0,0.0
+CMP,Igual,1,25.0
+CMP,Melhor,2,50.0
+CMP,Muito melhor,1,25.0

@@ -1,0 +1,14 @@
+etapa,n
+cadastros (consentiram),33
+responderam o pré,32
+  − errou o ATN no pré,1
+pré válido,31
+responderam o pós,6
+  − errou o ATN no pós,0
+pós válido,6
+  − pré depois da 1ª atividade no app,0
+  − sem pré válido,0
+pares pré × pós,6
+  − sem UES pareada (C1 ≠ Sim),2
+pares com UES,4
+envios repetidos descartados (vale o primeiro),0

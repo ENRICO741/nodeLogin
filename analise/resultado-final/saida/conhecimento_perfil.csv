@@ -1,0 +1,32 @@
+,acertos_pre,erros_pre,nao_sei_pre,nivel_pre,padrao_pre,acertos_pos,erros_pos,nao_sei_pos,nivel_pos,padrao_pos
+0eb09a3761963d9797d078aafd64b792,3,4,0,médio (3–4),erra com confiança,,,,,
+1258adefe5a0b80dd824dda14cc9140c,4,3,0,médio (3–4),erra com confiança,,,,,
+1d2661a6c019f2d6d1cb60d512ddb70f,6,0,1,alto (5–7),admite não saber,,,,,
+2c0550ffbeccab1d78e4520f986a8aea,4,3,0,médio (3–4),erra com confiança,7.0,0.0,0.0,alto (5–7),sem erros
+3a4a8a607198b31936a63d2bc9bc8733,7,0,0,alto (5–7),sem erros,,,,,
+3c53d89d8398b0fe8ec2ed00b764db47,7,0,0,alto (5–7),sem erros,7.0,0.0,0.0,alto (5–7),sem erros
+3f3f193c7b8548bb6d68afff27451f15,7,0,0,alto (5–7),sem erros,,,,,
+4ab082e0b20f8c1abcf8090bf0a8afb7,7,0,0,alto (5–7),sem erros,,,,,
+4b61a274736fe2dfcb2478e57eac4bf7,5,1,1,alto (5–7),misto,,,,,
+569a74fcd2afb6b488de66c4fd9f91be,6,1,0,alto (5–7),erra com confiança,,,,,
+632db12a8e80be096f4ae37f3b239e48,2,0,5,baixo (0–2),admite não saber,6.0,0.0,1.0,alto (5–7),admite não saber
+7717ebbc893f606ff64fb4316188d1e1,6,1,0,alto (5–7),erra com confiança,,,,,
+7b67bbf1f1c108684e95c806fddfecd6,5,2,0,alto (5–7),erra com confiança,,,,,
+7bd83f41f9e4d65b4876f9a997a64bcb,6,1,0,alto (5–7),erra com confiança,,,,,
+7f589e3132930d9e5bd1aec2ba3fd5e8,7,0,0,alto (5–7),sem erros,,,,,
+80d29ff98a4bbfd58b866042fb46fdc2,6,1,0,alto (5–7),erra com confiança,,,,,
+830c587ce3b50f79cf169603fb812c7d,7,0,0,alto (5–7),sem erros,,,,,
+85641549cc2ba753557e0e209655eff4,6,1,0,alto (5–7),erra com confiança,,,,,
+8c46fbd1987dbd46d555ad529d732edf,5,1,1,alto (5–7),misto,,,,,
+9054fa7c4462fdec42b9eeb8d723bae0,7,0,0,alto (5–7),sem erros,,,,,
+acfc2f80c38fb7f1617180f61b3ef4fc,5,0,2,alto (5–7),admite não saber,,,,,
+afefb472b21aecfe0a81da16214643ae,4,2,1,médio (3–4),erra com confiança,,,,,
+b4ad4462cd608d06738832e4cd5e36b5,7,0,0,alto (5–7),sem erros,,,,,
+bbd561ea9875b25f878f7730bdcd2760,3,4,0,médio (3–4),erra com confiança,6.0,1.0,0.0,alto (5–7),erra com confiança
+c5386dbb2c3a2e51ab2dd8eab486284d,5,1,1,alto (5–7),misto,7.0,0.0,0.0,alto (5–7),sem erros
+c9848ab9dfa5e87152361c1703bc6033,7,0,0,alto (5–7),sem erros,,,,,
+e1bc2759c3eabc51e779d27ec42601b4,7,0,0,alto (5–7),sem erros,,,,,
+e479eed96a6bde0781328f2c6ff78e0c,7,0,0,alto (5–7),sem erros,,,,,
+e6d6f08615777c575d2093583f83a94f,6,0,1,alto (5–7),admite não saber,,,,,
+f2ae186ead63c7ae2ebdead43ab1f345,7,0,0,alto (5–7),sem erros,,,,,
+fc733d17bb868c16f0934be4d2da973d,4,3,0,médio (3–4),erra com confiança,6.0,1.0,0.0,alto (5–7),erra com confiança
